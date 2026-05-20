@@ -4,16 +4,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ShieldAlert, Activity, HeartHandshake, Building2, Timer } from 'lucide-react';
 import Link from 'next/link';
+import Navbar from '@/components/navigation/Navbar';
+import Footer from '@/components/navigation/Footer';
 
 export default function LandingPage() {
-  // Navigation items
-  const navLinks = [
-    { name: 'Network', href: '#network' },
-    { name: 'Impact', href: '#impact' },
-    { name: 'Features', href: '#features' },
-    { name: 'AI Assist', href: '#ai-assist' },
-    { name: 'App', href: '#app' }
-  ];
 
   // Animation variants
   const fadeInUp = {
@@ -31,62 +25,29 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-brand-bgLight overflow-x-hidden flex flex-col font-dmsans">
+    <div className="relative min-h-screen w-full bg-brand-bgLight flex flex-col font-dmsans">
       
       {/* Top Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-[76px] flex items-center justify-center bg-[#F8F9FF]/70 border-b border-brand-borderLight/30 shadow-[0_8px_30px_rgba(85,107,47,0.08)] backdrop-blur-xl transition-all duration-300">
-        <div className="w-full max-w-[1280px] px-6 lg:px-12 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="font-syne font-semibold text-2xl tracking-[-1.2px] text-brand-green transition-transform duration-300 group-hover:scale-105">
-              LifeLink AI
-            </span>
-          </Link>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.name} 
-                href={link.href} 
-                className="text-base font-medium text-brand-navText hover:text-brand-green transition-colors duration-200 relative group py-2"
-              >
-                {link.name}
-                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-brand-green transition-all duration-300 group-hover:w-full" />
-              </Link>
-            ))}
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/register" 
-              className="hidden sm:flex items-center justify-center px-4 py-2 h-11 font-syne font-medium text-[16px] text-brand-navText bg-brand-btnBlue hover:bg-brand-btnBlue/80 transition-all duration-200 rounded-lg hover:shadow-sm"
-            >
-              Join Network
-            </Link>
-            <Link 
-              href="/sos" 
-              className="flex items-center justify-center px-5 py-2 h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive hover:brightness-110 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_20px_-3px_rgba(62,82,25,0.2)] transition-all duration-200 rounded-lg transform hover:-translate-y-[1px] active:translate-y-0"
-            >
-              Emergency SOS
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Main Content */}
-      <main className="flex-grow pt-[76px] flex flex-col items-center">
+      <main className="flex-grow w-full flex flex-col items-center">
         
         {/* Hero Section */}
-        <section className="relative w-full min-h-[921px] flex items-center justify-center bg-gradient-to-br from-[#F4F7F0] to-[#DDE5D3] px-6 lg:px-12 py-16 overflow-hidden">
+        <section className="relative w-full min-h-[720px] flex items-start justify-center bg-gradient-to-br from-[#F4F7F0] to-[#DDE5D3] px-6 lg:px-12 pt-28 pb-20 md:pt-[180px] md:pb-24 overflow-hidden">
           
-          {/* Hero Background Pattern */}
-          <div 
-            className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-20 mix-blend-overlay"
-            style={{ backgroundImage: `url('/images/hero_mesh.png')` }}
-          />
-          <div className="absolute inset-0 bg-radial-gradient from-transparent to-[#DDE5D3]/50 pointer-events-none" />
+          {/* Hero Background Video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-85"
+            poster="/images/hero_bg.png"
+          >
+            <source src="/video/hero_bg_video.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-radial-gradient from-transparent via-[#F4F7F0]/20 to-[#DDE5D3]/50 pointer-events-none" />
 
           {/* Container */}
           <div className="w-full max-w-[1280px] grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
@@ -178,6 +139,7 @@ export default function LandingPage() {
           </div>
         </section>
 
+
         {/* Section - Impact Stats */}
         <section id="impact" className="w-full bg-brand-statsBg px-6 lg:px-12 py-16 flex items-center justify-center">
           <div className="w-full max-w-[1280px]">
@@ -238,40 +200,7 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-white border-t border-brand-borderLight/80 py-12 px-6 flex flex-col items-center justify-center">
-        <div className="w-full max-w-[1280px] flex flex-col items-center justify-center gap-6">
-          {/* Footer Logo */}
-          <span className="font-syne font-medium text-[20px] leading-[1.4] text-brand-green tracking-wide">
-            LifeLink AI
-          </span>
-
-          {/* Footer Links */}
-          <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 max-w-[600px]">
-            <Link href="/privacy" className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark hover:text-brand-green transition-colors duration-200">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark hover:text-brand-green transition-colors duration-200">
-              Terms of Service
-            </Link>
-            <Link href="/hipaa" className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark hover:text-brand-green transition-colors duration-200">
-              HIPAA Compliance
-            </Link>
-            <Link href="/status" className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark hover:text-brand-green transition-colors duration-200">
-              Network Status
-            </Link>
-            <Link href="/support" className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark hover:text-brand-green transition-colors duration-200">
-              Contact Support
-            </Link>
-          </div>
-
-          {/* Copyright Margin */}
-          <div className="mt-4 pt-4 border-t border-brand-borderLight/20 w-full flex items-center justify-center">
-            <span className="font-dmsans text-[14px] leading-[1.5] text-brand-textDark opacity-80">
-              © 2024 LifeLink AI. Emergency Care, Redefined.
-            </span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   );
