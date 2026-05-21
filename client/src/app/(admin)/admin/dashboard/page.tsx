@@ -10,7 +10,6 @@ export default function DashboardPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-md">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-primary">Dashboard Overview</h1>
           <p className="text-on-surface-variant font-body-md mt-1">
             Welcome back, Sarah. Here is what's happening today in the network.
           </p>

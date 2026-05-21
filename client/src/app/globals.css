@@ -32,7 +32,7 @@ body {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3E5219;
+  background: #123e20;
 }
 
 /* Mockup global card & animation helper classes */
@@ -65,4 +65,12 @@ body {
   scrollbar-width: none;  /* Firefox */
 }
 
-
+/* Global Premium Dark Green Theme Variables */
+:root {
+  --color-primary: #123e20;
+  --color-primary-container: #1b4d2c;
+  --color-on-primary-container: #a3d9b4;
+  --color-secondary: #2d6a4f;
+  --color-secondary-container: #d8f3dc;
+  --color-on-secondary-container: #1b4332;
+}

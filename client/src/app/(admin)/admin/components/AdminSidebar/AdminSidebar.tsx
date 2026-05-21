@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, useAnimation } from 'framer-motion';
 
 interface SidebarItem {
   name: string;
@@ -11,8 +12,70 @@ interface SidebarItem {
   fillIcon?: boolean;
 }
 
-export default function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const controls = useAnimation();
+
+  useEffect(() => {
+    // Initial entrance animation
+    controls.start("animate");
+
+    // Loop wave animation every 3 seconds
+    const interval = setInterval(() => {
+      controls.start("loopWave");
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [controls]);
+
+  const logoVariants = {
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    loopWave: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    hover: {
+      transition: {
+        staggerChildren: 0.03
+      }
+    }
+  };
+
+  const letterVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: [0.16, 1, 0.3, 1]
+      }
+    },
+    loopWave: {
+      y: [0, -8, 0],
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    },
+    hover: {
+      y: [0, -8, 0],
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    }
+  };
 
   const scrollNavigation: SidebarItem[] = [
     { name: 'Dashboard', icon: 'dashboard', href: '/admin/dashboard' },
@@ -50,7 +113,28 @@ export default function AdminSidebar() {
         rel="stylesheet"
       />
 
-      <nav className="fixed left-0 top-0 h-screen w-[280px] hidden lg:flex flex-col bg-primary border-r border-outline-variant/30 shadow-md py-10 z-50">
+      {/* Backdrop overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300"
+          onClick={onClose}
+        />
+      )}
+
+      <nav
+        className={`fixed left-0 top-0 h-screen w-[280px] flex flex-col bg-primary border-r border-outline-variant/30 shadow-md py-10 z-50 transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
+        {/* Mobile Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 lg:hidden p-2 text-white/70 hover:text-white transition-colors rounded-full hover:bg-white/10"
+          aria-label="Close Sidebar"
+        >
+          <span className="material-symbols-outlined text-[24px]">close</span>
+        </button>
+
         {/* Notion-style Workspace Header */}
         <div className="px-5 mb-8">
           <div className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors duration-150 group">
@@ -60,9 +144,23 @@ export default function AdminSidebar() {
             </div>
             {/* Titles */}
             <div className="flex-1 min-w-0">
-              <h2 className="font-syne text-[18px] font-bold text-white tracking-tight leading-tight truncate">
-                LifeLink
-              </h2>
+              <motion.h2 
+                initial="initial"
+                animate={controls}
+                whileHover="hover"
+                variants={logoVariants}
+                className="font-syne text-[18px] font-bold text-white tracking-tight leading-tight flex"
+              >
+                {"LifeLink".split("").map((char, index) => (
+                  <motion.span
+                    key={index}
+                    variants={letterVariants}
+                    className="inline-block"
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </motion.h2>
               <p className="font-dmsans text-[12px] text-on-primary-container opacity-80 leading-tight truncate mt-0.5">
                 Coordination
               </p>
@@ -82,6 +180,7 @@ export default function AdminSidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onClose}
                 className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 ${
                   active
                     ? 'bg-white text-primary scale-[0.98] shadow-sm font-bold'
@@ -116,6 +215,7 @@ export default function AdminSidebar() {
             return (
               <Link
                 href={emergencyHubItem.href}
+                onClick={onClose}
                 className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 bg-red-600 text-white font-bold shadow-md hover:bg-red-700 group ${
                   active
                     ? 'ring-2 ring-white/40 scale-[0.98]'
@@ -145,6 +245,7 @@ export default function AdminSidebar() {
             return (
               <Link
                 href={settingsItem.href}
+                onClick={onClose}
                 className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 ${
                   active
                     ? 'bg-white text-primary scale-[0.98] shadow-sm font-bold'

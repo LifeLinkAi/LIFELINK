@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import AdminSidebar from './components/AdminSidebar/AdminSidebar';
 import AdminHeader from './components/AdminHeader/AdminHeader';
 
@@ -9,15 +9,17 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-[#F4F7F0] text-on-surface font-dmsans antialiased flex">
+    <div className="min-h-screen bg-[#EFF2EE] text-on-surface font-dmsans antialiased flex admin-theme">
       {/* Sidebar - fixed on the left (hidden on mobile, shown on lg screens) */}
-      <AdminSidebar />
+      <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content Wrapper */}
       <div className="flex-grow lg:pl-[280px] flex flex-col min-h-screen">
         {/* Top Header - sticky inside the main content wrapper */}
-        <AdminHeader />
+        <AdminHeader onMenuClick={() => setIsSidebarOpen(true)} />
 
         {/* Page Content */}
         <main className="flex-1 p-6 md:p-10">

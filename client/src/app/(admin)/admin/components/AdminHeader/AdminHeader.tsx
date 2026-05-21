@@ -1,65 +1,27 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, useAnimation } from 'framer-motion';
+import React from 'react';
+import { usePathname } from 'next/navigation';
 
-export default function AdminHeader() {
-  const controls = useAnimation();
+interface AdminHeaderProps {
+  onMenuClick?: () => void;
+}
 
-  useEffect(() => {
-    // Initial entrance animation
-    controls.start("animate");
+export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
+  const pathname = usePathname();
 
-    // Loop wave animation every 3 seconds
-    const interval = setInterval(() => {
-      controls.start("loopWave");
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [controls]);
-
-  const logoVariants = {
-    animate: {
-      transition: {
-        staggerChildren: 0.05
-      }
-    },
-    loopWave: {
-      transition: {
-        staggerChildren: 0.05
-      }
-    },
-    hover: {
-      transition: {
-        staggerChildren: 0.03
-      }
-    }
-  };
-
-  const letterVariants = {
-    initial: { opacity: 0, y: 10 },
-    animate: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: [0.16, 1, 0.3, 1]
-      }
-    },
-    loopWave: {
-      y: [0, -8, 0],
-      transition: {
-        duration: 0.4,
-        ease: "easeInOut"
-      }
-    },
-    hover: {
-      y: [0, -8, 0],
-      transition: {
-        duration: 0.4,
-        ease: "easeInOut"
-      }
-    }
+  const getPageTitle = (path: string) => {
+    if (path.startsWith('/admin/dashboard')) return 'Dashboard Overview';
+    if (path.startsWith('/admin/donors')) return 'Donor Management';
+    if (path.startsWith('/admin/hospitals')) return 'Hospital Management';
+    if (path.startsWith('/admin/drivers')) return 'Ambulance Management';
+    if (path.startsWith('/admin/emergencies')) return 'Emergency Hub';
+    if (path.startsWith('/admin/blood-requests')) return 'Blood Management';
+    if (path.startsWith('/admin/organ-requests')) return 'Organ Management';
+    if (path.startsWith('/admin/analytics')) return 'Analytics';
+    if (path.startsWith('/admin/campaigns')) return 'Campaigns';
+    if (path.startsWith('/admin/settings')) return 'Settings';
+    return 'Admin Control';
   };
 
   return (
@@ -70,25 +32,21 @@ export default function AdminHeader() {
         rel="stylesheet"
       />
 
-      <header className="flex justify-between items-center w-full px-2 md:px-6 h-16 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-sm sticky top-0">
-        <div className="flex items-center gap-2">
-          <motion.span 
-            initial="initial"
-            animate={controls}
-            whileHover="hover"
-            variants={logoVariants}
-            className="font-syne font-bold text-[24px] tracking-[-1.2px] text-primary flex"
+      <header className="flex justify-between items-center w-full px-4 md:px-8 h-16 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-sm sticky top-0">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu Button - Mobile Only */}
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden p-2 -ml-2 text-primary hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center"
+            aria-label="Toggle Navigation Menu"
           >
-            {"LifeLink".split("").map((char, index) => (
-              <motion.span
-                key={index}
-                variants={letterVariants}
-                className="inline-block"
-              >
-                {char}
-              </motion.span>
-            ))}
-          </motion.span>
+            <span className="material-symbols-outlined text-[24px]">menu</span>
+          </button>
+
+          {/* Dynamic Bold Page Title */}
+          <h1 className="font-syne font-bold text-[16px] sm:text-lg md:text-[22px] text-primary tracking-tight">
+            {getPageTitle(pathname).toUpperCase()}
+          </h1>
         </div>
 
         <div className="flex items-center gap-4">
