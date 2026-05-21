@@ -1,14 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const controls = useAnimation();
+
+  useEffect(() => {
+    // Initial entrance animation
+    controls.start("animate");
+
+    // Loop wave animation every 3 seconds
+    const interval = setInterval(() => {
+      controls.start("loopWave");
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [controls]);
 
   const navLinks = [
     { name: 'Services', href: '/services' },
@@ -21,6 +34,11 @@ export default function Navbar() {
 
   const logoVariants = {
     animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    loopWave: {
       transition: {
         staggerChildren: 0.05
       }
@@ -42,10 +60,17 @@ export default function Navbar() {
         ease: [0.16, 1, 0.3, 1]
       }
     },
-    hover: {
-      y: [0, -5, 0],
+    loopWave: {
+      y: [0, -8, 0],
       transition: {
-        duration: 0.35,
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    },
+    hover: {
+      y: [0, -8, 0],
+      transition: {
+        duration: 0.4,
         ease: "easeInOut"
       }
     }
@@ -58,7 +83,7 @@ export default function Navbar() {
         <Link href="/" className="flex items-center gap-2 z-50" onClick={() => setIsMenuOpen(false)}>
           <motion.span 
             initial="initial"
-            animate="animate"
+            animate={controls}
             whileHover="hover"
             variants={logoVariants}
             className="font-syne font-bold text-2xl tracking-[-1.2px] text-brand-green flex"
