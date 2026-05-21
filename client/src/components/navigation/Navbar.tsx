@@ -19,14 +19,60 @@ export default function Navbar() {
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
+  const logoVariants = {
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    hover: {
+      transition: {
+        staggerChildren: 0.03
+      }
+    }
+  };
+
+  const letterVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: [0.16, 1, 0.3, 1]
+      }
+    },
+    hover: {
+      y: [0, -5, 0],
+      transition: {
+        duration: 0.35,
+        ease: "easeInOut"
+      }
+    }
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[76px] flex items-center justify-center bg-[#F8F9FF]/80 border-b border-brand-borderLight/30 shadow-[0_8px_30px_rgba(85,107,47,0.05)] backdrop-blur-xl transition-all duration-300">
       <div className="w-full max-w-[1280px] px-6 lg:px-12 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group z-50" onClick={() => setIsMenuOpen(false)}>
-          <span className="font-syne font-semibold text-2xl tracking-[-1.2px] text-brand-green transition-transform duration-300 group-hover:scale-105">
-            LifeLink AI
-          </span>
+        <Link href="/" className="flex items-center gap-2 z-50" onClick={() => setIsMenuOpen(false)}>
+          <motion.span 
+            initial="initial"
+            animate="animate"
+            whileHover="hover"
+            variants={logoVariants}
+            className="font-syne font-bold text-2xl tracking-[-1.2px] text-brand-green flex"
+          >
+            {"LifeLink".split("").map((char, index) => (
+              <motion.span
+                key={index}
+                variants={letterVariants}
+                className="inline-block"
+              >
+                {char}
+              </motion.span>
+            ))}
+          </motion.span>
         </Link>
 
         {/* Desktop Navigation Links */}
