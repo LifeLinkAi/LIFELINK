@@ -11,6 +11,36 @@ const config: Config = {
       fontFamily: {
         syne: ['Syne', 'sans-serif'],
         dmsans: ['"DM Sans"', 'sans-serif'],
+        "label-caps": ["'DM Sans'", "sans-serif"],
+        "display-lg": ["Syne", "sans-serif"],
+        "body-md": ["'DM Sans'", "sans-serif"],
+        "headline-sm": ["Syne", "sans-serif"],
+        "headline-md": ["Syne", "sans-serif"],
+        "headline-lg": ["Syne", "sans-serif"],
+        "body-lg": ["'DM Sans'", "sans-serif"],
+        "body-sm": ["'DM Sans'", "sans-serif"],
+      },
+      fontSize: {
+        "label-caps": ["12px", { lineHeight: "1", letterSpacing: "0.05em", fontWeight: "700" }],
+        "display-lg": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+        "headline-sm": ["20px", { lineHeight: "1.4", fontWeight: "500" }],
+        "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+        "headline-lg": ["32px", { lineHeight: "1.2", fontWeight: "600" }],
+        "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+        "body-sm": ["14px", { lineHeight: "1.5", fontWeight: "400" }]
+      },
+      spacing: {
+        "lg": "24px",
+        "margin-desktop": "48px",
+        "sm": "8px",
+        "md": "16px",
+        "xxl": "64px",
+        "gutter": "24px",
+        "xl": "40px",
+        "unit": "4px",
+        "xs": "4px",
+        "margin-mobile": "16px"
       },
       colors: {
         brand: {
