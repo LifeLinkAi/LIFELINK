@@ -1,8 +1,67 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { motion, useAnimation } from 'framer-motion';
 
 export default function AdminHeader() {
+  const controls = useAnimation();
+
+  useEffect(() => {
+    // Initial entrance animation
+    controls.start("animate");
+
+    // Loop wave animation every 3 seconds
+    const interval = setInterval(() => {
+      controls.start("loopWave");
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [controls]);
+
+  const logoVariants = {
+    animate: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    loopWave: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    },
+    hover: {
+      transition: {
+        staggerChildren: 0.03
+      }
+    }
+  };
+
+  const letterVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: [0.16, 1, 0.3, 1]
+      }
+    },
+    loopWave: {
+      y: [0, -8, 0],
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    },
+    hover: {
+      y: [0, -8, 0],
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut"
+      }
+    }
+  };
+
   return (
     <>
       {/* Load Material Symbols for icons */}
@@ -13,12 +72,23 @@ export default function AdminHeader() {
 
       <header className="flex justify-between items-center w-full px-2 md:px-6 h-16 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-sm sticky top-0">
         <div className="flex items-center gap-2">
-          {/* <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-            emergency
-          </span>
-          <span className="font-syne text-[24px] font-bold tracking-tight text-primary leading-[1.3]">
-            LifeLink 
-          </span> */}
+          <motion.span 
+            initial="initial"
+            animate={controls}
+            whileHover="hover"
+            variants={logoVariants}
+            className="font-syne font-bold text-[24px] tracking-[-1.2px] text-primary flex"
+          >
+            {"LifeLink".split("").map((char, index) => (
+              <motion.span
+                key={index}
+                variants={letterVariants}
+                className="inline-block"
+              >
+                {char}
+              </motion.span>
+            ))}
+          </motion.span>
         </div>
 
         <div className="flex items-center gap-4">

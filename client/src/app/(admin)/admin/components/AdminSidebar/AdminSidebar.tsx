@@ -14,18 +14,28 @@ interface SidebarItem {
 export default function AdminSidebar() {
   const pathname = usePathname();
 
-  const primaryNavigation: SidebarItem[] = [
-    { name: 'Dashboards', icon: 'dashboard', href: '/admin/dashboard' },
-    { name: 'Emergency Hubs', icon: 'emergency_home', href: '/admin/emergencies' },
-    { name: 'Analytics', icon: 'insights', href: '/admin/analytics' },
-    { name: 'Medical Intelligence', icon: 'psychology', href: '/admin/medical-intelligence' },
-    { name: 'Verifications', icon: 'admin_panel_settings', href: '/admin/verifications', fillIcon: true },
+  const scrollNavigation: SidebarItem[] = [
+    { name: 'Dashboard', icon: 'dashboard', href: '/admin/dashboard' },
+    { name: 'Donor Management', icon: 'volunteer_activism', href: '/admin/donors' },
+    { name: 'Hospital Management', icon: 'local_hospital', href: '/admin/hospitals' },
     { name: 'Ambulance Management', icon: 'ambulance', href: '/admin/drivers' },
-    { name: 'Coordination', icon: 'apartment', href: '/admin/hospitals' },
+    { name: 'Blood Management', icon: 'bloodtype', href: '/admin/blood-requests' },
+    { name: 'Organ Management', icon: 'nephrology', href: '/admin/organ-requests' },
+    { name: 'Analytics', icon: 'insights', href: '/admin/analytics' },
     { name: 'Campaigns', icon: 'campaign', href: '/admin/campaigns' },
-    { name: 'Operational Reports', icon: 'assessment', href: '/admin/reports' },
-    { name: 'Settings', icon: 'settings', href: '/admin/settings' },
   ];
+
+  const emergencyHubItem: SidebarItem = {
+    name: 'Emergency Hub',
+    icon: 'emergency',
+    href: '/admin/emergencies',
+  };
+
+  const settingsItem: SidebarItem = {
+    name: 'Settings',
+    icon: 'settings',
+    href: '/admin/settings',
+  };
 
   // Helper to check if a route is active
   const isActive = (href: string) => {
@@ -65,8 +75,8 @@ export default function AdminSidebar() {
         </div>
 
         {/* Main Navigation Links */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-2 space-y-1">
-          {primaryNavigation.map((item) => {
+        <div className="flex-grow overflow-y-auto no-scrollbar px-2 space-y-1">
+          {scrollNavigation.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
@@ -98,6 +108,68 @@ export default function AdminSidebar() {
           })}
         </div>
 
+        {/* Sticky Bottom Section */}
+        <div className="mt-auto pt-4 border-t border-white/10 px-2 space-y-1 shrink-0">
+          {/* Emergency Hub (Red, Sticky) */}
+          {(() => {
+            const active = isActive(emergencyHubItem.href);
+            return (
+              <Link
+                href={emergencyHubItem.href}
+                className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 bg-red-600 text-white font-bold shadow-md hover:bg-red-700 group ${
+                  active
+                    ? 'ring-2 ring-white/40 scale-[0.98]'
+                    : 'opacity-90 hover:opacity-100'
+                }`}
+              >
+                <span
+                  className="material-symbols-outlined transition-transform duration-200 group-hover:scale-110 text-white"
+                  style={
+                    active
+                      ? { fontVariationSettings: "'FILL' 1" }
+                      : undefined
+                  }
+                >
+                  {emergencyHubItem.icon}
+                </span>
+                <span className="font-dmsans text-[12px] tracking-[0.05em] uppercase font-bold text-white">
+                  {emergencyHubItem.name}
+                </span>
+              </Link>
+            );
+          })()}
+
+          {/* Settings */}
+          {(() => {
+            const active = isActive(settingsItem.href);
+            return (
+              <Link
+                href={settingsItem.href}
+                className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-all duration-200 ${
+                  active
+                    ? 'bg-white text-primary scale-[0.98] shadow-sm font-bold'
+                    : 'text-on-primary-container hover:bg-white/10 group'
+                }`}
+              >
+                <span
+                  className={`material-symbols-outlined transition-transform duration-200 ${
+                    !active ? 'group-hover:translate-x-1' : ''
+                  }`}
+                  style={
+                    active
+                      ? { fontVariationSettings: "'FILL' 1" }
+                      : undefined
+                  }
+                >
+                  {settingsItem.icon}
+                </span>
+                <span className={`font-dmsans text-[12px] tracking-[0.05em] uppercase ${active ? 'font-bold' : 'font-normal'}`}>
+                  {settingsItem.name}
+                </span>
+              </Link>
+            );
+          })()}
+        </div>
 
       </nav>
     </>
