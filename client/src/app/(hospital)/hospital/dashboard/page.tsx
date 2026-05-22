@@ -198,7 +198,7 @@ export default function HospitalDashboard() {
             <Droplets size={16} />
             <span className="text-[14px] font-semibold text-[#1a2e0a]">Blood Bank Levels</span>
           </div>
-          <a href="/blood-stock" className="text-[12px] font-medium text-[#3d6b1e] hover:underline">
+          <a href="/hospital/blood-stock" className="text-[12px] font-medium text-[#3d6b1e] hover:underline">
             Manage stock →
           </a>
         </div>
@@ -299,7 +299,7 @@ export default function HospitalDashboard() {
               </div>
             ))}
             <div className="flex items-center justify-center text-[13px] font-medium text-[#3d6b1e] hover:underline py-3">
-              <a href="/ambulance-coordination">View All →</a>
+              <a href="/hospital/ambulance-coordination">View All →</a>
             </div>
           </div>
         </div>
