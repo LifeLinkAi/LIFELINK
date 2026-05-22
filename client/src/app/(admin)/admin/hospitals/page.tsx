@@ -1,18 +1,879 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+
+// Define Interface for Hospital
+interface Hospital {
+  id: string;
+  licenseId: string;
+  name: string;
+  city: string;
+  location: string;
+  logo: string;
+  specialties: string[];
+  status: 'Verified' | 'Pending' | 'Active' | 'Suspended';
+  patientCount: number;
+  rating: number | string;
+  bloodHealthLevels: number[]; // represents level heights for the bar chart
+  bloodHealthStatus: 'Critical' | 'Stable' | 'Optimal';
+  bloodStock: {
+    [key: string]: number;
+  };
+  documents: {
+    name: string;
+    image: string;
+  }[];
+  recentActivity: {
+    title: string;
+    description: string;
+    time: string;
+    type: 'admission' | 'blood' | 'dispatch' | 'other';
+  }[];
+}
 
 export default function HospitalManagementPage() {
+  // Page states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [cityFilter, setCityFilter] = useState('All');
+  const [specialtyFilter, setSpecialtyFilter] = useState('All');
+  const [bloodHealthFilter, setBloodHealthFilter] = useState('All');
+
+  // Checkbox Selection
+  const [selectedHospitals, setSelectedHospitals] = useState<string[]>([]);
+  
+  // Side drawer panel state
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
+
+  // Modals & Toasts
+  const [isAddHospitalOpen, setIsAddHospitalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Mock hospital data list
+  const initialHospitals: Hospital[] = [
+    {
+      id: 'H-99201',
+      licenseId: 'LIC-99201-B',
+      name: 'Central Medicare Center',
+      city: 'San Francisco',
+      location: 'San Francisco, CA',
+      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCndKwZAiRIDmkFZ4FWM6JczqMsVNmmTEqsvQplK2qg6W7WhHJXzeBhb_0ldWIM0FZUh_skk8SX2JAJsfwFVtAqY4GzUMjsmtJkwL91RGlys15J5qjT1g236YyNWTz8l3igdzqAJYVxnuo1eb-3OZax4sx9HfbZknVtabk2X8lfYMiWo-d1T_U_pkuJy-h5N6saaq7D-1kyLSfnKOUI7xJtJrJuVux-orPLHFquh0CptbaQyskT9gmizL8wmwTH-BFOOtPH1OcTGXWw',
+      specialties: ['ER', 'Trauma'],
+      status: 'Verified',
+      patientCount: 284,
+      rating: 4.8,
+      bloodHealthLevels: [90, 60, 80, 40],
+      bloodHealthStatus: 'Optimal',
+      bloodStock: {
+        'A+': 420, 'A-': 128, 'B+': 12, 'B-': 88,
+        'O+': 512, 'O-': 8, 'AB+': 194, 'AB-': 44
+      },
+      documents: [
+        { 
+          name: 'State License 2024', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
+        },
+        { 
+          name: 'ISO Safety Cert', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
+        }
+      ],
+      recentActivity: [
+        { title: 'Emergency Admission', description: 'Trauma Unit', time: '12 mins ago', type: 'admission' },
+        { title: 'Blood Unit Requested', description: 'B+ Unit', time: '45 mins ago', type: 'blood' },
+        { title: 'Driver Dispatched', description: 'Route: Hub B to Medicare', time: '1h ago', type: 'dispatch' }
+      ]
+    },
+    {
+      id: 'H-77412',
+      licenseId: 'LIC-77412-A',
+      name: 'Eastside Clinic',
+      city: 'Oakland',
+      location: 'Oakland, CA',
+      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBv35N9rbEue8kENJIxoCOenjXxjHj7_Wp6OWdzEtJEVCX-5NUWT9KfcGFnMApyYHStm37tWcsgL5qzvBYQfI3Cozv6UhbUmeCa54tCDeYyWmsSrM9iqTT8PvVVUhBkBweL7kF80PBT43JPjFNxW3CmsuhyBDm7T37wP4x-g-hxtd-Mi3qYsqegQHuSNZqvyRoI4_OdK1l0tDeqqbLbWtiISfT0ollryDcaxrEfAKb98jn67g1rvVDAZ9REKINpNEJmk-pFBXv5-Exf',
+      specialties: ['General'],
+      status: 'Pending',
+      patientCount: 42,
+      rating: '--',
+      bloodHealthLevels: [20, 30, 15, 10],
+      bloodHealthStatus: 'Critical',
+      bloodStock: {
+        'A+': 15, 'A-': 5, 'B+': 2, 'B-': 10,
+        'O+': 20, 'O-': 1, 'AB+': 8, 'AB-': 2
+      },
+      documents: [
+        { 
+          name: 'State License 2024', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
+        }
+      ],
+      recentActivity: [
+        { title: 'Pending Verification Check', description: 'Admin verification audit', time: '1h ago', type: 'other' },
+        { title: 'Registry Document Uploaded', description: 'License file upload', time: '3h ago', type: 'other' }
+      ]
+    },
+    {
+      id: 'H-88421',
+      licenseId: 'LIC-88421-C',
+      name: 'St. Jude Medical Center',
+      city: 'San Jose',
+      location: 'San Jose, CA',
+      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNkJyO7fkWxsEnVwHIKVraVtZaQWbo-HSgdpoSrt8ylSRRWfWLcgZL5hbuQ4RUQAmVVbkm55pMcA0SpcHxJ1t-eRMd3kI3S3FNZt9rrnoRtiE-FuzR5nSZ3AEV8uvhJ2hZF-Pmwuvv24MxfzXsDkHWbNovy_85UNUpiHFH2mkLqGL3c7I5Y4XL93qM_4qkzyaUIeckZ1K91nYGwdCvRubDfrjRoIc6wgLL97RVJkkIkjBaeQk3dMh3mPDIQqQWDJaTBIZU96sCSeDp',
+      specialties: ['ER', 'Cardiology', 'Pediatrics'],
+      status: 'Verified',
+      patientCount: 512,
+      rating: 4.9,
+      bloodHealthLevels: [70, 85, 55, 90],
+      bloodHealthStatus: 'Optimal',
+      bloodStock: {
+        'A+': 310, 'A-': 94, 'B+': 84, 'B-': 48,
+        'O+': 402, 'O-': 25, 'AB+': 112, 'AB-': 30
+      },
+      documents: [
+        { 
+          name: 'State License 2024', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
+        },
+        { 
+          name: 'ISO Safety Cert', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
+        }
+      ],
+      recentActivity: [
+        { title: 'Admission', description: 'Cardiology Unit', time: '30 mins ago', type: 'admission' },
+        { title: 'Stock Report Updated', description: 'All types logged', time: '2h ago', type: 'blood' }
+      ]
+    },
+    {
+      id: 'H-55104',
+      licenseId: 'LIC-55104-D',
+      name: 'Bay Area General',
+      city: 'San Francisco',
+      location: 'San Francisco, CA',
+      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCndKwZAiRIDmkFZ4FWM6JczqMsVNmmTEqsvQplK2qg6W7WhHJXzeBhb_0ldWIM0FZUh_skk8SX2JAJsfwFVtAqY4GzUMjsmtJkwL91RGlys15J5qjT1g236YyNWTz8l3igdzqAJYVxnuo1eb-3OZax4sx9HfbZknVtabk2X8lfYMiWo-d1T_U_pkuJy-h5N6saaq7D-1kyLSfnKOUI7xJtJrJuVux-orPLHFquh0CptbaQyskT9gmizL8wmwTH-BFOOtPH1OcTGXWw',
+      specialties: ['ER', 'Trauma', 'Neurology'],
+      status: 'Active',
+      patientCount: 410,
+      rating: 4.7,
+      bloodHealthLevels: [95, 90, 80, 85],
+      bloodHealthStatus: 'Stable',
+      bloodStock: {
+        'A+': 380, 'A-': 110, 'B+': 92, 'B-': 78,
+        'O+': 450, 'O-': 32, 'AB+': 150, 'AB-': 40
+      },
+      documents: [
+        { 
+          name: 'State License 2024', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
+        },
+        { 
+          name: 'ISO Safety Cert', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
+        }
+      ],
+      recentActivity: [
+        { title: 'Trauma Admission', description: 'ER Wing', time: '5 mins ago', type: 'admission' },
+        { title: 'Organ Transport Dispatched', description: 'Helipad departure', time: '4h ago', type: 'dispatch' }
+      ]
+    },
+    {
+      id: 'H-12409',
+      licenseId: 'LIC-12409-F',
+      name: 'Valley Health Clinic',
+      city: 'Sacramento',
+      location: 'Sacramento, CA',
+      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBv35N9rbEue8kENJIxoCOenjXxjHj7_Wp6OWdzEtJEVCX-5NUWT9KfcGFnMApyYHStm37tWcsgL5qzvBYQfI3Cozv6UhbUmeCa54tCDeYyWmsSrM9iqTT8PvVVUhBkBweL7kF80PBT43JPjFNxW3CmsuhyBDm7T37wP4x-g-hxtd-Mi3qYsqegQHuSNZqvyRoI4_OdK1l0tDeqqbLbWtiISfT0ollryDcaxrEfAKb98jn67g1rvVDAZ9REKINpNEJmk-pFBXv5-Exf',
+      specialties: ['General', 'Family Care'],
+      status: 'Suspended',
+      patientCount: 0,
+      rating: 3.2,
+      bloodHealthLevels: [0, 10, 5, 0],
+      bloodHealthStatus: 'Critical',
+      bloodStock: {
+        'A+': 0, 'A-': 2, 'B+': 0, 'B-': 1,
+        'O+': 5, 'O-': 0, 'AB+': 0, 'AB-': 0
+      },
+      documents: [
+        { 
+          name: 'State License 2024', 
+          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
+        }
+      ],
+      recentActivity: [
+        { title: 'Access Suspended', description: 'By Admin Sarah Jenkins', time: '1 day ago', type: 'other' },
+        { title: 'License Check Expired', description: 'Validation failed', time: '2 days ago', type: 'other' }
+      ]
+    }
+  ];
+
+  // Helper to show interactive toast notifications
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Filter logic
+  const filteredHospitals = useMemo(() => {
+    return initialHospitals.filter(hospital => {
+      const matchesSearch = 
+        hospital.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        hospital.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        hospital.licenseId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        hospital.location.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'All' || hospital.status === statusFilter;
+      const matchesCity = cityFilter === 'All' || hospital.city === cityFilter;
+      const matchesBloodHealth = bloodHealthFilter === 'All' || hospital.bloodHealthStatus === bloodHealthFilter;
+      
+      const matchesSpecialty = 
+        specialtyFilter === 'All' || 
+        hospital.specialties.includes(specialtyFilter);
+
+      return matchesSearch && matchesStatus && matchesCity && matchesSpecialty && matchesBloodHealth;
+    });
+  }, [searchQuery, statusFilter, cityFilter, specialtyFilter, bloodHealthFilter]);
+
+  // Handle stats card click to set category filters
+  const handleStatCardClick = (status: string) => {
+    setStatusFilter(status);
+    setSearchQuery('');
+    showToast(`Filtering lists to: ${status === 'All' ? 'All Hospitals' : status}`);
+  };
+
+  // Handle multi-checkbox selection
+  const handleToggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedHospitals(filteredHospitals.map(h => h.id));
+    } else {
+      setSelectedHospitals([]);
+    }
+  };
+
+  const handleToggleSelectHospital = (id: string) => {
+    if (selectedHospitals.includes(id)) {
+      setSelectedHospitals(selectedHospitals.filter(hId => hId !== id));
+    } else {
+      setSelectedHospitals([...selectedHospitals, id]);
+    }
+  };
+
+  // Open side drawer panel
+  const handleOpenPanel = (hospital: Hospital) => {
+    setSelectedHospital(hospital);
+    setIsPanelOpen(true);
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-      <div className="glass-card p-xl rounded-2xl border border-outline-variant/30 max-w-lg shadow-lg">
-        <h1 className="font-headline-lg text-headline-lg text-primary mb-md">
-          Welcome to the Hospital Management Page
-        </h1>
-        <p className="text-on-surface-variant font-body-md">
-          This section contains all hospital facility coordination tools and details.
-        </p>
+    <div className="space-y-lg pb-xxl w-full relative">
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#123e20] text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-white/10 animate-slide-in">
+          <span className="material-symbols-outlined text-[20px] text-secondary-fixed">info</span>
+          <span className="font-dmsans text-sm font-semibold">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Sub-Header Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-md border-b border-outline-variant/30 pb-lg">
+        <div>
+          <p className="text-on-surface-variant font-body-md mt-1">
+            Verify, monitor, and manage every hospital in the LifeLink network.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <button 
+            onClick={() => {
+              setStatusFilter('All');
+              setCityFilter('All');
+              setSpecialtyFilter('All');
+              setBloodHealthFilter('All');
+              setSearchQuery('');
+              setSelectedHospitals([]);
+              showToast('Filters cleared');
+            }}
+            className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant hover:text-primary rounded-xl font-label-caps text-[12px] bg-white transition-colors"
+          >
+            Reset Filters
+          </button>
+          <button 
+            onClick={() => showToast('Data export initiated...')}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-outline-variant/50 text-primary hover:bg-neutral-50 rounded-xl font-label-caps text-[12px] transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            Export
+          </button>
+          <button 
+            onClick={() => setIsAddHospitalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl shadow-md hover:brightness-110 transition-all font-label-caps text-[12px]"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Add Hospital
+          </button>
+        </div>
       </div>
+
+      {/* Stats Bento Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Hospitals Card */}
+        <div 
+          onClick={() => handleStatCardClick('All')}
+          className={`p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:-translate-y-1 transition-all duration-200 cursor-pointer ${
+            statusFilter === 'All' 
+              ? 'bg-primary text-white ring-2 ring-primary/40 shadow-lg' 
+              : 'bg-primary/95 text-white/95 hover:brightness-105'
+          }`}
+        >
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+          <div className="flex justify-between items-start mb-4 relative z-10">
+            <span className="material-symbols-outlined text-white/80 text-3xl">local_hospital</span>
+            <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full text-white">+6 this month</span>
+          </div>
+          <p className="font-body-sm text-body-sm text-white/80 mb-1">Total Hospitals</p>
+          <h3 className="font-syne font-bold text-[32px] tracking-tight leading-none">142</h3>
+        </div>
+
+        {/* Verified Card */}
+        <div 
+          onClick={() => handleStatCardClick('Verified')}
+          className={`p-6 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-1 ${
+            statusFilter === 'Verified' 
+              ? 'bg-white border-primary ring-2 ring-primary/20 shadow-md' 
+              : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-neutral-50 shadow-sm'
+          }`}
+        >
+          <div className="flex justify-between items-start mb-4">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">Verified</p>
+          </div>
+          <div className="flex items-center justify-between mt-sm">
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">128</h3>
+            <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(18,62,32,0.4)]"></div>
+          </div>
+        </div>
+
+        {/* Pending Approval Card */}
+        <div 
+          onClick={() => handleStatCardClick('Pending')}
+          className={`p-6 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-1 ${
+            statusFilter === 'Pending' 
+              ? 'bg-white border-yellow-600 ring-2 ring-yellow-200 shadow-md' 
+              : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-neutral-50 shadow-sm'
+          }`}
+        >
+          <div className="flex justify-between items-start mb-4">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">Pending Approval</p>
+          </div>
+          <div className="flex items-center justify-between mt-sm">
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">11</h3>
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]"></div>
+          </div>
+        </div>
+
+        {/* Active Today Card */}
+        <div 
+          onClick={() => handleStatCardClick('Active')}
+          className={`p-6 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-1 relative ${
+            statusFilter === 'Active' 
+              ? 'bg-white border-secondary ring-2 ring-secondary/20 shadow-md' 
+              : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-neutral-50 shadow-sm'
+          }`}
+        >
+          <div className="flex justify-between items-start mb-4">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">Active Today</p>
+          </div>
+          <div className="flex items-center justify-between mt-sm">
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">97</h3>
+            <span className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded uppercase tracking-wider animate-pulse">Live</span>
+          </div>
+        </div>
+
+        {/* Suspended Card */}
+        <div 
+          onClick={() => handleStatCardClick('Suspended')}
+          className={`p-6 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-1 ${
+            statusFilter === 'Suspended' 
+              ? 'bg-white border-red-600 ring-2 ring-red-200 shadow-md' 
+              : 'bg-surface-container-lowest border-outline-variant/30 hover:bg-neutral-50 shadow-sm'
+          }`}
+        >
+          <div className="flex justify-between items-start mb-4">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">Suspended</p>
+          </div>
+          <div className="flex items-center justify-between mt-sm">
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">3</h3>
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Stats Pills Row */}
+      <div className="flex flex-wrap items-center gap-sm bg-surface-container/30 p-md rounded-2xl border border-outline-variant/30">
+        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
+          <span className="material-symbols-outlined text-primary text-[18px]">bloodtype</span>
+          <span className="text-xs font-semibold text-on-surface">Blood Stock: <span className="text-primary font-bold">18,420 Units</span></span>
+        </div>
+        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
+          <span className="material-symbols-outlined text-primary text-[18px]">steering_wheel_heat</span>
+          <span className="text-xs font-semibold text-on-surface">Drivers: <span className="text-primary font-bold">312 Online</span></span>
+        </div>
+        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
+          <span className="material-symbols-outlined text-primary text-[18px]">patient_list</span>
+          <span className="text-xs font-semibold text-on-surface">Patients: <span className="text-primary font-bold">1,847</span></span>
+        </div>
+        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
+          <span className="material-symbols-outlined text-amber-600 text-[18px]">timer</span>
+          <span className="text-xs font-semibold text-on-surface">Avg Response Time: <span className="text-primary font-bold">8.4 min</span></span>
+        </div>
+      </div>
+
+      {/* Main Table view & filtering */}
+      <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-hidden flex flex-col shadow-sm">
+        {/* Filter Bar */}
+        <div className="p-6 border-b border-outline-variant/30 flex flex-col lg:flex-row gap-4 items-center justify-between bg-surface-bright/50">
+          <div className="relative w-full lg:flex-1">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+            <input 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-[#F5F1E8]/50 focus:bg-white rounded-xl border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary text-sm outline-none transition-all placeholder:text-on-surface-variant/60"
+              placeholder="Search by name, ID, or license number..."
+              type="text"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Status Select */}
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="py-2.5 pl-4 pr-10 bg-white rounded-xl border border-outline-variant/50 text-sm text-on-surface focus:outline-none focus:border-primary cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_10px_center] bg-no-repeat"
+            >
+              <option value="All">Status (All)</option>
+              <option value="Verified">Verified</option>
+              <option value="Pending">Pending</option>
+              <option value="Active">Active</option>
+              <option value="Suspended">Suspended</option>
+            </select>
+
+            {/* City Select */}
+            <select 
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="py-2.5 pl-4 pr-10 bg-white rounded-xl border border-outline-variant/50 text-sm text-on-surface focus:outline-none focus:border-primary cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_10px_center] bg-no-repeat"
+            >
+              <option value="All">City (All)</option>
+              <option value="San Francisco">San Francisco</option>
+              <option value="Oakland">Oakland</option>
+              <option value="San Jose">San Jose</option>
+              <option value="Sacramento">Sacramento</option>
+            </select>
+
+            {/* Specialty Select */}
+            <select 
+              value={specialtyFilter}
+              onChange={(e) => setSpecialtyFilter(e.target.value)}
+              className="py-2.5 pl-4 pr-10 bg-white rounded-xl border border-outline-variant/50 text-sm text-on-surface focus:outline-none focus:border-primary cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_10px_center] bg-no-repeat"
+            >
+              <option value="All">Specialty (All)</option>
+              <option value="ER">Emergency Room (ER)</option>
+              <option value="Trauma">Trauma Unit</option>
+              <option value="Cardiology">Cardiology</option>
+              <option value="Pediatrics">Pediatrics</option>
+              <option value="Neurology">Neurology</option>
+              <option value="General">General Practice</option>
+            </select>
+
+            {/* Blood Health Select */}
+            <select 
+              value={bloodHealthFilter}
+              onChange={(e) => setBloodHealthFilter(e.target.value)}
+              className="py-2.5 pl-4 pr-10 bg-white rounded-xl border border-outline-variant/50 text-sm text-on-surface focus:outline-none focus:border-primary cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_10px_center] bg-no-repeat"
+            >
+              <option value="All">Blood Health (All)</option>
+              <option value="Optimal">Optimal</option>
+              <option value="Stable">Stable</option>
+              <option value="Critical">Critical</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Table Content */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#EFF2EE] text-on-surface border-b border-outline-variant/30">
+                <th className="px-6 py-4 w-12">
+                  <input 
+                    type="checkbox" 
+                    onChange={handleToggleSelectAll}
+                    checked={filteredHospitals.length > 0 && selectedHospitals.length === filteredHospitals.length}
+                    className="rounded text-primary focus:ring-primary h-4 w-4 border-outline-variant cursor-pointer"
+                  />
+                </th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Hospital</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Address</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Specialties</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Blood Health</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Data</th>
+                <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/20">
+              {filteredHospitals.length > 0 ? (
+                filteredHospitals.map((hospital) => (
+                  <tr 
+                    key={hospital.id} 
+                    onClick={() => handleOpenPanel(hospital)}
+                    className="hover:bg-neutral-50/80 transition-colors group cursor-pointer"
+                  >
+                    {/* Checkbox select */}
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        onChange={() => handleToggleSelectHospital(hospital.id)}
+                        checked={selectedHospitals.includes(hospital.id)}
+                        className="rounded text-primary focus:ring-primary h-4 w-4 border-outline-variant cursor-pointer"
+                      />
+                    </td>
+
+                    {/* Hospital details */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white overflow-hidden border border-outline-variant/30 flex items-center justify-center shadow-sm shrink-0">
+                          <img className="w-full h-full object-cover" src={hospital.logo} alt={`${hospital.name} Logo`} />
+                        </div>
+                        <div>
+                          <div className="font-syne font-bold text-[15px] text-on-surface group-hover:text-primary transition-colors">{hospital.name}</div>
+                          <div className="text-xs text-on-surface-variant">{hospital.licenseId}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Address / Location */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1 text-xs text-on-surface-variant">
+                        <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
+                        {hospital.location}
+                      </div>
+                    </td>
+
+                    {/* Specialties */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1 max-w-[150px]">
+                        {hospital.specialties.map(spec => (
+                          <span 
+                            key={spec}
+                            className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full"
+                          >
+                            {spec}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="px-6 py-4">
+                      {hospital.status === 'Verified' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Verified
+                        </span>
+                      )}
+                      {hospital.status === 'Active' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                        </span>
+                      )}
+                      {hospital.status === 'Pending' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-50 text-yellow-700 text-xs font-semibold rounded-full border border-yellow-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> Pending
+                        </span>
+                      )}
+                      {hospital.status === 'Suspended' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Suspended
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Blood Health Indicator Bar Chart */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-end gap-1 h-8">
+                        {hospital.bloodHealthLevels.map((val, idx) => (
+                          <div 
+                            key={idx}
+                            style={{ height: `${val}%` }}
+                            className={`w-1.5 rounded-t-sm ${
+                              hospital.status === 'Suspended' || val < 30 ? 'bg-red-500' : 'bg-primary'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </td>
+
+                    {/* Patients/Rating Summary */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-0.5 text-xs text-on-surface">
+                        <div className="flex justify-between gap-md">
+                          <span className="text-on-surface-variant">Patients:</span> 
+                          <span className="font-bold">{hospital.patientCount}</span>
+                        </div>
+                        <div className="flex justify-between gap-md">
+                          <span className="text-on-surface-variant">Rating:</span> 
+                          <span className="font-bold">{hospital.rating}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Actions Button */}
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={() => handleOpenPanel(hospital)}
+                        className="text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-neutral-100"
+                        aria-label="View Details"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-on-surface-variant font-dmsans">
+                    <span className="material-symbols-outlined text-4xl text-outline-variant block mb-2">domain_disabled</span>
+                    No hospitals found matching filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Bar */}
+        <div className="px-6 py-4 flex items-center justify-between border-t border-outline-variant/30 bg-surface-bright/30">
+          <span className="text-xs text-on-surface-variant">
+            Showing 1-{filteredHospitals.length} of {filteredHospitals.length} hospitals
+          </span>
+          <div className="flex items-center gap-1">
+            <button className="p-1 rounded hover:bg-neutral-100 disabled:opacity-30" disabled>
+              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            </button>
+            <button className="w-7 h-7 rounded bg-primary text-white font-bold text-xs">1</button>
+            <button className="p-1 rounded hover:bg-neutral-100 disabled:opacity-30" disabled>
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Slide-over Side Drawer Panel */}
+      <div 
+        className={`fixed inset-0 bg-[#121c2a]/40 backdrop-blur-sm z-50 transition-opacity duration-300 ${
+          isPanelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setIsPanelOpen(false)}
+      />
+
+      <aside 
+        className={`fixed right-0 top-0 h-full w-full sm:w-[460px] bg-white shadow-2xl z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 ease-in-out transform ${
+          isPanelOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {selectedHospital && (
+          <>
+            {/* Panel Header */}
+            <div className="p-6 border-b border-outline-variant/30 flex justify-between items-center bg-[#EFF2EE]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white overflow-hidden border border-outline-variant/30 flex items-center justify-center shadow-sm shrink-0">
+                  <img className="w-full h-full object-cover" src={selectedHospital.logo} alt={`${selectedHospital.name} Logo`} />
+                </div>
+                <div>
+                  <h3 className="font-syne font-bold text-base text-primary leading-tight">{selectedHospital.name}</h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">{selectedHospital.city} • Registry: {selectedHospital.id}</p>
+                </div>
+              </div>
+              <button 
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/50 text-on-surface-variant hover:text-on-surface transition-colors"
+                onClick={() => setIsPanelOpen(false)}
+                aria-label="Close details"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-6 flex-1 overflow-y-auto space-y-lg no-scrollbar">
+              {/* Blood Stock Units */}
+              <div className="space-y-sm">
+                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Blood Stock Units</h4>
+                <div className="grid grid-cols-4 gap-sm">
+                  {Object.entries(selectedHospital.bloodStock).map(([group, units]) => {
+                    const isCritical = units <= 15;
+                    return (
+                      <div 
+                        key={group}
+                        className={`p-2.5 rounded-xl border text-center transition-all ${
+                          isCritical 
+                            ? 'bg-red-50/50 border-red-200 text-red-700 shadow-sm' 
+                            : 'bg-white border-outline-variant/30 text-on-surface'
+                        }`}
+                      >
+                        <span className={`block font-bold text-sm ${isCritical ? 'text-red-600' : 'text-primary'}`}>
+                          {group}
+                        </span>
+                        <span className="block text-xs font-semibold text-on-surface-variant mt-0.5">
+                          {units}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Verified Documents Previews */}
+              <div className="space-y-sm">
+                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Verified Documents</h4>
+                <div className="grid grid-cols-2 gap-md">
+                  {selectedHospital.documents.map((doc, idx) => (
+                    <div key={idx} className="group cursor-pointer">
+                      <div className="aspect-[3/4] bg-neutral-100 rounded-xl overflow-hidden border border-outline-variant/30 mb-1 relative shadow-sm">
+                        <img 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          src={doc.image}
+                          alt={doc.name}
+                        />
+                      </div>
+                      <p className="text-[11px] font-bold text-on-surface-variant group-hover:text-primary transition-colors truncate">{doc.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent Activity Timeline */}
+              <div className="space-y-sm pt-4 border-t border-outline-variant/20">
+                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Recent Activity</h4>
+                <div className="space-y-4 pt-2">
+                  {selectedHospital.recentActivity.map((act, idx) => (
+                    <div key={idx} className="flex gap-4">
+                      {/* Timeline Node Icon/Dot */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm mt-1 ${
+                          act.type === 'admission' ? 'bg-primary' :
+                          act.type === 'blood' ? 'bg-amber-500' :
+                          act.type === 'dispatch' ? 'bg-red-600' : 'bg-neutral-400'
+                        }`} />
+                        {idx < selectedHospital.recentActivity.length - 1 && (
+                          <div className="w-[1px] bg-outline-variant/40 flex-1 my-1" />
+                        )}
+                      </div>
+                      <div className="pb-1">
+                        <p className="text-sm font-bold text-on-surface leading-tight">{act.title}</p>
+                        <p className="text-xs text-on-surface-variant mt-0.5">{act.description} • <span className="italic">{act.time}</span></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Sticky Bottom Actions */}
+            <div className="p-6 bg-white border-t border-outline-variant/30 grid grid-cols-2 gap-md shrink-0">
+              <button 
+                onClick={() => {
+                  showToast(`Access suspension sequence logged for ${selectedHospital.name}`);
+                  setIsPanelOpen(false);
+                }}
+                className="py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors"
+              >
+                Suspend Access
+              </button>
+              <button 
+                onClick={() => {
+                  showToast(`Sync records request submitted for ${selectedHospital.name}`);
+                  setIsPanelOpen(false);
+                }}
+                className="py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
+              >
+                Update Records
+              </button>
+            </div>
+          </>
+        )}
+      </aside>
+
+      {/* Add Hospital Modal */}
+      {isAddHospitalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-[#121c2a]/45 backdrop-blur-sm"
+            onClick={() => setIsAddHospitalOpen(false)}
+          />
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full z-10 border border-outline-variant/30 shadow-2xl relative animate-scale-in">
+            <h3 className="font-syne font-bold text-xl text-primary mb-1">Add Facility</h3>
+            <p className="text-xs text-on-surface-variant mb-4">Register a new healthcare facility in the coordinate system matrix.</p>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setIsAddHospitalOpen(false);
+              showToast('Hospital registered successfully (Mock DB confirmation)');
+            }} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Hospital Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Hope General Hospital" 
+                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">License ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="LIC-12345-X" 
+                    className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">City Location</label>
+                  <select className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer">
+                    <option>San Francisco</option>
+                    <option>Oakland</option>
+                    <option>San Jose</option>
+                    <option>Sacramento</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Facility Specialties (comma-separated)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. ER, Trauma, Cardiology" 
+                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
+                  required
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setIsAddHospitalOpen(false)}
+                  className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant hover:text-on-surface rounded-xl text-xs font-label-caps"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-white hover:brightness-110 rounded-xl text-xs font-label-caps shadow-md"
+                >
+                  Register Facility
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
