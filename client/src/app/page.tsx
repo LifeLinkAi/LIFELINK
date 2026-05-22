@@ -34,7 +34,7 @@ export default function LandingPage() {
       <main className="flex-grow w-full flex flex-col items-center">
         
         {/* Hero Section */}
-        <section className="relative w-full min-h-[720px] flex items-start justify-center bg-gradient-to-br from-[#F4F7F0] to-[#DDE5D3] px-6 lg:px-12 pt-28 pb-20 md:pt-[180px] md:pb-24 overflow-hidden">
+        <section className="relative w-full min-h-[720px] flex items-start justify-center bg-gradient-to-br from-[#EFF2EE] to-[#d8f3dc] px-6 lg:px-12 pt-28 pb-20 md:pt-[180px] md:pb-24 overflow-hidden">
           
           {/* Hero Background Video */}
           <video
@@ -47,7 +47,7 @@ export default function LandingPage() {
           >
             <source src="/video/hero_bg_video.mp4" type="video/mp4" />
           </video>
-          <div className="absolute inset-0 bg-radial-gradient from-transparent via-[#F4F7F0]/20 to-[#DDE5D3]/50 pointer-events-none" />
+          <div className="absolute inset-0 bg-radial-gradient from-transparent via-[#EFF2EE]/20 to-[#d8f3dc]/50 pointer-events-none" />
 
           {/* Container */}
           <div className="w-full max-w-[1280px] grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
@@ -85,7 +85,7 @@ export default function LandingPage() {
                 {/* Primary Button */}
                 <Link 
                   href="/get-started" 
-                  className="flex items-center justify-center gap-2 px-6 py-4 min-w-[213px] h-[65px] font-syne font-semibold text-lg text-white bg-gradient-to-r from-[#3E5219] to-[#556B2F] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_25px_-5px_rgba(62,82,25,0.3)] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+                  className="flex items-center justify-center gap-2 px-6 py-4 min-w-[213px] h-[65px] font-syne font-semibold text-lg text-white bg-gradient-to-r from-[#123e20] to-[#1b4d2c] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_25px_-5px_rgba(18,62,32,0.3)] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <span>Get Started</span>
                   <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
@@ -94,7 +94,7 @@ export default function LandingPage() {
                 {/* Secondary Button */}
                 <Link 
                   href="#how-it-works" 
-                  className="flex items-center justify-center px-6 py-4 min-w-[212px] h-[65px] font-syne font-semibold text-lg text-brand-green bg-brand-glassBg border border-brand-glassBorder backdrop-blur-md hover:bg-[#DDE5D3]/60 transition-all duration-300 rounded-xl transform hover:-translate-y-0.5 active:translate-y-0"
+                  className="flex items-center justify-center px-6 py-4 min-w-[212px] h-[65px] font-syne font-semibold text-lg text-brand-green bg-brand-glassBg border border-brand-glassBorder backdrop-blur-md hover:bg-[#d8f3dc]/60 transition-all duration-300 rounded-xl transform hover:-translate-y-0.5 active:translate-y-0"
                 >
                   How it Works
                 </Link>
@@ -149,7 +149,7 @@ export default function LandingPage() {
               whileInView="visible"
               viewport={{ once: true, margin: '-100px' }}
               variants={fadeIn}
-              className="w-full bg-brand-glassBg border border-brand-glassBorder backdrop-blur-md rounded-2xl p-8 md:p-12 shadow-[0_8px_32px_rgba(62,82,25,0.05)]"
+              className="w-full bg-brand-glassBg border border-brand-glassBorder backdrop-blur-md rounded-2xl p-8 md:p-12 shadow-[0_8px_32px_rgba(18,62,32,0.05)]"
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-0 items-center justify-center">
                 

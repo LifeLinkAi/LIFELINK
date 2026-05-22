@@ -58,7 +58,7 @@ export default function ContactPage() {
       <main className="flex-grow w-full flex flex-col items-center pt-[76px]">
         
         {/* Contact Hero */}
-        <section className="relative w-full py-16 md:py-24 flex items-center justify-center bg-gradient-to-br from-[#F4F7F0] to-[#DDE5D3] px-6 lg:px-12 overflow-hidden border-b border-brand-borderLight/30">
+        <section className="relative w-full py-16 md:py-24 flex items-start justify-center bg-gradient-to-br from-[#EFF2EE] to-[#d8f3dc] px-6 lg:px-12 overflow-hidden border-b border-brand-borderLight/30">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-green/5 rounded-full blur-[120px] pointer-events-none" />
           
           <div className="w-full max-w-[960px] flex flex-col items-start text-left relative z-10 gap-4">
@@ -82,7 +82,7 @@ export default function ContactPage() {
               </h2>
               
               {/* Hotline 1 */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white border border-brand-borderLight/40 rounded-2xl p-6 justify-between shadow-[0_4px_20px_rgba(62,82,25,0.02)]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white border border-brand-borderLight/40 rounded-2xl p-6 justify-between shadow-[0_4px_20px_rgba(18,62,32,0.02)]">
                 <div className="flex items-center gap-4">
                   <div className="text-brand-green flex items-center justify-center rounded-xl bg-[#eef0ea] shrink-0 w-12 h-12">
                     <Phone className="w-6 h-6" />
@@ -101,7 +101,7 @@ export default function ContactPage() {
               </div>
 
               {/* Hotline 2 */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white border border-brand-borderLight/40 rounded-2xl p-6 justify-between shadow-[0_4px_20px_rgba(62,82,25,0.02)]">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white border border-brand-borderLight/40 rounded-2xl p-6 justify-between shadow-[0_4px_20px_rgba(18,62,32,0.02)]">
                 <div className="flex items-center gap-4">
                   <div className="text-brand-green flex items-center justify-center rounded-xl bg-[#eef0ea] shrink-0 w-12 h-12">
                     <Heart className="w-6 h-6" />
@@ -124,7 +124,7 @@ export default function ContactPage() {
             <div className="flex flex-col gap-12 mt-4">
               
               {/* Form Section */}
-              <section className="bg-surface-container-highest p-8 rounded-2xl border border-outline-variant/30 shadow-[0_8px_30px_rgba(85,107,47,0.05)]">
+              <section className="bg-surface-container-highest p-8 rounded-2xl border border-outline-variant/30 shadow-[0_8px_30px_rgba(18,62,32,0.05)]">
                 <div className="flex items-center gap-3 mb-6 text-primary">
                   <Mail className="w-6 h-6 text-brand-green animate-pulse" />
                   <h2 className="font-syne font-bold text-2xl text-on-surface">Send us a message</h2>
@@ -207,7 +207,7 @@ export default function ContactPage() {
               </section>
 
               {/* Interactive Map & Hubs */}
-              <section className="bg-surface-container-high p-8 rounded-2xl border border-outline-variant/30 shadow-[0_8px_30px_rgba(85,107,47,0.05)]">
+              <section className="bg-surface-container-high p-8 rounded-2xl border border-outline-variant/30 shadow-[0_8px_30px_rgba(18,62,32,0.05)]">
                 <div className="flex items-center gap-3 mb-6 text-primary">
                   <Globe className="w-6 h-6 text-brand-green" />
                   <h2 className="font-syne font-bold text-2xl text-on-surface">Global Headquarters &amp; Regional Hubs</h2>
@@ -225,7 +225,7 @@ export default function ContactPage() {
 
                 {/* Hub Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(62,82,25,0.02)]">
+                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(18,62,32,0.02)]">
                     <h3 className="font-syne font-bold text-lg text-on-surface">Geneva HQ</h3>
                     <p className="font-dmsans text-sm text-on-surface-variant leading-relaxed">
                       1200 Avenue de la Paix<br />Geneva, Switzerland
@@ -233,7 +233,7 @@ export default function ContactPage() {
                     <span className="text-primary font-dmsans text-[11px] font-bold uppercase tracking-wider mt-auto pt-3">Main Office</span>
                   </div>
                   
-                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(62,82,25,0.02)]">
+                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(18,62,32,0.02)]">
                     <h3 className="font-syne font-bold text-lg text-on-surface">Americas Hub</h3>
                     <p className="font-dmsans text-sm text-on-surface-variant leading-relaxed">
                       100 UN Plaza<br />New York, NY, USA
@@ -241,7 +241,7 @@ export default function ContactPage() {
                     <span className="text-tertiary font-dmsans text-[11px] font-bold uppercase tracking-wider mt-auto pt-3">Regional Center</span>
                   </div>
                   
-                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(62,82,25,0.02)]">
+                  <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/50 flex flex-col gap-2 shadow-[0_2px_10px_rgba(18,62,32,0.02)]">
                     <h3 className="font-syne font-bold text-lg text-on-surface">Asia-Pacific Hub</h3>
                     <p className="font-dmsans text-sm text-on-surface-variant leading-relaxed">
                       Marina Bay Financial Centre<br />Singapore
@@ -272,7 +272,7 @@ export default function ContactPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
               transition={{ duration: 0.2 }}
-              className="bg-surface-container-lowest w-72 rounded-xl shadow-[0_8px_30px_rgba(85,107,47,0.15)] border border-outline-variant/30 overflow-hidden flex flex-col pointer-events-auto"
+              className="bg-surface-container-lowest w-72 rounded-xl shadow-[0_8px_30px_rgba(18,62,32,0.15)] border border-outline-variant/30 overflow-hidden flex flex-col pointer-events-auto"
             >
               {/* Header */}
               <div className="bg-primary p-4 flex items-center justify-between text-on-primary">
