@@ -11,4 +11,73 @@
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+html {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(0deg, #F8F9FF, #F8F9FF), #FFFFFF;
+  font-family: 'DM Sans', sans-serif;
+  color: #45483C;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom styled scrollbars or other styles if needed */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F8F9FF;
+}
+::-webkit-scrollbar-thumb {
+  background: #C5C8B8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #123e20;
+}
+
+/* Mockup global card & animation helper classes */
+.glass-card {
+  background: rgba(221, 229, 211, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(199, 210, 192, 0.5);
+}
+.pulse-red {
+  animation: pulse-key 2s infinite;
+}
+@keyframes pulse-key {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.chart-gradient-red {
+  background: linear-gradient(180deg, rgba(186, 26, 26, 0.2) 0%, rgba(186, 26, 26, 0) 100%);
+}
+.chart-gradient-blue {
+  background: linear-gradient(180deg, rgba(80, 101, 42, 0.2) 0%, rgba(80, 101, 42, 0) 100%);
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Global Premium Dark Green Theme Variables */
+:root {
+  --color-primary: #123e20;
+  --color-primary-container: #1b4d2c;
+  --color-on-primary-container: #a3d9b4;
+  --color-secondary: #2d6a4f;
+  --color-secondary-container: #d8f3dc;
+  --color-on-secondary-container: #1b4332;
 }
