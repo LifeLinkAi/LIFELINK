@@ -55,6 +55,11 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// Root path confirmation check
+app.get('/', (req, res) => {
+  res.send('LifeLink Backend Running 🚀');
+});
+
 // Mount main application router under /api
 app.use('/api', apiRouter);
 
