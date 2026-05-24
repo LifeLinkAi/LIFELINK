@@ -278,7 +278,10 @@ export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarPr
               localStorage.removeItem('token');
               localStorage.removeItem('user');
               // 2. Fire backend logout route to clear httpOnly cookie
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+              let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+              if (!apiUrl.endsWith('/api')) {
+                apiUrl += '/api';
+              }
               fetch(`${apiUrl}/auth/logout`, { method: 'POST' }).finally(() => {
                 // 3. Redirect back to login screen
                 window.location.href = '/login';
