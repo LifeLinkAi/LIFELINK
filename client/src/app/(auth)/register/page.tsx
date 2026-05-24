@@ -26,7 +26,10 @@ export default function RegisterPage() {
     try {
       setError(null);
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      if (!apiUrl.endsWith('/api')) {
+        apiUrl = `${apiUrl}/api`;
+      }
       const res = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +43,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // Automatically log in by setting credentials or redirect to login
       router.push('/login');
     } catch (err) {
       setLoading(false);
