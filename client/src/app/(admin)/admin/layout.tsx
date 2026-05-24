@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import AdminSidebar from './components/AdminSidebar/AdminSidebar';
 import AdminHeader from './components/AdminHeader/AdminHeader';
 
@@ -10,6 +11,12 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const isSettings = pathname.startsWith('/admin/settings');
+
+  if (isSettings) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[#EFF2EE] text-on-surface font-dmsans antialiased flex admin-theme">
@@ -17,7 +24,7 @@ export default function AdminLayout({
       <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
       {/* Main Content Wrapper */}
-      <div className="flex-grow lg:pl-[280px] flex flex-col min-h-screen">
+      <div className="flex-grow lg:pl-[280px] flex flex-col min-h-screen min-w-0">
         {/* Top Header - sticky inside the main content wrapper */}
         <AdminHeader onMenuClick={() => setIsSidebarOpen(true)} />
 
