@@ -37,6 +37,8 @@ const startServer = async (): Promise<void> => {
   // Connect to Database
   await connectDB();
 
+  
+
   // Start HTTP Server listener
   const port = process.env.PORT || 5000;
   const nodeEnv = process.env.NODE_ENV || 'development';

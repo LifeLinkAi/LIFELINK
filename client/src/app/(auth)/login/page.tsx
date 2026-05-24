@@ -11,17 +11,46 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ role, email, password });
-    // Navigate on successful login based on role
-    if (role === 'Hospital') {
-      router.push('/(hospital)');
-    } else if (role === 'Driver') {
-      router.push('/(driver)');
-    } else {
-      router.push('/');
+    try {
+      setError(null);
+      setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      setLoading(false);
+
+      if (!res.ok) {
+        setError(data.message || 'Invalid email or password.');
+        return;
+      }
+
+      // Store credentials in localStorage
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirect based on database user role
+      const userRole = data.user.role;
+      if (userRole === 'Admin') {
+        router.push('/admin/dashboard');
+      } else if (userRole === 'Hospital') {
+        router.push('/(hospital)');
+      } else if (userRole === 'Driver') {
+        router.push('/(driver)');
+      } else {
+        router.push('/');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError('Network error. Please check if the backend server is running.');
     }
   };
 
@@ -106,6 +135,11 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
+          {error && (
+            <div className="bg-[#ffdad6] text-[#ba1a1a] p-3 rounded-lg text-xs font-semibold border border-[#ffdad6] mb-4">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Input */}
             <div className="space-y-1">
@@ -157,10 +191,11 @@ export default function LoginPage() {
             {/* Primary Action Button */}
             <button 
               type="submit"
-              className="w-full h-[48px] rounded-lg bg-gradient-to-br from-primary to-secondary text-on-primary font-syne font-bold text-base shadow-[0_8px_30px_rgba(85,107,47,0.15)] hover:shadow-[0_8px_30px_rgba(85,107,47,0.25)] hover:brightness-105 transition-all flex items-center justify-center gap-1.5 mt-6"
+              disabled={loading}
+              className="w-full h-[48px] rounded-lg bg-gradient-to-br from-primary to-secondary text-on-primary font-syne font-bold text-base shadow-[0_8px_30px_rgba(85,107,47,0.15)] hover:shadow-[0_8px_30px_rgba(85,107,47,0.25)] hover:brightness-105 transition-all flex items-center justify-center gap-1.5 mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Sign In
-              <ArrowRight className="w-5 h-5" />
+              {loading ? 'Signing In...' : 'Sign In'}
+              {!loading && <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
 
@@ -172,7 +207,7 @@ export default function LoginPage() {
           </div>
 
           {/* Social Logins */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid  gap-4">
             <button className="h-[48px] flex items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-dmsans text-sm font-medium">
               <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
@@ -182,13 +217,7 @@ export default function LoginPage() {
               </svg>
               Google
             </button>
-            <button className="h-[48px] flex items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-dmsans text-sm font-medium">
-              <svg className="w-5 h-5 text-on-surface shrink-0" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16.365 14.496c-.021-3.238 2.646-4.8 2.766-4.877-1.492-2.183-3.805-2.483-4.63-2.52-1.967-.197-3.84 1.162-4.845 1.162-1.006 0-2.551-1.127-4.184-1.096-2.115.032-4.062 1.233-5.15 3.136-2.197 3.824-.563 9.488 1.583 12.593 1.05 1.516 2.298 3.224 3.957 3.161 1.582-.064 2.185-1.026 4.103-1.026 1.918 0 2.457 1.026 4.135.995 1.708-.032 2.8-1.55 3.844-3.07 1.21-1.772 1.706-3.486 1.733-3.578-.038-.016-3.268-1.257-3.292-4.89z"></path>
-                <path d="M15.467 6.471c.85-1.033 1.424-2.467 1.267-3.901-1.237.05-2.72.825-3.593 1.854-.78.887-1.468 2.348-1.286 3.754 1.381.107 2.756-.672 3.612-1.707z"></path>
-              </svg>
-              Apple
-            </button>
+           
           </div>
 
           {/* Registration Prompt */}
