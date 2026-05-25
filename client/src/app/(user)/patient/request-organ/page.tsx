@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
 import { Heart, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,12 +22,12 @@ interface OrganRequestForm {
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const ORGAN_TYPES = [
-  { key: 'Kidney',   icon: 'Kid', desc: 'Most common transplant'         },
-  { key: 'Liver',    icon: 'Liv', desc: 'Partial or full transplant'     },
-  { key: 'Heart',    icon: 'Hrt', desc: 'Cardiac transplant'             },
-  { key: 'Lung',     icon: 'Lng', desc: 'Single or double lung'          },
-  { key: 'Pancreas', icon: 'Pan', desc: 'For diabetes/pancreatic disease'},
-  { key: 'Cornea',   icon: 'Eye', desc: 'Restores vision'                },
+  { key: 'Kidney',   icon: '🫘', desc: 'Most common transplant'         },
+  { key: 'Liver',    icon: '🫁', desc: 'Partial or full transplant'     },
+  { key: 'Heart',    icon: '❤️', desc: 'Cardiac transplant'             },
+  { key: 'Lung',     icon: '🫁', desc: 'Single or double lung'          },
+  { key: 'Pancreas', icon: '🟤', desc: 'For diabetes/pancreatic disease'},
+  { key: 'Cornea',   icon: '👁️', desc: 'Restores vision'                },
 ];
 
 const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: string; bg: string }[] = [
@@ -110,7 +110,7 @@ export default function RequestOrganPage() {
                     'w-7 h-7 rounded-full flex items-center justify-center text-[13px] flex-shrink-0',
                     i === 0 ? 'bg-green-100' : 'bg-white border border-[#E8E4D8]'
                   )}>
-                    {i === 0 ? '✓' : s.icon}
+                    {i === 0 ? 'âœ“' : s.icon}
                   </div>
                   <span className={cn(
                     'text-[12.5px]',
@@ -382,3 +382,4 @@ export default function RequestOrganPage() {
     </div>
   );
 }
+
