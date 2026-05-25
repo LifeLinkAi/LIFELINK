@@ -1,4 +1,4 @@
-'use client';
+import { redirect } from 'next/navigation';
 
 import React from 'react';
 import { motion } from 'framer-motion';
