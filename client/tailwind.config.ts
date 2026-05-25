@@ -8,15 +8,6 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        brand: {
-          900: '#1a2e0a',
-          800: '#2B4A18',
-          600: '#3d6b1e',
-          400: '#7AB648',
-          50:  '#f3f9ea',
-        },
-        cream: '#F5F2E8',
       fontFamily: {
         syne: ['Syne', 'sans-serif'],
         dmsans: ['"DM Sans"', 'sans-serif'],
@@ -69,6 +60,11 @@ const config: Config = {
         "settings-success": "#3A5544",
         "settings-error": "#E5484D",
         brand: {
+          900: '#1a2e0a',
+          800: '#2B4A18',
+          600: '#3d6b1e',
+          400: '#7AB648',
+          50:  '#f3f9ea',
           green: '#123e20',
           olive: '#1b4d2c',
           textDark: '#45483C',
@@ -80,6 +76,7 @@ const config: Config = {
           glassBg: 'rgba(221, 229, 211, 0.4)',
           glassBorder: 'rgba(199, 210, 192, 0.5)',
         },
+        cream: '#F5F2E8',
         // Authentication layout colors
         "on-primary": "#ffffff",
         "secondary-fixed": "#c8f17a",
