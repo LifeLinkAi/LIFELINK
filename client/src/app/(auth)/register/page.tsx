@@ -13,16 +13,41 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match!");
       return;
     }
-    console.log({ role, name, email, password });
-    // Navigate on successful registration
-    router.push('/login');
+    
+    try {
+      setError(null);
+      setLoading(true);
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      if (!apiUrl.endsWith('/api')) {
+        apiUrl = `${apiUrl}/api`;
+      }
+      const res = await fetch(`${apiUrl}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role }),
+      });
+      const data = await res.json();
+      setLoading(false);
+
+      if (!res.ok) {
+        setError(data.message || 'Registration failed.');
+        return;
+      }
+
+      router.push('/login');
+    } catch (err) {
+      setLoading(false);
+      setError('Network error. Please check if the backend server is running.');
+    }
   };
 
   return (
@@ -106,6 +131,11 @@ export default function RegisterPage() {
           </div>
 
           {/* Form */}
+          {error && (
+            <div className="bg-[#ffdad6] text-[#ba1a1a] p-3 rounded-lg text-xs font-semibold border border-[#ffdad6] mb-4">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name Input */}
             <div className="space-y-1">
@@ -190,10 +220,11 @@ export default function RegisterPage() {
             {/* Primary Action Button */}
             <button 
               type="submit"
-              className="w-full h-[48px] rounded-lg bg-gradient-to-br from-primary to-secondary text-on-primary font-syne font-bold text-base shadow-[0_8px_30px_rgba(85,107,47,0.15)] hover:shadow-[0_8px_30px_rgba(85,107,47,0.25)] hover:brightness-105 transition-all flex items-center justify-center gap-1.5 mt-6"
+              disabled={loading}
+              className="w-full h-[48px] rounded-lg bg-gradient-to-br from-primary to-secondary text-on-primary font-syne font-bold text-base shadow-[0_8px_30px_rgba(85,107,47,0.15)] hover:shadow-[0_8px_30px_rgba(85,107,47,0.25)] hover:brightness-105 transition-all flex items-center justify-center gap-1.5 mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Register
-              <ArrowRight className="w-5 h-5" />
+              {loading ? 'Registering...' : 'Register'}
+              {!loading && <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
 

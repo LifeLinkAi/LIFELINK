@@ -270,6 +270,32 @@ export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarPr
               </Link>
             );
           })()}
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              // 1. Clear local session keys
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              // 2. Fire backend logout route to clear httpOnly cookie
+              let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+              if (!apiUrl.endsWith('/api')) {
+                apiUrl += '/api';
+              }
+              fetch(`${apiUrl}/auth/logout`, { method: 'POST' }).finally(() => {
+                // 3. Redirect back to login screen
+                window.location.href = '/login';
+              });
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 mx-2 rounded-lg text-[#ffdad6] hover:bg-white/10 transition-all duration-200 group text-left"
+          >
+            <span className="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">
+              logout
+            </span>
+            <span className="font-dmsans text-[12px] tracking-[0.05em] uppercase font-normal">
+              Logout
+            </span>
+          </button>
         </div>
 
       </nav>
