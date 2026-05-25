@@ -1,15 +1,6 @@
-type RootState = {
-  notifications: {
-    unreadCount: number;
-  };
-};
+import { useDispatch, useSelector } from 'react-redux';
+import type { TypedUseSelectorHook } from 'react-redux';
+import type { RootState, AppDispatch } from './index';
 
-const defaultState: RootState = {
-  notifications: {
-    unreadCount: 0,
-  },
-};
-
-export function useAppSelector<TSelected>(selector: (state: RootState) => TSelected) {
-  return selector(defaultState);
-}
+export const useAppDispatch: () => AppDispatch = useDispatch;
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
