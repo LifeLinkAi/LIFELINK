@@ -50,8 +50,6 @@ export default function LoginPage() {
         router.push('/donor/dashboard');
       } else if (userRole === 'Patient') {
         router.push('/patient/dashboard');
-      } else if (userRole === 'Driver') {
-        router.push('/driver/dashboard');
       } else {
         router.push('/');
       }
