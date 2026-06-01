@@ -736,7 +736,7 @@ export default function SettingsPage() {
               <section className="bg-settings-surface rounded-xl border border-settings-outline-var shadow-[0_8px_30px_rgba(85,107,47,0.04)] overflow-hidden">
                 <div className="px-lg py-md border-b border-settings-outline-var bg-settings-surface-dim/30">
                   <h2 className="font-headline-sm text-headline-sm text-settings-primary text-lg font-bold">Verification Rules</h2>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">Configure compliance rules for hospitals, facilities, and drivers.</p>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">Configure compliance rules for hospitals and facilities.</p>
                 </div>
                 <div className="p-lg flex flex-col gap-lg">
                   <div className="flex items-center justify-between p-md rounded-lg border border-settings-outline bg-white">
