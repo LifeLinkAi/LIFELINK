@@ -31,7 +31,6 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
     if (path.startsWith('/admin/dashboard')) return 'Dashboard Overview';
     if (path.startsWith('/admin/donors')) return 'Donor Management';
     if (path.startsWith('/admin/hospitals')) return 'Hospital Management';
-    if (path.startsWith('/admin/drivers')) return 'Ambulance Management';
     if (path.startsWith('/admin/emergencies')) return 'Emergency Hub';
     if (path.startsWith('/admin/blood-requests')) return 'Blood Management';
     if (path.startsWith('/admin/organ-requests')) return 'Organ Management';

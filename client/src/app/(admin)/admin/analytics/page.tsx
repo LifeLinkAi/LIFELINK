@@ -70,7 +70,6 @@ export default function AnalyticsPage() {
         newUsers: '432',
         activeDonors: '892',
         newHospitals: '3',
-        activeDrivers: '285',
         criticalCases: '54',
         avgMatchTime: '12 min'
       };
@@ -80,7 +79,6 @@ export default function AnalyticsPage() {
         newUsers: '1,847',
         activeDonors: '3,254',
         newHospitals: '14',
-        activeDrivers: '312',
         criticalCases: '218',
         avgMatchTime: '14 min'
       };
@@ -90,7 +88,6 @@ export default function AnalyticsPage() {
       newUsers: '5,420',
       activeDonors: '9,842',
       newHospitals: '38',
-      activeDrivers: '342',
       criticalCases: '642',
       avgMatchTime: '16 min'
     };
@@ -504,7 +501,7 @@ export default function AnalyticsPage() {
       </section>
 
       {/* 3. Secondary Metrics Rows */}
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-md mb-xl">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-md mb-xl">
         <div className="bg-[#E8EDE5] rounded-xl p-md border border-outline-variant/30 flex flex-col items-center justify-center text-center hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
           <span className="font-body-sm text-body-sm text-outline mb-xs text-xs font-medium">New Users</span>
           <span className="font-headline-sm text-headline-sm text-[#14291F] font-bold text-lg">{secondaryMetrics.newUsers}</span>
@@ -516,10 +513,6 @@ export default function AnalyticsPage() {
         <div className="bg-[#E8EDE5] rounded-xl p-md border border-outline-variant/30 flex flex-col items-center justify-center text-center hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
           <span className="font-body-sm text-body-sm text-outline mb-xs text-xs font-medium">New Hospitals</span>
           <span className="font-headline-sm text-headline-sm text-[#14291F] font-bold text-lg">{secondaryMetrics.newHospitals}</span>
-        </div>
-        <div className="bg-[#E8EDE5] rounded-xl p-md border border-outline-variant/30 flex flex-col items-center justify-center text-center hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
-          <span className="font-body-sm text-body-sm text-outline mb-xs text-xs font-medium">Active Drivers</span>
-          <span className="font-headline-sm text-headline-sm text-[#14291F] font-bold text-lg">{secondaryMetrics.activeDrivers}</span>
         </div>
         {/* Glowing warning color layout for critical metrics */}
         <div className="bg-white rounded-xl p-md border border-[#E5484D]/30 shadow-sm flex flex-col items-center justify-center text-center hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 animate-pulse-subtle">

@@ -82,7 +82,7 @@ export default function HospitalManagementPage() {
       recentActivity: [
         { title: 'Emergency Admission', description: 'Trauma Unit', time: '12 mins ago', type: 'admission' },
         { title: 'Blood Unit Requested', description: 'B+ Unit', time: '45 mins ago', type: 'blood' },
-        { title: 'Driver Dispatched', description: 'Route: Hub B to Medicare', time: '1h ago', type: 'dispatch' }
+        { title: 'Ambulance Dispatched', description: 'Route: Hub B to Medicare', time: '1h ago', type: 'dispatch' }
       ]
     },
     {
@@ -411,10 +411,6 @@ export default function HospitalManagementPage() {
         <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
           <span className="material-symbols-outlined text-primary text-[18px]">bloodtype</span>
           <span className="text-xs font-semibold text-on-surface">Blood Stock: <span className="text-primary font-bold">18,420 Units</span></span>
-        </div>
-        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
-          <span className="material-symbols-outlined text-primary text-[18px]">steering_wheel_heat</span>
-          <span className="text-xs font-semibold text-on-surface">Drivers: <span className="text-primary font-bold">312 Online</span></span>
         </div>
         <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
           <span className="material-symbols-outlined text-primary text-[18px]">patient_list</span>

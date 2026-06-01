@@ -128,19 +128,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Secondary Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-md bg-surface-container/30 p-md rounded-2xl border border-outline-variant/30">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-md bg-surface-container/30 p-md rounded-2xl border border-outline-variant/30">
         <div className="flex items-center gap-3 px-4 py-2">
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
           <div>
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">Hospitals</p>
             <p className="font-headline-sm text-headline-sm">142</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 px-4 py-2 border-l border-outline-variant/50">
-          <div className="w-2 h-2 rounded-full bg-secondary"></div>
-          <div>
-            <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">Drivers Online</p>
-            <p className="font-headline-sm text-headline-sm">89</p>
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 border-l border-outline-variant/50">
@@ -362,31 +355,6 @@ export default function DashboardPage() {
                 </button>
                 <button
                   aria-label="Reject Dr. Alan"
-                  className="w-8 h-8 flex items-center justify-center bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
-            </div>
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <img
-                alt="Driver David"
-                className="w-10 h-10 rounded-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8ndqD9gfnUinLqqWadfXMVaH81UDEcD6_Oqoba5Qz2JJIfTzhpLAT9eoXRIupfsT9ebvc7a6bPdaPRLFrbxQt5tJxonnQoSPlQGip0k-TfIIkucATkvGb6Oi-zWgKBd8pKMnkVlxd2HykrG3e65khNrbNQ-MtGDjEbENodVo2As2F6OfUPtTVydVbupris_PKZiYVZtRid0JoLFFNojEeaT1ozI4BSx_WX73EuFhb8iscKSj3pVYZSMAobXMPyyVKHfaVni7H_LLC"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold truncate font-dmsans">David Rodriguez</p>
-                <p className="text-[11px] text-on-surface-variant font-dmsans">Fleet A · Logistics</p>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  aria-label="Approve David"
-                  className="w-8 h-8 flex items-center justify-center bg-secondary/10 text-secondary rounded-lg hover:bg-secondary hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">check</span>
-                </button>
-                <button
-                  aria-label="Reject David"
                   className="w-8 h-8 flex items-center justify-center bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
