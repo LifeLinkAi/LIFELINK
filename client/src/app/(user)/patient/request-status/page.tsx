@@ -1,9 +1,9 @@
 ﻿'use client';
 import { useState } from 'react';
-import { Clock, Droplets, Heart, Ambulance, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type RequestType   = 'Blood' | 'Organ' | 'Ambulance';
+type RequestType   = 'Blood' | 'Organ';
 type RequestStatus = 'PENDING' | 'MATCHING' | 'DONOR_FOUND' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 interface PatientRequest {
@@ -32,20 +32,6 @@ const REQUESTS: PatientRequest[] = [
       { time: '—',        event: 'Donor found & notified',      done: false },
       { time: '—',        event: 'Donation confirmed',          done: false },
       { time: '—',        event: 'Request fulfilled',           done: false },
-    ],
-  },
-  {
-    id: 'AMB-312', type: 'Ambulance', status: 'IN_PROGRESS',
-    createdAt: '25 mins ago', updatedAt: 'Just now',
-    urgency: 'high', detail: 'Emergency · Kozhikode Medical College',
-    hospital: 'Kozhikode Medical College',
-    canCancel: false,
-    timeline: [
-      { time: '10:20 AM', event: 'Request submitted',           done: true  },
-      { time: '10:21 AM', event: 'AMB-12 assigned',             done: true  },
-      { time: '10:24 AM', event: 'Driver en route to pickup',   done: true  },
-      { time: '—',        event: 'Patient picked up',           done: false },
-      { time: '—',        event: 'Arrived at hospital',         done: false },
     ],
   },
   {
@@ -90,7 +76,6 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: s
 const TYPE_CONFIG: Record<RequestType, { icon: React.ReactNode; color: string; bg: string }> = {
   Blood:     { icon: <Droplets size={15} />, color: '#CC0000', bg: '#FFE5E5' },
   Organ:     { icon: <Heart    size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
-  Ambulance: { icon: <Ambulance size={15}/>, color: '#B86E00', bg: '#FFF3E0' },
 };
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -238,7 +223,7 @@ export default function RequestStatusPage() {
         <div>
           <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">My Requests</h1>
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">
-            Track all your blood, organ, and ambulance requests.
+            Track all your blood and organ requests.
           </p>
         </div>
         <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors">
@@ -290,11 +275,10 @@ export default function RequestStatusPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[
           { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
           { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart     size={16} />, color: '#5B21B6' },
-          { label: 'Request Ambulance', href: '/patient/request-ambulance', icon: <Ambulance size={16} />, color: '#B86E00' },
         ].map(l => (
           <a key={l.label} href={l.href}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E8E4D8] hover:border-[#7AB648] transition-colors text-center">
