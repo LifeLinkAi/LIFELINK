@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import api from '@/lib/axios';
 
 // Interfaces for Organ Management data structures
 interface OrganRequest {
@@ -115,6 +116,10 @@ export default function OrganManagementPage() {
   const [newSurgTime, setNewSurgTime] = useState('08:00 AM');
   const [newSurgNotes, setNewSurgNotes] = useState('');
 
+  // Database States
+  const [requests, setRequests] = useState<OrganRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -123,159 +128,45 @@ export default function OrganManagementPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Mock Organ Requests Dataset
-  const [requests, setRequests] = useState<OrganRequest[]>([
-    {
-      id: 'REQ-7842',
-      patientName: 'Sarah Jenkins',
-      age: 28,
-      gender: 'Female',
-      organType: 'Kidney',
-      bloodGroup: 'O+',
-      urgency: 'Critical',
-      status: 'Awaiting Match',
-      matchPercentage: null,
-      registeredDate: '2026-05-18',
-      hlaCompatibility: { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-      checklist: { identityVerified: true, medicalClearance: false, legalConsent: true },
-      notes: 'End-stage renal disease. Patient is on dialysis 3x weekly. Urgently looking for O+ kidney match.'
-    },
-    {
-      id: 'REQ-7841',
-      patientName: 'Michael Chang',
-      age: 42,
-      gender: 'Male',
-      organType: 'Heart',
-      bloodGroup: 'A-',
-      urgency: 'High',
-      status: 'Verification',
-      matchPercentage: 94,
-      registeredDate: '2026-05-15',
-      hlaCompatibility: { classI: '6/6', classII: '4/4', classIPercent: 100, classIIPercent: 100 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: false },
-      notes: 'Severe dilated cardiomyopathy. High matching donor candidate selected (DON-5013), awaiting legal consent completion.'
-    },
-    {
-      id: 'REQ-7839',
-      patientName: 'Elena Rostova',
-      age: 35,
-      gender: 'Female',
-      organType: 'Liver',
-      bloodGroup: 'B+',
-      urgency: 'Routine',
-      status: 'Scheduled',
-      matchPercentage: 98,
-      registeredDate: '2026-05-10',
-      hlaCompatibility: { classI: '6/6', classII: '3/4', classIPercent: 100, classIIPercent: 75 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      notes: 'Chronic hepatic cirrhosis. Surgery scheduled for May 29 with donor DON-5012.'
-    },
-    {
-      id: 'REQ-7843',
-      patientName: 'David Miller',
-      age: 51,
-      gender: 'Male',
-      organType: 'Lung',
-      bloodGroup: 'O-',
-      urgency: 'Critical',
-      status: 'Awaiting Match',
-      matchPercentage: null,
-      registeredDate: '2026-05-20',
-      hlaCompatibility: { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-      checklist: { identityVerified: true, medicalClearance: false, legalConsent: false },
-      notes: 'Idiopathic pulmonary fibrosis. Inpatient ICU oxygen dependency. Critical need for lungs.'
-    },
-    {
-      id: 'REQ-7844',
-      patientName: 'Aisha Vance',
-      age: 19,
-      gender: 'Female',
-      organType: 'Pancreas',
-      bloodGroup: 'AB+',
-      urgency: 'Routine',
-      status: 'Scheduled',
-      matchPercentage: 92,
-      registeredDate: '2026-05-08',
-      hlaCompatibility: { classI: '5/6', classII: '4/4', classIPercent: 83, classIIPercent: 100 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      notes: 'Type 1 diabetes complications, kidney-pancreas dual recipient candidate. Pancreas surgery scheduled.'
-    },
-    {
-      id: 'REQ-7845',
-      patientName: 'Carlos Mendez',
-      age: 63,
-      gender: 'Male',
-      organType: 'Kidney',
-      bloodGroup: 'B-',
-      urgency: 'High',
-      status: 'Verification',
-      matchPercentage: 88,
-      registeredDate: '2026-05-14',
-      hlaCompatibility: { classI: '5/6', classII: '3/4', classIPercent: 83, classIIPercent: 75 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: false },
-      notes: 'Polycystic kidney disease. Potential living donor match registered, undergoing legal consent check.'
-    },
-    {
-      id: 'REQ-7846',
-      patientName: 'Chloe Dupont',
-      age: 31,
-      gender: 'Female',
-      organType: 'Heart',
-      bloodGroup: 'O+',
-      urgency: 'Critical',
-      status: 'Awaiting Match',
-      matchPercentage: null,
-      registeredDate: '2026-05-21',
-      hlaCompatibility: { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-      checklist: { identityVerified: false, medicalClearance: false, legalConsent: true },
-      notes: 'Acute myocarditis. Placed on ECMO support. Extremely critical condition.'
-    },
-    {
-      id: 'REQ-7847',
-      patientName: 'Arthur Pendelton',
-      age: 47,
-      gender: 'Male',
-      organType: 'Liver',
-      bloodGroup: 'A+',
-      urgency: 'Routine',
-      status: 'Completed',
-      matchPercentage: 95,
-      registeredDate: '2026-04-30',
-      hlaCompatibility: { classI: '6/6', classII: '4/4', classIPercent: 100, classIIPercent: 100 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      notes: 'Hepatocellular carcinoma post-resection liver transplant. Successful operation.'
-    },
-    {
-      id: 'REQ-7848',
-      patientName: 'Grace Hopper',
-      age: 24,
-      gender: 'Female',
-      organType: 'Kidney',
-      bloodGroup: 'AB-',
-      urgency: 'High',
-      status: 'Awaiting Match',
-      matchPercentage: null,
-      registeredDate: '2026-05-12',
-      hlaCompatibility: { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      notes: 'Chronic glomerulonephritis. Awaiting suitable matched living or deceased donor.'
-    },
-    {
-      id: 'REQ-7849',
-      patientName: 'Marcus Aurelius',
-      age: 56,
-      gender: 'Male',
-      organType: 'Lung',
-      bloodGroup: 'B+',
-      urgency: 'Critical',
-      status: 'Verification',
-      matchPercentage: 91,
-      registeredDate: '2026-05-19',
-      hlaCompatibility: { classI: '5/6', classII: '4/4', classIPercent: 83, classIIPercent: 100 },
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: false },
-      notes: 'Severe COPD. High urgency matching lung donor identified, crossmatching verified.'
+  // Fetch Requests from DB
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/requests?type=Organ');
+      // Set to requests
+      const mapped = res.data.map((r: any) => ({
+        id: r.id || r._id,
+        patientName: r.patientName,
+        age: r.age,
+        gender: r.gender,
+        organType: r.organType,
+        bloodGroup: r.bloodGroup,
+        urgency: r.urgency,
+        status: r.status,
+        matchPercentage: r.matchPercentage,
+        registeredDate: r.registeredDate ? r.registeredDate.split('T')[0] : '',
+        hlaCompatibility: r.hlaCompatibility || { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
+        checklist: r.checklist || { identityVerified: true, medicalClearance: true, legalConsent: true },
+        notes: r.notes || '',
+      }));
+      setRequests(mapped);
+      if (mapped.length > 0) {
+        setSelectedRequestId(mapped[0].id);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to fetch organ requests from database.');
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+
+
 
   // Mock Organ Donors Dataset
   const [donors, setDonors] = useState<DonorRecord[]>([
