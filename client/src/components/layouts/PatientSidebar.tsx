@@ -1,10 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Siren, Droplets, Heart,
   Clock, MapPin, FileHeart,
-  Settings, HelpCircle, ArrowLeftRight,
+  Settings, HelpCircle, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +20,13 @@ const NAV = [
 
 export function PatientSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.removeItem('lifelink-auth');
+    sessionStorage.clear();
+    router.push('/login');
+  };
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-[240px] bg-[#1a0a0a] flex flex-col z-50 overflow-hidden">
@@ -70,13 +77,14 @@ export function PatientSidebar() {
 
       {/* Role switch + bottom */}
       <div className="border-t border-white/10 px-2 py-2 flex-shrink-0 space-y-0.5">
-        <Link
-          href="/role-switch"
-          className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all"
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all"
         >
-          <ArrowLeftRight size={16} /> Switch to Donor
-        </Link>
-        <Link href="/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+          <LogOut size={16} /> Logout
+        </button>
+        <Link href="/patient/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <Settings size={16} /> Settings
         </Link>
         <Link href="/support" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
