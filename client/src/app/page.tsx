@@ -71,7 +71,7 @@ export default function LandingPage() {
                 animate="visible"
                 className="font-dmsans text-lg md:text-xl leading-[1.6] text-brand-textDark max-w-[550px] mb-10"
               >
-                Connecting donors, hospitals, and emergency responders through real-time AI coordination.
+                Connecting donors, hospitals, and healthcare networks through real-time AI coordination.
               </motion.p>
 
               {/* Action Buttons */}

@@ -7,7 +7,6 @@ import {
   ArrowDown, 
   Activity, 
   Heart, 
-  Truck, 
   Network, 
   CheckCircle2, 
   Radio, 
@@ -55,19 +54,6 @@ export default function ServicesPage() {
         "Legal & Ethical Compliance Hub"
       ],
       buttonText: "Gift of Life Registry"
-    },
-    {
-      title: "Ambulance AI Logistics",
-      description: "Dynamic fleet telemetry and AI route optimization reduce response times by up to 40%. Our centralized dispatch ensures the closest unit is always deployed with the right equipment.",
-      imageUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDLwTkZ9uB7lIufCwbdR3pO8WJGTLbyC7zpvSBpobNWxRr9YtGGxE5bkmSJyZJ5T3Px0ufYA8rzBLKLUvanmr_qVw04nLS8mXKEMup3-8cedVCzAEbkARa4Tk2GX6toV4o950JXZUlI2jUF1yp4FVPYOFX55R1ztgIekA75KkB1HKoVCc3hUO6StmjH4mjP1lqWepRz0jnzmOJMAIj9nKpXMBEoAPQ2TBX0rHWqlYNSJChD-kcXZte1FKUVVKMVxCte2QJwxEKPSqXW",
-      badgeText: "Real-Time GPS",
-      badgeIcon: <Truck className="w-3.5 h-3.5" />,
-      features: [
-        "Traffic-Preemption Intelligence",
-        "Live Vital Data Uplink to Trauma Center",
-        "Smart Dispatch Fleet Telemetry"
-      ],
-      buttonText: "View Fleet Telemetry"
     },
     {
       title: "Hospital Unified Network",
@@ -147,10 +133,10 @@ export default function ServicesPage() {
           </div>
         </section>
 
-        {/* 4 Core Services Grid */}
+        {/* 3 Core Services Grid */}
         <section className="w-full px-6 lg:px-12 py-24 flex items-center justify-center" id="services">
           <div className="w-full max-w-[1280px]">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 w-full">
               {services.map((svc, i) => (
                 <motion.div 
                   key={svc.title}
@@ -158,12 +144,10 @@ export default function ServicesPage() {
                   whileInView="visible"
                   viewport={{ once: true, margin: '-50px' }}
                   variants={fadeInUp}
-                  custom={i % 2 === 0 ? 1 : 2}
-                  whileHover={{ y: -6, boxShadow: '0 25px 50px rgba(62,82,25,0.06)' }}
+                  custom={i}
+                  whileHover={{ y: -6, boxShadow: '0 25px 50px rgba(18,62,32,0.06)' }}
                   transition={{ duration: 0.3 }}
-                  className={`bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 shadow-sm hover:shadow-xl transition-all duration-500 flex flex-col justify-between group ${
-                    i % 2 !== 0 ? 'md:mt-10' : ''
-                  }`}
+                  className="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 shadow-sm hover:shadow-xl transition-all duration-500 flex flex-col justify-between group"
                 >
                   <div className="flex flex-col gap-6">
                     {/* Card Image */}
@@ -252,7 +236,7 @@ export default function ServicesPage() {
                 </div>
                 <h4 className="font-syne font-bold text-lg mb-2 text-secondary-fixed">Step 02: Logistics</h4>
                 <p className="font-dmsans text-sm opacity-80 leading-relaxed">
-                  Autonomous and tracked ambulance dispatch finds the optimal route, clearing traffic for rapid transfer.
+                  AI-optimized transport routing coordinates secure, rapid transfer of blood and organs.
                 </p>
               </div>
             </div>

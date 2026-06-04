@@ -50,8 +50,8 @@ export default function FeaturesPage() {
       )
     },
     {
-      title: "Real-Time Emergency Navigation & Fleet Logistics",
-      description: "Seamless indoor mapping utilizing BLE beacons and Wi-Fi triangulation to guide patients and optimize fleet routing through complex hospital ecosystems effortlessly.",
+      title: "Real-Time Campus Navigation & Indoor Mapping",
+      description: "Seamless indoor mapping utilizing BLE beacons and Wi-Fi triangulation to guide patients and optimize routing through complex hospital ecosystems effortlessly.",
       tags: ["BLE Beacons", "Indoor GPS"],
       icon: <Map className="w-6 h-6" />,
       visual: (
