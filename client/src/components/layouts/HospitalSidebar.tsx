@@ -1,9 +1,9 @@
- 'use client';
+'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Droplets, Heart, Star, ShieldCheck,
-  AlertTriangle, Truck, FlaskConical, Settings, HelpCircle, Plus,
+  AlertTriangle, FlaskConical, Settings, HelpCircle, Plus, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,12 +14,18 @@ const NAV = [
   { label: 'Organ Requests',     href: '/hospital/organ-requests',         icon: Heart           },
   { label: 'Donation Monitor',   href: '/hospital/donation-monitor',       icon: Star            },
   { label: 'Donor Verification', href: '/hospital/donor-verification',     icon: ShieldCheck     },
-  { label: 'Ambulance',          href: '/hospital/ambulance-coordination', icon: Truck           },
   { label: 'Blood Stock',        href: '/hospital/blood-stock',            icon: FlaskConical    },
 ];
 
 export function HospitalSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.removeItem('lifelink-auth');
+    sessionStorage.clear();
+    router.push('/login');
+  };
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-[240px] bg-brand-900 flex flex-col z-50 overflow-hidden">
@@ -67,12 +73,19 @@ export function HospitalSidebar() {
 
       {/* Bottom */}
       <div className="border-t border-white/10 px-2 py-2 flex-shrink-0 space-y-0.5">
-        <Link href="/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+        <Link href="/hospital/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <Settings size={16} /> Settings
         </Link>
         <Link href="/support" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <HelpCircle size={16} /> Support
         </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all"
+        >
+          <LogOut size={16} /> Logout
+        </button>
       </div>
     </aside>
   );
