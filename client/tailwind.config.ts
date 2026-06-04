@@ -43,6 +43,22 @@ const config: Config = {
         "margin-mobile": "16px"
       },
       colors: {
+        "custom-dark-green": "#123e20",
+        "custom-sec-green": "#2d6a4f",
+        "custom-coral": "#ba1a1a",
+        "custom-card-mint": "#d8f3dc",
+        "custom-deep-red": "#8b0000",
+        "custom-bg": "#f5f1e8",
+        "settings-bg": "#F5F1E8",
+        "settings-on-bg": "#14291F",
+        "settings-primary": "#14291F",
+        "settings-secondary": "#2D4A3A",
+        "settings-outline": "#D8D2C4",
+        "settings-outline-var": "#D8D2C4",
+        "settings-surface-dim": "#E8EDE5",
+        "settings-surface": "#FFFFFF",
+        "settings-success": "#3A5544",
+        "settings-error": "#E5484D",
         brand: {
           900: '#1a2e0a',
           800: '#2B4A18',
