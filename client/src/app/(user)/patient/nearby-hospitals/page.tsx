@@ -1,6 +1,6 @@
 ﻿'use client';
 import { useState } from 'react';
-import { MapPin, Phone, Clock, Droplets, Heart, Ambulance, Search, Navigation } from 'lucide-react';
+import { MapPin, Phone, Clock, Droplets, Heart, Search, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BloodStock {
@@ -21,7 +21,6 @@ interface Hospital {
   emergencyOpen: boolean;
   bloodBank: boolean;
   organTransplant: boolean;
-  ambulanceAvailable: boolean;
   rating: number;
   bloodStock: BloodStock[];
   waitTime: string;
@@ -34,7 +33,7 @@ const HOSPITALS: Hospital[] = [
     address: 'Medical College Rd, Kozhikode, Kerala',
     phone: '+91 495 276 1000',
     type: 'Private', emergencyOpen: true,
-    bloodBank: true, organTransplant: true, ambulanceAvailable: true,
+    bloodBank: true, organTransplant: true,
     rating: 4.8, waitTime: '45 min',
     bloodStock: [
       { group: 'O-',  level: 'critical', units: 12  },
@@ -49,7 +48,7 @@ const HOSPITALS: Hospital[] = [
     address: 'Medical College Rd, Kozhikode, Kerala 673008',
     phone: '+91 495 235 0216',
     type: 'Government', emergencyOpen: true,
-    bloodBank: true, organTransplant: false, ambulanceAvailable: true,
+    bloodBank: true, organTransplant: false,
     rating: 4.2, waitTime: '1.2 hrs',
     bloodStock: [
       { group: 'O+',  level: 'optimal',  units: 210 },
@@ -64,7 +63,7 @@ const HOSPITALS: Hospital[] = [
     address: 'Indira Gandhi Rd, Kozhikode, Kerala 673004',
     phone: '+91 495 276 6666',
     type: 'Private', emergencyOpen: true,
-    bloodBank: true, organTransplant: false, ambulanceAvailable: false,
+    bloodBank: true, organTransplant: false,
     rating: 4.5, waitTime: '30 min',
     bloodStock: [
       { group: 'A+',  level: 'optimal',  units: 142 },
@@ -79,7 +78,7 @@ const HOSPITALS: Hospital[] = [
     address: 'Mini Bypass Rd, Kozhikode, Kerala 673016',
     phone: '+91 495 303 0303',
     type: 'Private', emergencyOpen: true,
-    bloodBank: true, organTransplant: true, ambulanceAvailable: true,
+    bloodBank: true, organTransplant: true,
     rating: 4.6, waitTime: '20 min',
     bloodStock: [
       { group: 'O-',  level: 'adequate', units: 34  },
@@ -94,7 +93,7 @@ const HOSPITALS: Hospital[] = [
     address: 'Govindapuram, Kozhikode, Kerala 673016',
     phone: '+91 495 305 7000',
     type: 'Private', emergencyOpen: false,
-    bloodBank: true, organTransplant: false, ambulanceAvailable: true,
+    bloodBank: true, organTransplant: false,
     rating: 4.3, waitTime: 'Closed',
     bloodStock: [
       { group: 'A+',  level: 'optimal',  units: 88  },
@@ -148,8 +147,8 @@ function BloodStockBar({ stock }: { stock: BloodStock }) {
   );
 }
 
-function HospitalCard({ hospital: h, onGetDirections, onRequestAmbulance }:
-  { hospital: Hospital; onGetDirections: (id: string) => void; onRequestAmbulance: () => void }
+function HospitalCard({ hospital: h, onGetDirections }:
+  { hospital: Hospital; onGetDirections: (id: string) => void }
 ) {
   const [expanded, setExpanded] = useState(false);
 
@@ -207,11 +206,6 @@ function HospitalCard({ hospital: h, onGetDirections, onRequestAmbulance }:
               <Heart size={10} /> Organ Transplant
             </span>
           )}
-          {h.ambulanceAvailable && (
-            <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-              <Ambulance size={10} /> Ambulance
-            </span>
-          )}
         </div>
 
         {/* Actions */}
@@ -226,14 +220,6 @@ function HospitalCard({ hospital: h, onGetDirections, onRequestAmbulance }:
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[12px] font-medium rounded-lg hover:border-[#7AB648] transition-colors">
             <Phone size={12} /> Call
           </a>
-          {h.ambulanceAvailable && (
-            <button
-              onClick={onRequestAmbulance}
-              className="flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white text-[12px] font-medium rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <Ambulance size={12} /> Request Ambulance
-            </button>
-          )}
           <button
             onClick={() => setExpanded(e => !e)}
             className="flex items-center gap-1 px-3 py-2 bg-white border border-[#D0CCBC] text-[#6B7A5A] text-[12px] font-medium rounded-lg hover:border-[#7AB648] transition-colors ml-auto"
@@ -267,7 +253,6 @@ export default function NearbyHospitalsPage() {
     { key: 'all',    label: 'All'              },
     { key: 'blood',  label: '🩸 Blood Bank'    },
     { key: 'organ',  label: '🫀 Organ Transplant'},
-    { key: 'amb',    label: '🚑 Ambulance'     },
     { key: 'open',   label: '✓ ER Open'        },
   ];
 
@@ -277,7 +262,6 @@ export default function NearbyHospitalsPage() {
       const mf = filterService === 'all'   ? true
                : filterService === 'blood' ? h.bloodBank
                : filterService === 'organ' ? h.organTransplant
-               : filterService === 'amb'   ? h.ambulanceAvailable
                : filterService === 'open'  ? h.emergencyOpen
                : true;
       return ms && mf;
@@ -305,12 +289,11 @@ export default function NearbyHospitalsPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Total Nearby',    value: HOSPITALS.length,                                color: '' },
           { label: 'ER Open',         value: HOSPITALS.filter(h => h.emergencyOpen).length,   color: 'text-green-700' },
           { label: 'Blood Banks',     value: HOSPITALS.filter(h => h.bloodBank).length,       color: 'text-red-600'   },
-          { label: 'With Ambulance',  value: HOSPITALS.filter(h => h.ambulanceAvailable).length, color: 'text-amber-600' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-[#E8E4D8] p-4 text-center">
             <p className={cn('text-[26px] font-bold leading-none', s.color || 'text-[#1a2e0a]')}>{s.value}</p>
@@ -370,7 +353,6 @@ export default function NearbyHospitalsPage() {
               <HospitalCard
                 key={h.id} hospital={h}
                 onGetDirections={handleDirections}
-                onRequestAmbulance={() => window.location.href = '/patient/request-ambulance'}
               />
             ))
           : (
