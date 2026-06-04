@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import api from '@/lib/axios';
 
 // Define the interface for our Donor data model
 interface Donor {
@@ -34,107 +35,17 @@ export default function DonorManagementPage() {
   // State for modal (e.g. Add Donor)
   const [isAddDonorOpen, setIsAddDonorOpen] = useState(false);
 
-  // Mock donor list representing verified lifesavers
-  const initialDonors: Donor[] = [
-    {
-      id: 'D-8942',
-      name: 'Marcus Vance',
-      location: 'Portland, OR',
-      bloodType: 'O-',
-      tier: 'Gold',
-      status: 'Verified',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=256',
-      email: 'marcus.vance@example.com',
-      phone: '+1 (503) 555-0192',
-      lastDonation: '2026-04-02',
-      totalDonated: '14 Liters',
-      details: 'Universal donor. Very active in emergency drives and quick-response calls.',
-    },
-    {
-      id: 'D-3104',
-      name: 'Elena Rostova',
-      location: 'Seattle, WA',
-      bloodType: 'A+',
-      tier: 'Platinum',
-      status: 'Available',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
-      email: 'elena.r@example.com',
-      phone: '+1 (206) 555-0143',
-      lastDonation: '2026-05-10',
-      totalDonated: '28 Liters',
-      details: 'Regular blood and plasma donor. Highly dependable with perfect clinical logs.',
-    },
-    {
-      id: 'D-7742',
-      name: 'Amara Okafor',
-      location: 'Los Angeles, CA',
-      bloodType: 'B+',
-      tier: 'Silver',
-      status: 'Verified',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
-      email: 'amara.o@example.com',
-      phone: '+1 (310) 555-0188',
-      lastDonation: '2026-03-15',
-      totalDonated: '10 Liters',
-      details: 'Active blood donor. Joined the network last year. Participated in 5 local donation drives.',
-    },
-    {
-      id: 'D-4921',
-      name: 'David Chen',
-      location: 'San Francisco, CA',
-      bloodType: 'AB-',
-      tier: 'Bronze',
-      status: 'Pending',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
-      email: 'david.chen@example.com',
-      phone: '+1 (415) 555-0174',
-      lastDonation: 'N/A',
-      totalDonated: '0 Liters',
-      details: 'Recently registered donor. Awaiting medical verification of documents and blood group confirmation.',
-    },
-    {
-      id: 'D-1049',
-      name: 'Sarah Connor',
-      location: 'Austin, TX',
-      bloodType: 'O+',
-      tier: 'Gold',
-      status: 'Verified',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=256',
-      email: 's.connor@example.com',
-      phone: '+1 (512) 555-0112',
-      lastDonation: '2026-01-22',
-      totalDonated: '16 Liters',
-      details: 'Maintains optimal health record. Readily available for emergency local O+ requests.',
-    },
-    {
-      id: 'D-0001',
-      name: 'Bruce Wayne',
-      location: 'Gotham, NJ',
-      bloodType: 'O-',
-      tier: 'Platinum',
-      status: 'Blocked',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&q=80&w=256',
-      email: 'bruce.w@waynecorp.com',
-      phone: '+1 (609) 555-0100',
-      lastDonation: '2025-12-12',
-      totalDonated: '32 Liters',
-      details: 'Temporarily ineligible due to international travel in high-risk zones. Re-evaluation scheduled for next month.',
-    },
-    {
-      id: 'D-5112',
-      name: 'Zara Larsson',
-      location: 'New York, NY',
-      bloodType: 'A-',
-      tier: 'Silver',
-      status: 'Available',
-      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=256',
-      email: 'zara.l@example.com',
-      phone: '+1 (212) 555-0155',
-      lastDonation: '2026-04-29',
-      totalDonated: '8 Liters',
-      details: 'Fast response times for hospital requests in the Manhattan area. Outstanding health record.',
-    }
-  ];
+  // Real Database Donors State
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // New Donor Form Fields
+  const [newDonorName, setNewDonorName] = useState('');
+  const [newDonorEmail, setNewDonorEmail] = useState('');
+  const [newDonorLocation, setNewDonorLocation] = useState('');
+  const [newDonorPhone, setNewDonorPhone] = useState('');
+  const [newDonorBlood, setNewDonorBlood] = useState('O-');
+  const [newDonorTier, setNewDonorTier] = useState('Bronze');
 
   // Helper to show interactive toast notifications
   const showToast = (message: string) => {
@@ -142,9 +53,37 @@ export default function DonorManagementPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Fetch Donors from Database
+  const fetchDonors = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/donors');
+      setDonors(res.data);
+    } catch (error) {
+      console.error('Error fetching donors:', error);
+      showToast('❌ Failed to load donors from database.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDonors();
+  }, []);
+
+  // Compute stats based on real database records
+  const stats = useMemo(() => {
+    const total = donors.length;
+    const verified = donors.filter(d => d.status === 'Verified').length;
+    const pending = donors.filter(d => d.status === 'Pending').length;
+    const available = donors.filter(d => d.status === 'Available').length;
+    const blocked = donors.filter(d => d.status === 'Blocked').length;
+    return { total, verified, pending, available, blocked };
+  }, [donors]);
+
   // Filter donor list dynamically based on search query, blood group, and status filter
   const filteredDonors = useMemo(() => {
-    return initialDonors.filter(donor => {
+    return donors.filter(donor => {
       const matchesSearch = 
         donor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         donor.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -155,7 +94,7 @@ export default function DonorManagementPage() {
       
       return matchesSearch && matchesBlood && matchesStatus;
     });
-  }, [searchQuery, bloodFilter, statusFilter]);
+  }, [donors, searchQuery, bloodFilter, statusFilter]);
 
   // Open details slide panel
   const handleOpenPanel = (donor: Donor) => {
@@ -169,6 +108,71 @@ export default function DonorManagementPage() {
     setSearchQuery('');
     showToast(`Filtering lists to: ${status === 'All' ? 'All Donors' : status}`);
   };
+
+  // Submit hander for adding new donor to database
+  const handleAddDonorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDonorName || !newDonorEmail || !newDonorLocation) {
+      showToast('❌ Name, email, and location are required.');
+      return;
+    }
+    try {
+      const payload = {
+        name: newDonorName,
+        email: newDonorEmail,
+        bloodType: newDonorBlood,
+        tier: newDonorTier,
+        location: newDonorLocation,
+        phone: newDonorPhone || '+1 (555) 0199',
+        status: 'Pending',
+        details: 'Registered donor. Verification and documentation pending review.',
+      };
+      const res = await api.post('/donors', payload);
+      setDonors(prev => [res.data, ...prev]);
+      setIsAddDonorOpen(false);
+      // Reset inputs
+      setNewDonorName('');
+      setNewDonorEmail('');
+      setNewDonorLocation('');
+      setNewDonorPhone('');
+      setNewDonorBlood('O-');
+      setNewDonorTier('Bronze');
+      showToast('🎉 Donor successfully registered in the database!');
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.message || 'Failed to register donor.';
+      showToast(`❌ ${errMsg}`);
+    }
+  };
+
+  // Update donor status
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await api.put(`/donors/${id}`, { status: newStatus });
+      setDonors(prev => prev.map(d => d.id === id ? res.data : d));
+      setSelectedDonor(res.data);
+      showToast(`Status updated to ${newStatus}`);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to update donor status.');
+    }
+  };
+
+  // Delete donor from database
+  const handleDeleteDonor = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this donor?')) return;
+    try {
+      await api.delete(`/donors/${id}`);
+      setDonors(prev => prev.filter(d => d.id !== id));
+      setIsPanelOpen(false);
+      setSelectedDonor(null);
+      showToast('🗑️ Donor deleted successfully.');
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to delete donor.');
+    }
+  };
+
 
   return (
     <div className="space-y-lg pb-xxl w-full relative">
@@ -218,10 +222,9 @@ export default function DonorManagementPage() {
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           <div className="flex justify-between items-start mb-4 relative z-10">
             <span className="material-symbols-outlined text-white/80 text-3xl">groups</span>
-            <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full text-white">+12%</span>
           </div>
           <p className="font-body-sm text-body-sm text-white/80 mb-1">Total Donors</p>
-          <h3 className="font-syne font-bold text-[32px] tracking-tight leading-none">12.4k</h3>
+          <h3 className="font-syne font-bold text-[32px] tracking-tight leading-none">{stats.total}</h3>
         </div>
 
         {/* Verified Card */}
@@ -237,7 +240,7 @@ export default function DonorManagementPage() {
             <span className="material-symbols-outlined text-primary text-3xl">verified_user</span>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant mb-1">Verified</p>
-          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">10,842</h3>
+          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.verified}</h3>
         </div>
 
         {/* Pending Card */}
@@ -254,7 +257,7 @@ export default function DonorManagementPage() {
             <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></span>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant mb-1">Pending Review</p>
-          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">845</h3>
+          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.pending}</h3>
         </div>
 
         {/* Available Now Card (Pulsing live indicator) */}
@@ -277,7 +280,7 @@ export default function DonorManagementPage() {
             <span className="material-symbols-outlined text-secondary text-3xl text-green-700">emergency_home</span>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant mb-1">Available Now</p>
-          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">432</h3>
+          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.available}</h3>
         </div>
 
         {/* Blocked Card */}
@@ -293,7 +296,7 @@ export default function DonorManagementPage() {
             <span className="material-symbols-outlined text-red-500 text-3xl">block</span>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant mb-1">Ineligible / Blocked</p>
-          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">281</h3>
+          <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.blocked}</h3>
         </div>
       </div>
 
@@ -608,19 +611,33 @@ export default function DonorManagementPage() {
 
               {/* Action Operations Area */}
               <div className="space-y-3 border-t border-outline-variant/20 pt-6">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Modify Account Status</p>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleUpdateStatus(selectedDonor.id, 'Verified')}
+                    className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white rounded-xl font-syne font-bold text-xs shadow-sm transition-colors text-center"
+                  >
+                    Verify
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateStatus(selectedDonor.id, 'Available')}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-syne font-bold text-xs shadow-sm transition-colors text-center"
+                  >
+                    Set Available
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateStatus(selectedDonor.id, 'Blocked')}
+                    className="flex-1 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-syne font-bold text-xs shadow-sm transition-colors text-center"
+                  >
+                    Block
+                  </button>
+                </div>
                 <button 
-                  onClick={() => showToast(`Emergency alert dispatched to ${selectedDonor.name}`)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-syne font-bold text-sm shadow-md transition-colors"
+                  onClick={() => handleDeleteDonor(selectedDonor.id)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-syne font-bold text-sm shadow-md transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[18px]">emergency_share</span>
-                  Dispatch Emergency Request
-                </button>
-                <button 
-                  onClick={() => showToast(`Notification sent to ${selectedDonor.name}`)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-white hover:bg-neutral-50 text-primary border border-outline-variant/50 rounded-xl font-syne font-bold text-sm transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">notifications_active</span>
-                  Send Portal Notification
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                  Delete Donor Profile
                 </button>
               </div>
             </div>
@@ -639,15 +656,13 @@ export default function DonorManagementPage() {
             <h3 className="font-syne font-bold text-xl text-primary mb-2">Register New Donor</h3>
             <p className="text-xs text-on-surface-variant mb-4">Input donor credentials to register them on the coordination matrix.</p>
             
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setIsAddDonorOpen(false);
-              showToast('Donor successfully registered (mock database update)');
-            }} className="space-y-4">
+            <form onSubmit={handleAddDonorSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Full Name</label>
                 <input 
                   type="text" 
+                  value={newDonorName}
+                  onChange={(e) => setNewDonorName(e.target.value)}
                   placeholder="e.g. Liam Neeson" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
@@ -656,24 +671,32 @@ export default function DonorManagementPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Blood Group</label>
-                  <select className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer">
-                    <option>O-</option>
-                    <option>O+</option>
-                    <option>A+</option>
-                    <option>A-</option>
-                    <option>B+</option>
-                    <option>B-</option>
-                    <option>AB-</option>
-                    <option>AB+</option>
+                  <select 
+                    value={newDonorBlood}
+                    onChange={(e) => setNewDonorBlood(e.target.value)}
+                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+                  >
+                    <option value="O-">O-</option>
+                    <option value="O+">O+</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB-">AB-</option>
+                    <option value="AB+">AB+</option>
                   </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Tier Level</label>
-                  <select className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer">
-                    <option>Bronze</option>
-                    <option>Silver</option>
-                    <option>Gold</option>
-                    <option>Platinum</option>
+                  <select 
+                    value={newDonorTier}
+                    onChange={(e) => setNewDonorTier(e.target.value)}
+                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+                  >
+                    <option value="Bronze">Bronze</option>
+                    <option value="Silver">Silver</option>
+                    <option value="Gold">Gold</option>
+                    <option value="Platinum">Platinum</option>
                   </select>
                 </div>
               </div>
@@ -681,6 +704,8 @@ export default function DonorManagementPage() {
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Location (City, State)</label>
                 <input 
                   type="text" 
+                  value={newDonorLocation}
+                  onChange={(e) => setNewDonorLocation(e.target.value)}
                   placeholder="e.g. New York, NY" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
@@ -690,9 +715,21 @@ export default function DonorManagementPage() {
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Email Address</label>
                 <input 
                   type="email" 
+                  value={newDonorEmail}
+                  onChange={(e) => setNewDonorEmail(e.target.value)}
                   placeholder="name@example.com" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Phone Number (Optional)</label>
+                <input 
+                  type="text" 
+                  value={newDonorPhone}
+                  onChange={(e) => setNewDonorPhone(e.target.value)}
+                  placeholder="+1 (555) 0199" 
+                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                 />
               </div>
               <div className="flex gap-3 justify-end pt-4">

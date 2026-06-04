@@ -8,7 +8,10 @@ export const getSocket = (): Socket => {
     socket = io(
       process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:5000',
       {
-        auth: (cb) => cb({ token: Cookies.get('ll_access_token') }),
+        auth: (cb) => {
+          const token = Cookies.get('ll_access_token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+          cb({ token });
+        },
         autoConnect: false,
         reconnection: true,
         reconnectionAttempts: 5,
