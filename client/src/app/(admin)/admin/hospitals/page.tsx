@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import api from '@/lib/axios';
 
 // Define Interface for Hospital
 interface Hospital {
@@ -50,162 +51,16 @@ export default function HospitalManagementPage() {
   const [isAddHospitalOpen, setIsAddHospitalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Mock hospital data list
-  const initialHospitals: Hospital[] = [
-    {
-      id: 'H-99201',
-      licenseId: 'LIC-99201-B',
-      name: 'Central Medicare Center',
-      city: 'San Francisco',
-      location: 'San Francisco, CA',
-      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCndKwZAiRIDmkFZ4FWM6JczqMsVNmmTEqsvQplK2qg6W7WhHJXzeBhb_0ldWIM0FZUh_skk8SX2JAJsfwFVtAqY4GzUMjsmtJkwL91RGlys15J5qjT1g236YyNWTz8l3igdzqAJYVxnuo1eb-3OZax4sx9HfbZknVtabk2X8lfYMiWo-d1T_U_pkuJy-h5N6saaq7D-1kyLSfnKOUI7xJtJrJuVux-orPLHFquh0CptbaQyskT9gmizL8wmwTH-BFOOtPH1OcTGXWw',
-      specialties: ['ER', 'Trauma'],
-      status: 'Verified',
-      patientCount: 284,
-      rating: 4.8,
-      bloodHealthLevels: [90, 60, 80, 40],
-      bloodHealthStatus: 'Optimal',
-      bloodStock: {
-        'A+': 420, 'A-': 128, 'B+': 12, 'B-': 88,
-        'O+': 512, 'O-': 8, 'AB+': 194, 'AB-': 44
-      },
-      documents: [
-        { 
-          name: 'State License 2024', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
-        },
-        { 
-          name: 'ISO Safety Cert', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
-        }
-      ],
-      recentActivity: [
-        { title: 'Emergency Admission', description: 'Trauma Unit', time: '12 mins ago', type: 'admission' },
-        { title: 'Blood Unit Requested', description: 'B+ Unit', time: '45 mins ago', type: 'blood' },
-        { title: 'Driver Dispatched', description: 'Route: Hub B to Medicare', time: '1h ago', type: 'dispatch' }
-      ]
-    },
-    {
-      id: 'H-77412',
-      licenseId: 'LIC-77412-A',
-      name: 'Eastside Clinic',
-      city: 'Oakland',
-      location: 'Oakland, CA',
-      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBv35N9rbEue8kENJIxoCOenjXxjHj7_Wp6OWdzEtJEVCX-5NUWT9KfcGFnMApyYHStm37tWcsgL5qzvBYQfI3Cozv6UhbUmeCa54tCDeYyWmsSrM9iqTT8PvVVUhBkBweL7kF80PBT43JPjFNxW3CmsuhyBDm7T37wP4x-g-hxtd-Mi3qYsqegQHuSNZqvyRoI4_OdK1l0tDeqqbLbWtiISfT0ollryDcaxrEfAKb98jn67g1rvVDAZ9REKINpNEJmk-pFBXv5-Exf',
-      specialties: ['General'],
-      status: 'Pending',
-      patientCount: 42,
-      rating: '--',
-      bloodHealthLevels: [20, 30, 15, 10],
-      bloodHealthStatus: 'Critical',
-      bloodStock: {
-        'A+': 15, 'A-': 5, 'B+': 2, 'B-': 10,
-        'O+': 20, 'O-': 1, 'AB+': 8, 'AB-': 2
-      },
-      documents: [
-        { 
-          name: 'State License 2024', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
-        }
-      ],
-      recentActivity: [
-        { title: 'Pending Verification Check', description: 'Admin verification audit', time: '1h ago', type: 'other' },
-        { title: 'Registry Document Uploaded', description: 'License file upload', time: '3h ago', type: 'other' }
-      ]
-    },
-    {
-      id: 'H-88421',
-      licenseId: 'LIC-88421-C',
-      name: 'St. Jude Medical Center',
-      city: 'San Jose',
-      location: 'San Jose, CA',
-      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNkJyO7fkWxsEnVwHIKVraVtZaQWbo-HSgdpoSrt8ylSRRWfWLcgZL5hbuQ4RUQAmVVbkm55pMcA0SpcHxJ1t-eRMd3kI3S3FNZt9rrnoRtiE-FuzR5nSZ3AEV8uvhJ2hZF-Pmwuvv24MxfzXsDkHWbNovy_85UNUpiHFH2mkLqGL3c7I5Y4XL93qM_4qkzyaUIeckZ1K91nYGwdCvRubDfrjRoIc6wgLL97RVJkkIkjBaeQk3dMh3mPDIQqQWDJaTBIZU96sCSeDp',
-      specialties: ['ER', 'Cardiology', 'Pediatrics'],
-      status: 'Verified',
-      patientCount: 512,
-      rating: 4.9,
-      bloodHealthLevels: [70, 85, 55, 90],
-      bloodHealthStatus: 'Optimal',
-      bloodStock: {
-        'A+': 310, 'A-': 94, 'B+': 84, 'B-': 48,
-        'O+': 402, 'O-': 25, 'AB+': 112, 'AB-': 30
-      },
-      documents: [
-        { 
-          name: 'State License 2024', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
-        },
-        { 
-          name: 'ISO Safety Cert', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
-        }
-      ],
-      recentActivity: [
-        { title: 'Admission', description: 'Cardiology Unit', time: '30 mins ago', type: 'admission' },
-        { title: 'Stock Report Updated', description: 'All types logged', time: '2h ago', type: 'blood' }
-      ]
-    },
-    {
-      id: 'H-55104',
-      licenseId: 'LIC-55104-D',
-      name: 'Bay Area General',
-      city: 'San Francisco',
-      location: 'San Francisco, CA',
-      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCndKwZAiRIDmkFZ4FWM6JczqMsVNmmTEqsvQplK2qg6W7WhHJXzeBhb_0ldWIM0FZUh_skk8SX2JAJsfwFVtAqY4GzUMjsmtJkwL91RGlys15J5qjT1g236YyNWTz8l3igdzqAJYVxnuo1eb-3OZax4sx9HfbZknVtabk2X8lfYMiWo-d1T_U_pkuJy-h5N6saaq7D-1kyLSfnKOUI7xJtJrJuVux-orPLHFquh0CptbaQyskT9gmizL8wmwTH-BFOOtPH1OcTGXWw',
-      specialties: ['ER', 'Trauma', 'Neurology'],
-      status: 'Active',
-      patientCount: 410,
-      rating: 4.7,
-      bloodHealthLevels: [95, 90, 80, 85],
-      bloodHealthStatus: 'Stable',
-      bloodStock: {
-        'A+': 380, 'A-': 110, 'B+': 92, 'B-': 78,
-        'O+': 450, 'O-': 32, 'AB+': 150, 'AB-': 40
-      },
-      documents: [
-        { 
-          name: 'State License 2024', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
-        },
-        { 
-          name: 'ISO Safety Cert', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB0AbT1BI45mgH6mQWpPAc3gQmtFpFOnlg6-J6yWR0zWJlUDFi-OJO2w-e7VPbNMAEeSHncQP-4blghJExXX5scVA5PLm352sKu9m51CAIgtlNiB8M8kI-CFg9c13CzGZW-Jysg86HndpE85oHozhvcfJfosTaZoJW0fauyoXBDc6NKWIwrEiJSERIW8P8vhmVOxalPia8gXOCmKoXFC5STfDChVrM4aHZVsdJN4Rq_zmjjtXxBuqO5_w0NU8iubbhCixCH-881WrZk' 
-        }
-      ],
-      recentActivity: [
-        { title: 'Trauma Admission', description: 'ER Wing', time: '5 mins ago', type: 'admission' },
-        { title: 'Organ Transport Dispatched', description: 'Helipad departure', time: '4h ago', type: 'dispatch' }
-      ]
-    },
-    {
-      id: 'H-12409',
-      licenseId: 'LIC-12409-F',
-      name: 'Valley Health Clinic',
-      city: 'Sacramento',
-      location: 'Sacramento, CA',
-      logo: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBv35N9rbEue8kENJIxoCOenjXxjHj7_Wp6OWdzEtJEVCX-5NUWT9KfcGFnMApyYHStm37tWcsgL5qzvBYQfI3Cozv6UhbUmeCa54tCDeYyWmsSrM9iqTT8PvVVUhBkBweL7kF80PBT43JPjFNxW3CmsuhyBDm7T37wP4x-g-hxtd-Mi3qYsqegQHuSNZqvyRoI4_OdK1l0tDeqqbLbWtiISfT0ollryDcaxrEfAKb98jn67g1rvVDAZ9REKINpNEJmk-pFBXv5-Exf',
-      specialties: ['General', 'Family Care'],
-      status: 'Suspended',
-      patientCount: 0,
-      rating: 3.2,
-      bloodHealthLevels: [0, 10, 5, 0],
-      bloodHealthStatus: 'Critical',
-      bloodStock: {
-        'A+': 0, 'A-': 2, 'B+': 0, 'B-': 1,
-        'O+': 5, 'O-': 0, 'AB+': 0, 'AB-': 0
-      },
-      documents: [
-        { 
-          name: 'State License 2024', 
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' 
-        }
-      ],
-      recentActivity: [
-        { title: 'Access Suspended', description: 'By Admin Sarah Jenkins', time: '1 day ago', type: 'other' },
-        { title: 'License Check Expired', description: 'Validation failed', time: '2 days ago', type: 'other' }
-      ]
-    }
-  ];
+  // Real Database State
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Form Fields State
+  const [newHospitalName, setNewHospitalName] = useState('');
+  const [newHospitalLicense, setNewHospitalLicense] = useState('');
+  const [newHospitalCity, setNewHospitalCity] = useState('San Francisco');
+  const [newHospitalSpecialties, setNewHospitalSpecialties] = useState('');
+  const [newHospitalEmail, setNewHospitalEmail] = useState('');
 
   // Helper to show interactive toast notifications
   const showToast = (message: string) => {
@@ -213,9 +68,156 @@ export default function HospitalManagementPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Fetch Hospitals from Database
+  const fetchHospitals = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/hospitals');
+      const mapped: Hospital[] = res.data.map((h: any) => ({
+        id: h.id,
+        licenseId: h.licenseId || 'LIC-UNKNOWN',
+        name: h.name,
+        city: h.city || 'San Francisco',
+        location: h.location || h.city || 'San Francisco, CA',
+        logo: h.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(h.name)}`,
+        specialties: h.specialties || ['General'],
+        status: h.status || 'Pending',
+        patientCount: h.patientCount || 0,
+        rating: h.rating || '--',
+        bloodHealthLevels: h.bloodHealthLevels || [60, 40, 80, 50],
+        bloodHealthStatus: h.bloodHealthStatus || 'Stable',
+        bloodStock: h.bloodStock || {
+          'A+': 120, 'A-': 40, 'B+': 32, 'B-': 18,
+          'O+': 200, 'O-': 12, 'AB+': 45, 'AB-': 10
+        },
+        documents: h.documents || [
+          { name: 'State License 2024', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' }
+        ],
+        recentActivity: h.recentActivity || [
+          { title: 'Facility Synchronized', description: 'Central registry connection verified', time: 'Just now', type: 'other' }
+        ]
+      }));
+      setHospitals(mapped);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to fetch hospitals.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHospitals();
+  }, []);
+
+  // Compute stats based on real database records
+  const stats = useMemo(() => {
+    const total = hospitals.length;
+    const verified = hospitals.filter(h => h.status === 'Verified').length;
+    const pending = hospitals.filter(h => h.status === 'Pending').length;
+    const active = hospitals.filter(h => h.status === 'Active').length;
+    const suspended = hospitals.filter(h => h.status === 'Suspended').length;
+    return { total, verified, pending, active, suspended };
+  }, [hospitals]);
+
+  // Submit handler for registering a new hospital
+  const handleAddHospitalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHospitalName || !newHospitalLicense || !newHospitalEmail) {
+      showToast('❌ Hospital Name, License ID, and Email are required.');
+      return;
+    }
+    try {
+      const payload = {
+        name: newHospitalName,
+        email: newHospitalEmail,
+        licenseId: newHospitalLicense,
+        city: newHospitalCity,
+        location: `${newHospitalCity}, CA`,
+        specialties: newHospitalSpecialties ? newHospitalSpecialties.split(',').map(s => s.trim()) : ['General'],
+        status: 'Pending',
+        patientCount: 0,
+        rating: '--',
+        bloodHealthStatus: 'Stable',
+      };
+      const res = await api.post('/hospitals', payload);
+      
+      // Map return value
+      const newHosp: Hospital = {
+        id: res.data.id,
+        licenseId: res.data.licenseId,
+        name: res.data.name,
+        city: res.data.city,
+        location: res.data.location,
+        logo: res.data.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(res.data.name)}`,
+        specialties: res.data.specialties,
+        status: res.data.status,
+        patientCount: res.data.patientCount,
+        rating: res.data.rating,
+        bloodHealthLevels: [60, 40, 80, 50],
+        bloodHealthStatus: res.data.bloodHealthStatus,
+        bloodStock: {
+          'A+': 120, 'A-': 40, 'B+': 32, 'B-': 18,
+          'O+': 200, 'O-': 12, 'AB+': 45, 'AB-': 10
+        },
+        documents: [
+          { name: 'State License 2024', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' }
+        ],
+        recentActivity: [
+          { title: 'Facility Synchronized', description: 'Central registry connection verified', time: 'Just now', type: 'other' }
+        ]
+      };
+      
+      setHospitals(prev => [newHosp, ...prev]);
+      setIsAddHospitalOpen(false);
+      
+      // Reset form
+      setNewHospitalName('');
+      setNewHospitalLicense('');
+      setNewHospitalEmail('');
+      setNewHospitalSpecialties('');
+      setNewHospitalCity('San Francisco');
+      showToast('🎉 Facility registered successfully!');
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.message || 'Failed to register facility.';
+      showToast(`❌ ${errMsg}`);
+    }
+  };
+
+  // Update Hospital Status (Verify / Suspend)
+  const handleUpdateHospitalStatus = async (id: string, newStatus: string) => {
+    try {
+      const res = await api.put(`/hospitals/${id}`, { status: newStatus });
+      setHospitals(prev => prev.map(h => h.id === id ? { ...h, status: res.data.status } : h));
+      if (selectedHospital && selectedHospital.id === id) {
+        setSelectedHospital(prev => prev ? { ...prev, status: res.data.status } : null);
+      }
+      showToast(`Facility status updated to ${newStatus}`);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to update facility status.');
+    }
+  };
+
+  // Delete Hospital
+  const handleDeleteHospital = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this facility? This will remove its account from the network.')) return;
+    try {
+      await api.delete(`/hospitals/${id}`);
+      setHospitals(prev => prev.filter(h => h.id !== id));
+      setIsPanelOpen(false);
+      setSelectedHospital(null);
+      showToast('🗑️ Facility deleted successfully.');
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to delete facility.');
+    }
+  };
+
   // Filter logic
   const filteredHospitals = useMemo(() => {
-    return initialHospitals.filter(hospital => {
+    return hospitals.filter(hospital => {
       const matchesSearch = 
         hospital.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         hospital.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -232,7 +234,7 @@ export default function HospitalManagementPage() {
 
       return matchesSearch && matchesStatus && matchesCity && matchesSpecialty && matchesBloodHealth;
     });
-  }, [searchQuery, statusFilter, cityFilter, specialtyFilter, bloodHealthFilter]);
+  }, [hospitals, searchQuery, statusFilter, cityFilter, specialtyFilter, bloodHealthFilter]);
 
   // Handle stats card click to set category filters
   const handleStatCardClick = (status: string) => {
@@ -327,10 +329,9 @@ export default function HospitalManagementPage() {
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           <div className="flex justify-between items-start mb-4 relative z-10">
             <span className="material-symbols-outlined text-white/80 text-3xl">local_hospital</span>
-            <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full text-white">+6 this month</span>
           </div>
           <p className="font-body-sm text-body-sm text-white/80 mb-1">Total Hospitals</p>
-          <h3 className="font-syne font-bold text-[32px] tracking-tight leading-none">142</h3>
+          <h3 className="font-syne font-bold text-[32px] tracking-tight leading-none">{stats.total}</h3>
         </div>
 
         {/* Verified Card */}
@@ -346,7 +347,7 @@ export default function HospitalManagementPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant">Verified</p>
           </div>
           <div className="flex items-center justify-between mt-sm">
-            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">128</h3>
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.verified}</h3>
             <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(18,62,32,0.4)]"></div>
           </div>
         </div>
@@ -364,7 +365,7 @@ export default function HospitalManagementPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant">Pending Approval</p>
           </div>
           <div className="flex items-center justify-between mt-sm">
-            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">11</h3>
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.pending}</h3>
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]"></div>
           </div>
         </div>
@@ -382,7 +383,7 @@ export default function HospitalManagementPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant">Active Today</p>
           </div>
           <div className="flex items-center justify-between mt-sm">
-            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">97</h3>
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.active}</h3>
             <span className="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded uppercase tracking-wider animate-pulse">Live</span>
           </div>
         </div>
@@ -400,7 +401,7 @@ export default function HospitalManagementPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant">Suspended</p>
           </div>
           <div className="flex items-center justify-between mt-sm">
-            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">3</h3>
+            <h3 className="font-syne font-bold text-[28px] text-on-surface leading-none">{stats.suspended}</h3>
             <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></div>
           </div>
         </div>
@@ -411,10 +412,6 @@ export default function HospitalManagementPage() {
         <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
           <span className="material-symbols-outlined text-primary text-[18px]">bloodtype</span>
           <span className="text-xs font-semibold text-on-surface">Blood Stock: <span className="text-primary font-bold">18,420 Units</span></span>
-        </div>
-        <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
-          <span className="material-symbols-outlined text-primary text-[18px]">steering_wheel_heat</span>
-          <span className="text-xs font-semibold text-on-surface">Drivers: <span className="text-primary font-bold">312 Online</span></span>
         </div>
         <div className="flex items-center gap-xs px-4 py-2 bg-white rounded-full border border-outline-variant/30 shadow-sm">
           <span className="material-symbols-outlined text-primary text-[18px]">patient_list</span>
@@ -777,24 +774,27 @@ export default function HospitalManagementPage() {
             </div>
 
             {/* Sticky Bottom Actions */}
-            <div className="p-6 bg-white border-t border-outline-variant/30 grid grid-cols-2 gap-md shrink-0">
+            <div className="p-6 bg-white border-t border-outline-variant/30 flex flex-col gap-sm shrink-0">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, selectedHospital.status === 'Suspended' ? 'Active' : 'Suspended')}
+                  className="flex-1 py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors text-center"
+                >
+                  {selectedHospital.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                </button>
+                <button 
+                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, 'Verified')}
+                  className="flex-1 py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center"
+                  disabled={selectedHospital.status === 'Verified'}
+                >
+                  {selectedHospital.status === 'Verified' ? 'Verified ✓' : 'Verify'}
+                </button>
+              </div>
               <button 
-                onClick={() => {
-                  showToast(`Access suspension sequence logged for ${selectedHospital.name}`);
-                  setIsPanelOpen(false);
-                }}
-                className="py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors"
+                onClick={() => handleDeleteHospital(selectedHospital.id)}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-syne font-bold text-sm shadow-md transition-colors text-center"
               >
-                Suspend Access
-              </button>
-              <button 
-                onClick={() => {
-                  showToast(`Sync records request submitted for ${selectedHospital.name}`);
-                  setIsPanelOpen(false);
-                }}
-                className="py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all"
-              >
-                Update Records
+                Delete Account
               </button>
             </div>
           </>
@@ -812,15 +812,13 @@ export default function HospitalManagementPage() {
             <h3 className="font-syne font-bold text-xl text-primary mb-1">Add Facility</h3>
             <p className="text-xs text-on-surface-variant mb-4">Register a new healthcare facility in the coordinate system matrix.</p>
             
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setIsAddHospitalOpen(false);
-              showToast('Hospital registered successfully (Mock DB confirmation)');
-            }} className="space-y-4">
+            <form onSubmit={handleAddHospitalSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Hospital Name</label>
                 <input 
                   type="text" 
+                  value={newHospitalName}
+                  onChange={(e) => setNewHospitalName(e.target.value)}
                   placeholder="e.g. Hope General Hospital" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
@@ -831,6 +829,8 @@ export default function HospitalManagementPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">License ID</label>
                   <input 
                     type="text" 
+                    value={newHospitalLicense}
+                    onChange={(e) => setNewHospitalLicense(e.target.value)}
                     placeholder="LIC-12345-X" 
                     className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                     required
@@ -838,18 +838,35 @@ export default function HospitalManagementPage() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">City Location</label>
-                  <select className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer">
-                    <option>San Francisco</option>
-                    <option>Oakland</option>
-                    <option>San Jose</option>
-                    <option>Sacramento</option>
+                  <select 
+                    value={newHospitalCity}
+                    onChange={(e) => setNewHospitalCity(e.target.value)}
+                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
+                  >
+                    <option value="San Francisco">San Francisco</option>
+                    <option value="Oakland">Oakland</option>
+                    <option value="San Jose">San Jose</option>
+                    <option value="Sacramento">Sacramento</option>
                   </select>
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Email Address</label>
+                <input 
+                  type="email" 
+                  value={newHospitalEmail}
+                  onChange={(e) => setNewHospitalEmail(e.target.value)}
+                  placeholder="hospital@example.com" 
+                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
+                  required
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Facility Specialties (comma-separated)</label>
                 <input 
                   type="text" 
+                  value={newHospitalSpecialties}
+                  onChange={(e) => setNewHospitalSpecialties(e.target.value)}
                   placeholder="e.g. ER, Trauma, Cardiology" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required

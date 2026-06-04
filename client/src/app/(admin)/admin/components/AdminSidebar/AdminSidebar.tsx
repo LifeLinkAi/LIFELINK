@@ -81,7 +81,6 @@ export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarPr
     { name: 'Dashboard', icon: 'dashboard', href: '/admin/dashboard' },
     { name: 'Donor Management', icon: 'volunteer_activism', href: '/admin/donors' },
     { name: 'Hospital Management', icon: 'local_hospital', href: '/admin/hospitals' },
-    { name: 'Ambulance Management', icon: 'ambulance', href: '/admin/drivers' },
     { name: 'Blood Management', icon: 'bloodtype', href: '/admin/blood-requests' },
     { name: 'Organ Management', icon: 'nephrology', href: '/admin/organ-requests' },
     { name: 'Analytics', icon: 'insights', href: '/admin/analytics' },

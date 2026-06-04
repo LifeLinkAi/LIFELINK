@@ -64,7 +64,7 @@ const config: Config = {
           800: '#2B4A18',
           600: '#3d6b1e',
           400: '#7AB648',
-          50: '#f3f9ea',
+          50:  '#f3f9ea',
           green: '#123e20',
           olive: '#1b4d2c',
           textDark: '#45483C',

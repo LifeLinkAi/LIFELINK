@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'Patient' | 'Donor' | 'Hospital' | 'Driver'>('Patient');
+  const [role, setRole] = useState<'Patient' | 'Donor' | 'Hospital'>('Patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -39,15 +40,18 @@ export default function LoginPage() {
       // Store credentials in localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      Cookies.set('ll_access_token', data.token, { expires: 7 });
 
       // Redirect based on database user role
       const userRole = data.user.role;
       if (userRole === 'Admin') {
         router.push('/admin/dashboard');
       } else if (userRole === 'Hospital') {
-        router.push('/(hospital)');
-      } else if (userRole === 'Driver') {
-        router.push('/(driver)');
+        router.push('/hospital/dashboard');
+      } else if (userRole === 'Donor') {
+        router.push('/donor/dashboard');
+      } else if (userRole === 'Patient') {
+        router.push('/patient/dashboard');
       } else {
         router.push('/');
       }
@@ -121,7 +125,7 @@ export default function LoginPage() {
 
           {/* Role Selection */}
           <div className="bg-surface-variant rounded-xl p-1 mb-6 flex shadow-[0_4px_15px_rgba(85,107,47,0.05)]">
-            {(['Patient', 'Donor', 'Hospital', 'Driver'] as const).map((r) => (
+            {(['Patient', 'Donor', 'Hospital'] as const).map((r) => (
               <button
                 key={r}
                 type="button"
