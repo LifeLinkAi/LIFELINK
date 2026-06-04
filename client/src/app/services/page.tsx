@@ -71,7 +71,7 @@ export default function ServicesPage() {
   ];
 
   return (
-    <div className="relative min-h-screen w-full bg-[#F4F7F0] flex flex-col font-dmsans">
+    <div className="relative min-h-screen w-full bg-[#EFF2EE] flex flex-col font-dmsans">
       {/* Navigation Header */}
       <Navbar />
 
@@ -79,7 +79,7 @@ export default function ServicesPage() {
       <main className="flex-grow w-full flex flex-col items-center pt-[76px]">
         
         {/* Services Page Hero */}
-        <section className="relative w-full py-20 md:py-28 flex items-center justify-center bg-gradient-to-b from-[#3E4E24] to-[#3e5219] px-6 lg:px-12 overflow-hidden border-b border-brand-borderLight/30">
+        <section className="relative w-full py-20 md:py-28 flex items-center justify-center bg-gradient-to-b from-[#1b4d2c] to-[#123e20] px-6 lg:px-12 overflow-hidden border-b border-brand-borderLight/30">
           {/* Decorative blurred orbs */}
           <div className="absolute -top-1/4 -right-1/4 w-[600px] h-[600px] bg-secondary/20 rounded-full blur-[120px] pointer-events-none" />
           <div className="absolute -bottom-1/4 -left-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
@@ -124,7 +124,7 @@ export default function ServicesPage() {
             >
               <a 
                 href="#services" 
-                className="inline-flex items-center gap-2 px-8 py-3.5 font-syne font-bold text-white bg-gradient-to-br from-[#3e5219] to-[#496800] hover:brightness-110 shadow-md hover:shadow-[0_4px_15px_rgba(85,107,47,0.25)] transition-all duration-200 rounded-full"
+                className="inline-flex items-center gap-2 px-8 py-3.5 font-syne font-bold text-white bg-gradient-to-br from-[#123e20] to-[#2d6a4f] hover:brightness-110 shadow-md hover:shadow-[0_4px_15px_rgba(18,62,32,0.25)] transition-all duration-200 rounded-full"
               >
                 Explore Pillars
                 <ArrowDown className="w-4 h-4" />

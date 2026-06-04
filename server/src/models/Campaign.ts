@@ -1,0 +1,67 @@
+import { Schema, model } from 'mongoose';
+
+const campaignSchema = new Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    type: {
+      type: String,
+      enum: ['EMERGENCY DRIVE', 'ROUTINE DRIVE', 'AWARENESS'],
+      default: 'ROUTINE DRIVE',
+    },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'UPCOMING', 'DRAFT', 'ENDED'],
+      default: 'DRAFT',
+    },
+    hospital: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    startDate: {
+      type: Date,
+      required: true,
+    },
+    endDate: {
+      type: Date,
+      required: true,
+    },
+    bloodGroups: {
+      type: [String],
+      default: ['ANY'],
+    },
+    donorsRegistered: {
+      type: Number,
+      default: 0,
+    },
+    donorsTarget: {
+      type: Number,
+      default: 100,
+    },
+    donationsCollected: {
+      type: Number,
+      default: 0,
+    },
+    engagement: {
+      type: Number,
+      default: 0,
+    },
+    imageUrl: {
+      type: String,
+      default: '',
+    },
+    description: {
+      type: String,
+      default: '',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+export const Campaign = model('Campaign', campaignSchema);
