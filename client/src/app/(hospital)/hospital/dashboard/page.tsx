@@ -54,7 +54,7 @@ export default function HospitalDashboard() {
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">Live hospital operations and resource monitoring.</p>
         </div>
         <div className="flex gap-2.5">
-          <button
+          {/* <button
             onClick={() => setRefresh(n => n + 1)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors"
           >
@@ -62,7 +62,7 @@ export default function HospitalDashboard() {
           </button>
           <button className="px-4 py-2 rounded-lg bg-[#2B4A18] text-white text-[13px] font-medium hover:bg-[#3d6b1e] transition-colors">
             + New Request
-          </button>
+          </button> */}
         </div>
       </div>
 
