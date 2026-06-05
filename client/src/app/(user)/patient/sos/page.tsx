@@ -1,24 +1,23 @@
 'use client';
 import { useState, useEffect, type ReactNode } from 'react';
-import { Siren, MapPin, Phone, Clock, CheckCircle, XCircle, Ambulance, Droplets, Heart } from 'lucide-react';
+import { Siren, MapPin, Clock, CheckCircle, XCircle, Droplets, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // -- Types ------------------------------------------------
 type SOSState = 'idle' | 'confirming' | 'broadcasting' | 'active' | 'resolved';
-type EmergencyType = 'blood' | 'organ' | 'ambulance' | 'general';
+type EmergencyType = 'blood' | 'organ' | 'general';
 
 interface NearbyUnit {
   id: string;
-  type: 'ambulance' | 'hospital' | 'donor';
+  type: 'hospital' | 'donor';
   name: string;
   distance: string;
   eta: string;
-  status: 'responding' | 'available' | 'dispatched';
+  status: 'responding' | 'available';
 }
 
 // -- Data -------------------------------------------------
 const NEARBY_UNITS: NearbyUnit[] = [
-  { id: 'AMB-12', type: 'ambulance', name: 'Ambulance Unit 12', distance: '0.8 km', eta: '3 min', status: 'dispatched'  },
   { id: 'HOS-01', type: 'hospital',  name: 'LifeLink Main Campus', distance: '1.2 km', eta: '5 min', status: 'responding' },
   { id: 'DON-44', type: 'donor',     name: 'Nearby Donor (O-)',  distance: '2.1 km', eta: '8 min', status: 'responding' },
 ];
@@ -26,7 +25,6 @@ const NEARBY_UNITS: NearbyUnit[] = [
 const EMERGENCY_TYPES: { key: EmergencyType; label: string; icon: ReactNode; desc: string }[] = [
   { key: 'blood',     label: 'Blood Emergency',   icon: <Droplets size={20} />, desc: 'Urgent blood transfusion needed'    },
   { key: 'organ',     label: 'Organ Emergency',   icon: <Heart size={20} />,    desc: 'Organ failure or transplant urgent' },
-  { key: 'ambulance', label: 'Ambulance',         icon: <Ambulance size={20} />,desc: 'Emergency transport required'       },
   { key: 'general',   label: 'General Emergency', icon: <Siren size={20} />,    desc: 'Other medical emergency'            },
 ];
 
@@ -97,12 +95,10 @@ function ElapsedTimer() {
 // -- Nearby unit card -------------------------------------
 function UnitCard({ unit }: { unit: NearbyUnit }) {
   const iconMap = {
-    ambulance: <Ambulance size={16} className="text-red-600" />,
     hospital:  <MapPin    size={16} className="text-blue-600" />,
     donor:     <Droplets  size={16} className="text-green-600" />,
   };
   const statusColors = {
-    dispatched:  'text-red-700   bg-red-50   border-red-200',
     responding:  'text-blue-700  bg-blue-50  border-blue-200',
     available:   'text-green-700 bg-green-50 border-green-200',
   };
@@ -160,7 +156,7 @@ export default function SOSPage() {
       <div>
         <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">SOS Emergency</h1>
         <p className="text-[13.5px] text-[#6B7A5A] mt-1">
-          One tap broadcasts your location to nearby hospitals, donors, and ambulances.
+          One tap broadcasts your location to nearby hospitals and donors.
         </p>
       </div>
 
@@ -293,33 +289,6 @@ export default function SOSPage() {
             </div>
           </>
         )}
-      </div>
-
-      {/* Emergency contacts quick-dial */}
-      <div className="bg-white rounded-xl border border-[#E8E4D8] p-5">
-        <p className="text-[13px] font-semibold text-[#1a2e0a] mb-3">Quick Dial</p>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Ambulance',   number: '108',        color: 'text-red-600   bg-red-50'   },
-            { label: 'Police',      number: '100',        color: 'text-blue-600  bg-blue-50'  },
-            { label: 'Blood Bank',  number: '104',        color: 'text-green-600 bg-green-50' },
-          ].map(c => (
-            <a
-              key={c.label}
-              href={`tel:${c.number}`}
-              className={cn(
-                'flex flex-col items-center gap-1.5 p-3 rounded-xl border border-[#E8E4D8] hover:border-red-300 transition-colors',
-                'cursor-pointer'
-              )}
-            >
-              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', c.color)}>
-                <Phone size={16} />
-              </div>
-              <span className="text-[12px] font-semibold text-[#1a2e0a]">{c.label}</span>
-              <span className="text-[11px] text-[#8A9A7A]">{c.number}</span>
-            </a>
-          ))}
-        </div>
       </div>
 
       {/* Nearby responders - shown after SOS activated */}

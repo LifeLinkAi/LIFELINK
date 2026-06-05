@@ -1,9 +1,16 @@
 import { apiSlice } from '@/store/apiSlice';
 
 // ── Types ──────────────────────────────────────────────────────────────────
+export interface PopulatedUser {
+  _id: string;
+  name: string;
+  email: string;
+}
+
+/** user is populated as an object by the server when using .populate() */
 export interface DonorProfile {
   _id: string;
-  user: string;
+  user: string | PopulatedUser;
   bloodType: string;
   isAvailable: boolean;
   isEmergencyMode: boolean;

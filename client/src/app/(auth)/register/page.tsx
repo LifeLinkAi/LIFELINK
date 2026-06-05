@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -46,6 +47,7 @@ export default function RegisterPage() {
       // Store credentials in localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      Cookies.set('ll_access_token', data.token, { expires: 7 });
 
       // Redirect based on database user role
       const userRole = data.user.role;

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Siren, Droplets, Heart,
-  Ambulance, Clock, MapPin, FileHeart,
+  Clock, MapPin, FileHeart,
   Settings, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,6 @@ const NAV = [
   { label: 'SOS Emergency',     href: '/patient/sos',                icon: Siren           },
   { label: 'Request Blood',     href: '/patient/request-blood',      icon: Droplets        },
   { label: 'Request Organ',     href: '/patient/request-organ',      icon: Heart           },
-  { label: 'Request Ambulance', href: '/patient/request-ambulance',  icon: Ambulance       },
   { label: 'My Requests',       href: '/patient/request-status',     icon: Clock           },
   { label: 'Nearby Hospitals',  href: '/patient/nearby-hospitals',   icon: MapPin          },
   { label: 'Medical History',   href: '/patient/medical-history',    icon: FileHeart       },

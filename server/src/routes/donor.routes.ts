@@ -1,20 +1,14 @@
 import { Router } from 'express';
+import { getDonors, createDonor, createDonorBulk, updateDonor, deleteDonor } from '../controllers/donor.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import {
-  getProfile,
-  createProfile,
-  updateProfile,
-  deleteProfile,
-} from '../controllers/donor.controller';
 
 const router = Router();
 
-// All donor profile routes require auth + Donor role
-router.use(authenticate as any, authorize('Donor') as any);
-
-router.get('/',    getProfile    as any);   // GET    /api/donor/profile
-router.post('/',   createProfile as any);   // POST   /api/donor/profile
-router.put('/',    updateProfile as any);   // PUT    /api/donor/profile
-router.delete('/', deleteProfile as any);   // DELETE /api/donor/profile
+// Routes require authentication; mutate actions require Admin role
+router.get('/', authenticate, getDonors);
+router.post('/', authenticate, authorize('Admin'), createDonor);
+router.post('/bulk', authenticate, authorize('Admin'), createDonorBulk);
+router.put('/:id', authenticate, authorize('Admin'), updateDonor);
+router.delete('/:id', authenticate, authorize('Admin'), deleteDonor);
 
 export default router;

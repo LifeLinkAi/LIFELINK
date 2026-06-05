@@ -1,60 +1,58 @@
-import { Schema, model, Types } from 'mongoose';
+import { Schema, model } from 'mongoose';
 
 const donorProfileSchema = new Schema(
   {
-    user: {
-      type: Types.ObjectId,
+    userId: {
+      type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       unique: true,
     },
+    location: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     bloodType: {
       type: String,
-      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-      required: true,
+      default: 'O-',
+      trim: true,
     },
-    isAvailable: {
-      type: Boolean,
-      default: true,
+    tier: {
+      type: String,
+      enum: ['Gold', 'Silver', 'Platinum', 'Bronze'],
+      default: 'Bronze',
     },
-    isEmergencyMode: {
-      type: Boolean,
-      default: false,
-    },
-    lastDonationDate: {
-      type: Date,
-      default: null,
-    },
-    totalDonations: {
-      type: Number,
-      default: 0,
-    },
-    livesImpacted: {
-      type: Number,
-      default: 0,
-    },
-    availabilityRadius: {
-      type: Number,
-      default: 10, // miles
-    },
-    bloodDonationEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    organDonationEnabled: {
-      type: Boolean,
-      default: false,
+    status: {
+      type: String,
+      enum: ['Verified', 'Pending', 'Available', 'Blocked'],
+      default: 'Pending',
     },
     phone: {
       type: String,
       default: '',
+      trim: true,
     },
-    address: {
+    lastDonation: {
+      type: String,
+      default: 'N/A',
+    },
+    totalDonated: {
+      type: String,
+      default: '0 Liters',
+    },
+    details: {
+      type: String,
+      default: '',
+    },
+    avatar: {
       type: String,
       default: '',
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 export const DonorProfile = model('DonorProfile', donorProfileSchema);

@@ -1,5 +1,5 @@
 ﻿'use client';
-import { Siren, Droplets, Heart, Ambulance, Clock, 
+import { Siren, Droplets, Heart, Clock, 
          MapPin, FileHeart, ArrowRight, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +23,6 @@ const QUICK_ACTIONS = [
   { label: 'SOS Emergency',     href: '/patient/sos',                icon: <Siren     size={22} />, color: '#CC0000', bg: '#FFE5E5', urgent: true  },
   { label: 'Request Blood',     href: '/patient/request-blood',      icon: <Droplets  size={22} />, color: '#CC0000', bg: '#FFF0F0', urgent: false },
   { label: 'Request Organ',     href: '/patient/request-organ',      icon: <Heart     size={22} />, color: '#5B21B6', bg: '#F0EEFF', urgent: false },
-  { label: 'Request Ambulance', href: '/patient/request-ambulance',  icon: <Ambulance size={22} />, color: '#B86E00', bg: '#FFF8ED', urgent: false },
   { label: 'My Requests',       href: '/patient/request-status',     icon: <Clock     size={22} />, color: '#1A5FAA', bg: '#EFF6FF', urgent: false },
   { label: 'Nearby Hospitals',  href: '/patient/nearby-hospitals',   icon: <MapPin    size={22} />, color: '#2B6B0A', bg: '#F0FDF4', urgent: false },
   { label: 'Medical History',   href: '/patient/medical-history',    icon: <FileHeart size={22} />, color: '#6B7A5A', bg: '#F5F2E8', urgent: false },
@@ -32,7 +31,6 @@ const QUICK_ACTIONS = [
 const RECENT_ACTIVITY = [
   { time: 'Just now',   text: 'Blood request BR-2533 — AI matching in progress',      dot: '#5B21B6' },
   { time: '30 min ago', text: 'Organ request ORG-441 — Compatible donor found',       dot: '#1A5FAA' },
-  { time: '2 hrs ago',  text: 'Ambulance AMB-312 arrived at Kozhikode Medical College', dot: '#2B6B0A' },
   { time: '3 days ago', text: 'Blood request BR-2028 fulfilled successfully',          dot: '#2B6B0A' },
 ];
 
@@ -46,13 +44,11 @@ const HEALTH_SNAPSHOT = [
 const TYPE_ICONS = {
   Blood:     <Droplets  size={14} />,
   Organ:     <Heart     size={14} />,
-  Ambulance: <Ambulance size={14} />,
 };
 
 const TYPE_COLORS = {
   Blood:     { color: '#CC0000', bg: '#FFE5E5' },
   Organ:     { color: '#5B21B6', bg: '#EDE8FF' },
-  Ambulance: { color: '#B86E00', bg: '#FFF3E0' },
 };
 
 // ── Page ──────────────────────────────────────────────

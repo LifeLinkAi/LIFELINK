@@ -18,16 +18,5 @@ export const ORGAN_REQUEST_STATUS = {
   CANCELLED: 'CANCELLED',
 } as const;
 
-export const AMBULANCE_TRIP_STATUS = {
-  REQUESTED: 'REQUESTED',
-  ASSIGNED: 'ASSIGNED',
-  ON_THE_WAY: 'ON_THE_WAY',
-  PICKED_UP: 'PICKED_UP',
-  ARRIVED: 'ARRIVED',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED',
-} as const;
-
 export type BloodRequestStatus = typeof BLOOD_REQUEST_STATUS[keyof typeof BLOOD_REQUEST_STATUS];
 export type OrganRequestStatus = typeof ORGAN_REQUEST_STATUS[keyof typeof ORGAN_REQUEST_STATUS];
-export type AmbulanceTripStatus = typeof AMBULANCE_TRIP_STATUS[keyof typeof AMBULANCE_TRIP_STATUS];

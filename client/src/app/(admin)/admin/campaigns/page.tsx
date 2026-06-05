@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import api from '@/lib/axios';
 
 // Campaign interface
 interface Campaign {
@@ -18,6 +19,7 @@ interface Campaign {
   daysLeft: number;
   engagement: number;
   imageUrl: string;
+  description?: string;
 }
 
 // Activity interface for timeline
@@ -40,105 +42,9 @@ interface CampaignDonor {
 }
 
 export default function CampaignsPage() {
-  // 1. Initial State & Datasets
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: '1',
-      title: 'O-Negative Shortage Response',
-      type: 'EMERGENCY DRIVE',
-      status: 'ACTIVE',
-      hospital: 'Metro General Hospital',
-      startDate: '2026-05-12',
-      endDate: '2026-05-24',
-      bloodGroups: ['O-', 'ANY'],
-      donorsRegistered: 145,
-      donorsTarget: 200,
-      donationsCollected: 112,
-      daysLeft: 4,
-      engagement: 82,
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCZzPYPWGHaAfn0QyA3nBfLNrmGk6EcnRj9zhzYD7nUEatM4FyB77UFyb7i_1swl1oKZV01IOPH8esYKg3OVZh2mm57xHiITw3GwWgtmyaY5Jb5Fa9k48LMQEtmGGYIDlBQdwYwkbh3QUr7VNdwf5HBnU_uKZqB_SVPrJfYFm9w9qYBnpBrbvBLRnxaU2E64h1xPshJPXTCcPyIUrDooPqmeIGnYmp-tbkFjBeknJ2dpq6PtMxchJSsgJPo_hS33ZBYRco0F8ol7Wwc',
-    },
-    {
-      id: '2',
-      title: 'Annual Campus Blood Drive',
-      type: 'ROUTINE DRIVE',
-      status: 'ACTIVE',
-      hospital: 'University Medical Center',
-      startDate: '2026-05-18',
-      endDate: '2026-05-30',
-      bloodGroups: ['A+', 'B+', 'O+', 'AB+'],
-      donorsRegistered: 240,
-      donorsTarget: 300,
-      donationsCollected: 198,
-      daysLeft: 12,
-      engagement: 75,
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBGOZpeJK_R74HRMEhcsPPhew5W1osX0tE0IITJHq0951WyGloSjdEO75hgo2GgOMN1DIVNMQYXi0STg6pfERpdxUUfIFKhzJXdnKIIVHQsQHgWzk94_EWPFGDS4VYkL3TirxyINw5lNi6qC45617W9kPD0wnf8IKA8hdMaSts8LfJEKOR4emSwXGGU3hvnK-iztEgeVk9bWTO8mLDCBC6bTpu2QdepdRjtPODuloOvg11K_ot9EUzHxwbauNbmM15C8s0IQRi49m-7',
-    },
-    {
-      id: '3',
-      title: 'Silicon Labs Wellness Drive',
-      type: 'ROUTINE DRIVE',
-      status: 'UPCOMING',
-      hospital: 'Silicon Labs Clinic',
-      startDate: '2026-05-26',
-      endDate: '2026-05-29',
-      bloodGroups: ['ANY'],
-      donorsRegistered: 45,
-      donorsTarget: 150,
-      donationsCollected: 0,
-      daysLeft: 6,
-      engagement: 0,
-      imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=600',
-    },
-    {
-      id: '4',
-      title: 'Winter Plasma Initiative',
-      type: 'AWARENESS',
-      status: 'DRAFT',
-      hospital: 'St. Jude Research Center',
-      startDate: '2026-06-05',
-      endDate: '2026-06-12',
-      bloodGroups: ['ANY'],
-      donorsRegistered: 0,
-      donorsTarget: 100,
-      donationsCollected: 0,
-      daysLeft: 15,
-      engagement: 0,
-      imageUrl: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=600',
-    },
-    {
-      id: '5',
-      title: 'Storm Disaster Emergency Relief',
-      type: 'EMERGENCY DRIVE',
-      status: 'ENDED',
-      hospital: 'County Trauma Center',
-      startDate: '2026-05-01',
-      endDate: '2026-05-08',
-      bloodGroups: ['O-', 'O+', 'A-', 'B-'],
-      donorsRegistered: 412,
-      donorsTarget: 400,
-      donationsCollected: 395,
-      daysLeft: 0,
-      engagement: 95,
-      imageUrl: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=600',
-    },
-    {
-      id: '6',
-      title: 'Youth Donor Awareness Week',
-      type: 'AWARENESS',
-      status: 'ACTIVE',
-      hospital: 'Community Health Hub',
-      startDate: '2026-05-20',
-      endDate: '2026-05-28',
-      bloodGroups: ['ANY'],
-      donorsRegistered: 380,
-      donorsTarget: 500,
-      donationsCollected: 210,
-      daysLeft: 8,
-      engagement: 62,
-      imageUrl: 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?auto=format&fit=crop&q=80&w=600',
-    }
-  ]);
+  // 1. Database State
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // UI Interactive States
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
@@ -166,6 +72,42 @@ export default function CampaignsPage() {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // Fetch Campaigns from Database
+  const fetchCampaigns = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/campaigns');
+      // Format backend response to match Campaign interface if needed
+      const mapped: Campaign[] = res.data.map((c: any) => ({
+        id: c._id || c.id,
+        title: c.title,
+        type: c.type,
+        status: c.status,
+        hospital: c.hospital,
+        startDate: c.startDate ? c.startDate.split('T')[0] : '',
+        endDate: c.endDate ? c.endDate.split('T')[0] : '',
+        bloodGroups: c.bloodGroups,
+        donorsRegistered: c.donorsRegistered || 0,
+        donorsTarget: c.donorsTarget || 100,
+        donationsCollected: c.donationsCollected || 0,
+        daysLeft: Math.max(0, Math.ceil((new Date(c.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))),
+        engagement: c.engagement || 0,
+        imageUrl: c.imageUrl || 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600',
+        description: c.description || '',
+      }));
+      setCampaigns(mapped);
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      showToast('❌ Failed to load campaigns from database.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
 
   // 2. Computed Stats based on Current Data
   const stats = useMemo(() => {
@@ -199,7 +141,7 @@ export default function CampaignsPage() {
   }, [campaigns, activeTab, searchQuery]);
 
   // 3. Campaign Stepper Wizard Form Submit
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCampaign.title || !newCampaign.startDate || !newCampaign.endDate) {
       showToast('❌ Please fill in all required fields.');
@@ -215,38 +157,96 @@ export default function CampaignsPage() {
     const campaignStatus: 'ACTIVE' | 'UPCOMING' | 'DRAFT' | 'ENDED' = 
       new Date(newCampaign.startDate) > new Date() ? 'UPCOMING' : 'ACTIVE';
 
-    const item: Campaign = {
-      id: (campaigns.length + 1).toString(),
-      title: newCampaign.title,
-      type: typeMapping[newCampaign.type] || 'ROUTINE DRIVE',
-      status: campaignStatus,
-      hospital: newCampaign.hospital,
-      startDate: newCampaign.startDate,
-      endDate: newCampaign.endDate,
-      bloodGroups: newCampaign.bloodGroups,
-      donorsRegistered: 0,
-      donorsTarget: Number(newCampaign.targetDonors),
-      donationsCollected: 0,
-      daysLeft: Math.max(0, Math.ceil((new Date(newCampaign.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))),
-      engagement: 0,
-      imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600',
-    };
+    try {
+      const payload = {
+        title: newCampaign.title,
+        type: typeMapping[newCampaign.type] || 'ROUTINE DRIVE',
+        status: campaignStatus,
+        hospital: newCampaign.hospital,
+        startDate: newCampaign.startDate,
+        endDate: newCampaign.endDate,
+        bloodGroups: newCampaign.bloodGroups,
+        donorsTarget: Number(newCampaign.targetDonors),
+        description: newCampaign.description,
+        imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600',
+      };
 
-    setCampaigns(prev => [item, ...prev]);
-    setCreateModalOpen(false);
-    setCreateStep(1);
-    setNewCampaign({
-      title: '',
-      type: 'Emergency Response',
-      hospital: 'Metro General Hospital',
-      startDate: '',
-      endDate: '',
-      description: '',
-      targetDonors: 150,
-      bloodGroups: ['ANY']
-    });
-    showToast('🎉 Campaign successfully created and launched live!');
+      const res = await api.post('/campaigns', payload);
+      
+      // Map returned campaign
+      const newCamp: Campaign = {
+        id: res.data._id || res.data.id,
+        title: res.data.title,
+        type: res.data.type,
+        status: res.data.status,
+        hospital: res.data.hospital,
+        startDate: res.data.startDate ? res.data.startDate.split('T')[0] : '',
+        endDate: res.data.endDate ? res.data.endDate.split('T')[0] : '',
+        bloodGroups: res.data.bloodGroups,
+        donorsRegistered: res.data.donorsRegistered || 0,
+        donorsTarget: res.data.donorsTarget || 100,
+        donationsCollected: res.data.donationsCollected || 0,
+        daysLeft: Math.max(0, Math.ceil((new Date(res.data.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))),
+        engagement: res.data.engagement || 0,
+        imageUrl: res.data.imageUrl || 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600',
+        description: res.data.description || '',
+      };
+
+      setCampaigns(prev => [newCamp, ...prev]);
+      setCreateModalOpen(false);
+      setCreateStep(1);
+      setNewCampaign({
+        title: '',
+        type: 'Emergency Response',
+        hospital: 'Metro General Hospital',
+        startDate: '',
+        endDate: '',
+        description: '',
+        targetDonors: 150,
+        bloodGroups: ['ANY']
+      });
+      showToast('🎉 Campaign successfully created and launched live!');
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to create campaign.');
+    }
   };
+
+  // End Campaign Status Update
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'ENDED' ? 'ACTIVE' : 'ENDED';
+    try {
+      const res = await api.put(`/campaigns/${id}`, { status: nextStatus });
+      const mapped = {
+        ...res.data,
+        id: res.data._id || res.data.id,
+        startDate: res.data.startDate ? res.data.startDate.split('T')[0] : '',
+        endDate: res.data.endDate ? res.data.endDate.split('T')[0] : '',
+        daysLeft: Math.max(0, Math.ceil((new Date(res.data.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))),
+      };
+      setCampaigns(prev => prev.map(c => c.id === id ? mapped : c));
+      setSelectedCampaign(mapped);
+      showToast(`Campaign status set to ${nextStatus}`);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to toggle campaign status.');
+    }
+  };
+
+  // Delete Campaign
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this campaign?')) return;
+    try {
+      await api.delete(`/campaigns/${id}`);
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      setSelectedCampaign(null);
+      showToast('🗑️ Campaign deleted successfully.');
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to delete campaign.');
+    }
+  };
+
 
   // Mock timeline activities for selected campaign
   const campaignActivities = useMemo<Activity[]>(() => {
@@ -1043,16 +1043,16 @@ export default function CampaignsPage() {
             {/* Sidebar Sticky Actions Footer */}
             <div className="flex-none p-lg border-t border-outline-variant/30 bg-white flex gap-4">
               <button 
-                onClick={() => showToast(`Campaign edit window triggered for ${selectedCampaign.title}`)}
+                onClick={() => handleToggleStatus(selectedCampaign.id, selectedCampaign.status)}
                 className="flex-1 py-3 rounded-lg border border-outline-variant text-on-surface font-label-caps text-label-caps text-xs font-bold hover:bg-surface-variant/20 transition-colors"
               >
-                EDIT CAMPAIGN
+                {selectedCampaign.status === 'ENDED' ? 'ACTIVATE DRIVE' : 'END DRIVE'}
               </button>
               <button 
-                onClick={() => showToast(`🚨 Broadcast alerts updated and sent for ${selectedCampaign.title}!`)}
-                className="flex-1 py-3 rounded-lg btn-primary-grad text-white font-label-caps text-label-caps text-xs font-bold transition-all shadow-md"
+                onClick={() => handleDeleteCampaign(selectedCampaign.id)}
+                className="flex-1 py-3 rounded-lg bg-red-600 text-white font-label-caps text-label-caps text-xs font-bold hover:bg-red-700 transition-all shadow-md"
               >
-                BROADCAST UPDATE
+                DELETE CAMPAIGN
               </button>
             </div>
           </>

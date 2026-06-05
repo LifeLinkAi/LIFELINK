@@ -1,54 +1,240 @@
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../middlewares/auth.middleware';
+import bcrypt from 'bcrypt';
+import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
+import { AuthRequest } from '../middlewares/auth.middleware';
 
-// ── GET /api/donor/profile ─────────────────────────────────────────────────
-export const getProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const getDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const profile = await DonorProfile.findOne({ user: req.user!.id }).populate('user', 'name email');
-    if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
-    res.status(200).json({ success: true, data: profile });
-  } catch (err) {
-    next(err);
+    const donors = await User.find({ role: 'Donor' }).sort({ createdAt: -1 });
+    const result = [];
+    for (const user of donors) {
+      let profile = await DonorProfile.findOne({ userId: user._id });
+      if (!profile) {
+        profile = await DonorProfile.create({
+          userId: user._id,
+          avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
+        });
+      }
+      result.push({
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        location: profile.location,
+        bloodType: profile.bloodType,
+        tier: profile.tier,
+        status: profile.status,
+        avatar: profile.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
+        phone: profile.phone,
+        lastDonation: profile.lastDonation,
+        totalDonated: profile.totalDonated,
+        details: profile.details,
+      });
+    }
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
   }
 };
 
-// ── POST /api/donor/profile ────────────────────────────────────────────────
-export const createProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const createDonor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const exists = await DonorProfile.findOne({ user: req.user!.id });
-    if (exists) return next(new ApiError(400, 'Donor profile already exists.'));
+    const {
+      name,
+      email,
+      password,
+      location,
+      bloodType,
+      tier,
+      status,
+      phone,
+      lastDonation,
+      totalDonated,
+      details,
+      avatar,
+    } = req.body;
 
-    const profile = await DonorProfile.create({ user: req.user!.id, ...req.body });
-    res.status(201).json({ success: true, data: profile });
-  } catch (err) {
-    next(err);
+    if (!name || !email) {
+      return next(new ApiError(400, 'Name and email are required.'));
+    }
+
+    const emailLower = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: emailLower });
+    if (existingUser) {
+      return next(new ApiError(400, 'A user with this email already exists.'));
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const pass = password || 'donor1234';
+    const hashedPassword = await bcrypt.hash(pass, salt);
+
+    const user = await User.create({
+      name,
+      email: emailLower,
+      password: hashedPassword,
+      role: 'Donor',
+    });
+
+    const profile = await DonorProfile.create({
+      userId: user._id,
+      location: location || '',
+      bloodType: bloodType || 'O-',
+      tier: tier || 'Bronze',
+      status: status || 'Pending',
+      phone: phone || '',
+      lastDonation: lastDonation || 'N/A',
+      totalDonated: totalDonated || '0 Liters',
+      details: details || '',
+      avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+    });
+
+    res.status(201).json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      location: profile.location,
+      bloodType: profile.bloodType,
+      tier: profile.tier,
+      status: profile.status,
+      avatar: profile.avatar,
+      phone: profile.phone,
+      lastDonation: profile.lastDonation,
+      totalDonated: profile.totalDonated,
+      details: profile.details,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
-// ── PUT /api/donor/profile ─────────────────────────────────────────────────
-export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const createDonorBulk = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const { donors } = req.body;
+    if (!donors || !Array.isArray(donors)) {
+      return next(new ApiError(400, 'donors array is required for bulk operation.'));
+    }
+
+    const results = [];
+    const salt = await bcrypt.genSalt(10);
+    const defaultHashedPassword = await bcrypt.hash('donor1234', salt);
+
+    for (const donorData of donors) {
+      const {
+        name,
+        email,
+        location,
+        bloodType,
+        tier,
+        status,
+        phone,
+        lastDonation,
+        totalDonated,
+        details,
+        avatar,
+      } = donorData;
+
+      if (!name || !email) continue;
+      const emailLower = email.toLowerCase().trim();
+
+      const existingUser = await User.findOne({ email: emailLower });
+      if (existingUser) continue;
+
+      const user = await User.create({
+        name,
+        email: emailLower,
+        password: defaultHashedPassword,
+        role: 'Donor',
+      });
+
+      const profile = await DonorProfile.create({
+        userId: user._id,
+        location: location || '',
+        bloodType: bloodType || 'O-',
+        tier: tier || 'Bronze',
+        status: status || 'Pending',
+        phone: phone || '',
+        lastDonation: lastDonation || 'N/A',
+        totalDonated: totalDonated || '0 Liters',
+        details: details || '',
+        avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+      });
+
+      results.push({
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        location: profile.location,
+        bloodType: profile.bloodType,
+        tier: profile.tier,
+        status: profile.status,
+        avatar: profile.avatar,
+        phone: profile.phone,
+        lastDonation: profile.lastDonation,
+        totalDonated: profile.totalDonated,
+        details: profile.details,
+      });
+    }
+
+    res.status(201).json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateDonor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, email, ...profileFields } = req.body;
+
+    const user = await User.findById(id);
+    if (!user || user.role !== 'Donor') {
+      return next(new ApiError(404, 'Donor not found.'));
+    }
+
+    if (name) user.name = name;
+    if (email) user.email = email.toLowerCase().trim();
+    await user.save();
+
     const profile = await DonorProfile.findOneAndUpdate(
-      { user: req.user!.id },
-      req.body,
-      { new: true, runValidators: true }
+      { userId: user._id },
+      { $set: profileFields },
+      { new: true, upsert: true }
     );
-    if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
-    res.status(200).json({ success: true, data: profile });
-  } catch (err) {
-    next(err);
+
+    res.status(200).json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      location: profile.location,
+      bloodType: profile.bloodType,
+      tier: profile.tier,
+      status: profile.status,
+      avatar: profile.avatar,
+      phone: profile.phone,
+      lastDonation: profile.lastDonation,
+      totalDonated: profile.totalDonated,
+      details: profile.details,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
-// ── DELETE /api/donor/profile ──────────────────────────────────────────────
-export const deleteProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const deleteDonor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const profile = await DonorProfile.findOneAndDelete({ user: req.user!.id });
-    if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
-    res.status(200).json({ success: true, message: 'Donor profile deleted.' });
-  } catch (err) {
-    next(err);
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user || user.role !== 'Donor') {
+      return next(new ApiError(404, 'Donor not found.'));
+    }
+
+    await User.findByIdAndDelete(id);
+    await DonorProfile.findOneAndDelete({ userId: id });
+
+    res.status(200).json({ success: true, message: 'Donor deleted successfully.' });
+  } catch (error) {
+    next(error);
   }
 };
