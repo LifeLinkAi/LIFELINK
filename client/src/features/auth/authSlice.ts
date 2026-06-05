@@ -13,11 +13,25 @@ interface AuthState {
   loading: boolean;
 }
 
-const initialState: AuthState = {
-  user: null,
-  isAuthenticated: false,
-  loading: false,
-};
+// ── Bootstrap from localStorage so Redux is never stale on page reload ──────
+function loadInitialState(): AuthState {
+  if (typeof window === 'undefined') {
+    return { user: null, isAuthenticated: false, loading: false };
+  }
+  try {
+    const token    = localStorage.getItem('token');
+    const userJson = localStorage.getItem('user');
+    if (token && userJson) {
+      const user = JSON.parse(userJson) as AuthUser;
+      return { user, isAuthenticated: true, loading: false };
+    }
+  } catch {
+    // Ignore malformed data
+  }
+  return { user: null, isAuthenticated: false, loading: false };
+}
+
+const initialState: AuthState = loadInitialState();
 
 const authSlice = createSlice({
   name: 'auth',

@@ -1,11 +1,20 @@
-import { PatientSidebar } from '@/components/layouts/PatientSidebar';
-import { PatientTopBar }   from '@/components/layouts/PatientTopBar';
+"use client";
 
-export default function UserLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import { usePathname } from "next/navigation";
+import { PatientSidebar } from "@/components/layouts/PatientSidebar";
+import { PatientTopBar } from "@/components/layouts/PatientTopBar";
+
+export default function UserLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // Donor routes manage their own full layout (sidebar + topbar).
+  // Render only {children} so the donor layout.tsx has full control.
+  const isDonorRoute = pathname.startsWith("/donor");
+
+  if (isDonorRoute) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen bg-[#F5F2E8] overflow-hidden">
       <PatientSidebar />
