@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import AdminSidebar from './components/AdminSidebar/AdminSidebar';
 import AdminHeader from './components/AdminHeader/AdminHeader';
+import AuthGuard from '@/components/shared/AuthGuard';
 
 export default function AdminLayout({
   children,
@@ -14,11 +15,9 @@ export default function AdminLayout({
   const pathname = usePathname();
   const isSettings = pathname.startsWith('/admin/settings');
 
-  if (isSettings) {
-    return <>{children}</>;
-  }
-
-  return (
+  const content = isSettings ? (
+    <>{children}</>
+  ) : (
     <div className="min-h-screen bg-[#EFF2EE] text-on-surface font-dmsans antialiased flex admin-theme">
       {/* Sidebar - fixed on the left (hidden on mobile, shown on lg screens) */}
       <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
@@ -37,4 +36,6 @@ export default function AdminLayout({
       </div>
     </div>
   );
+
+  return <AuthGuard allowedRoles={['Admin']}>{content}</AuthGuard>;
 }

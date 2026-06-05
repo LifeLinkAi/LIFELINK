@@ -5,9 +5,30 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 import Cookies from 'js-cookie';
+import { useAppDispatch } from '@/store/hooks';
+import { setUser } from '@/features/auth/authSlice';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+
+  React.useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      if (user.role === 'Admin') {
+        router.push('/admin/dashboard');
+      } else if (user.role === 'Hospital') {
+        router.push('/hospital/dashboard');
+      } else if (user.role === 'Donor') {
+        router.push('/donor/dashboard');
+      } else if (user.role === 'Patient') {
+        router.push('/patient/dashboard');
+      } else {
+        router.push('/');
+      }
+    }
+  }, [authLoading, isAuthenticated, user, router]);
   const [role, setRole] = useState<'Patient' | 'Donor' | 'Hospital'>('Patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,6 +63,9 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
       Cookies.set('ll_access_token', data.token, { expires: 7 });
 
+      // Dispatch user state to Redux
+      dispatch(setUser(data.user));
+
       // Redirect based on database user role
       const userRole = data.user.role;
       if (userRole === 'Admin') {
@@ -60,6 +84,17 @@ export default function LoginPage() {
       setError('Network error. Please check if the backend server is running.');
     }
   };
+
+  if (authLoading || isAuthenticated) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#fcfdfa]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin" />
+          <p className="font-syne font-semibold text-emerald-800 text-sm tracking-wide">Redirecting to portal...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background text-on-surface h-screen overflow-hidden flex flex-col md:flex-row font-dmsans">

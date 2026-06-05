@@ -5,11 +5,27 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const controls = useAnimation();
+  const { user, isAuthenticated, loading } = useAuth();
+
+  const getPortalLink = () => {
+    if (!user) return '/';
+    if (user.role === 'Admin') return '/admin/dashboard';
+    if (user.role === 'Hospital') return '/hospital/dashboard';
+    if (user.role === 'Donor') return '/donor/dashboard';
+    if (user.role === 'Patient') return '/patient/dashboard';
+    return '/';
+  };
+
+  const getPortalLabel = () => {
+    if (!user) return 'Portal';
+    return `${user.role} Portal`;
+  };
 
   useEffect(() => {
     // Initial entrance animation
@@ -123,18 +139,31 @@ export default function Navbar() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-6">
-          <Link 
-            href="/login" 
-            className="font-syne font-medium text-[16px] text-brand-navText hover:text-brand-green transition-colors duration-200"
-          >
-            Login
-          </Link>
-          <Link 
-            href="/register" 
-            className="flex items-center justify-center px-5 py-2 h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive hover:brightness-110 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_20px_-3px_rgba(62,82,25,0.2)] transition-all duration-200 rounded-lg transform hover:-translate-y-[1px] active:translate-y-0"
-          >
-            Join Network
-          </Link>
+          {loading ? (
+            <div className="w-24 h-11 bg-brand-borderLight/20 animate-pulse rounded-lg" />
+          ) : isAuthenticated ? (
+            <Link 
+              href={getPortalLink()}
+              className="flex items-center justify-center px-5 py-2 h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive hover:brightness-110 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_20px_-3px_rgba(62,82,25,0.2)] transition-all duration-200 rounded-lg transform hover:-translate-y-[1px] active:translate-y-0"
+            >
+              {getPortalLabel()}
+            </Link>
+          ) : (
+            <>
+              <Link 
+                href="/login" 
+                className="font-syne font-medium text-[16px] text-brand-navText hover:text-brand-green transition-colors duration-200"
+              >
+                Login
+              </Link>
+              <Link 
+                href="/register" 
+                className="flex items-center justify-center px-5 py-2 h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive hover:brightness-110 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_20px_-3px_rgba(62,82,25,0.2)] transition-all duration-200 rounded-lg transform hover:-translate-y-[1px] active:translate-y-0"
+              >
+                Join Network
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -191,20 +220,34 @@ export default function Navbar() {
 
               {/* Action Buttons */}
               <div className="flex flex-col gap-4">
-                <Link 
-                  href="/login" 
-                  onClick={toggleMenu}
-                  className="flex items-center justify-center w-full h-11 font-syne font-medium text-[16px] text-brand-navText hover:text-brand-green border border-brand-borderLight rounded-lg transition-colors duration-200"
-                >
-                  Login
-                </Link>
-                <Link 
-                  href="/register" 
-                  onClick={toggleMenu}
-                  className="flex items-center justify-center w-full h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive rounded-lg hover:brightness-110 shadow-md transition-all duration-200"
-                >
-                  Join Network
-                </Link>
+                {loading ? (
+                  <div className="w-full h-11 bg-brand-borderLight/20 animate-pulse rounded-lg" />
+                ) : isAuthenticated ? (
+                  <Link 
+                    href={getPortalLink()}
+                    onClick={toggleMenu}
+                    className="flex items-center justify-center w-full h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive rounded-lg hover:brightness-110 shadow-md transition-all duration-200"
+                  >
+                    {getPortalLabel()}
+                  </Link>
+                ) : (
+                  <>
+                    <Link 
+                      href="/login" 
+                      onClick={toggleMenu}
+                      className="flex items-center justify-center w-full h-11 font-syne font-medium text-[16px] text-brand-navText hover:text-brand-green border border-brand-borderLight rounded-lg transition-colors duration-200"
+                    >
+                      Login
+                    </Link>
+                    <Link 
+                      href="/register" 
+                      onClick={toggleMenu}
+                      className="flex items-center justify-center w-full h-11 font-syne font-medium text-[16px] text-white bg-gradient-to-r from-brand-green to-brand-olive rounded-lg hover:brightness-110 shadow-md transition-all duration-200"
+                    >
+                      Join Network
+                    </Link>
+                  </>
+                )}
               </div>
             </motion.div>
           </>

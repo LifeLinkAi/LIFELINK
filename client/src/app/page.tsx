@@ -8,8 +8,19 @@ import { ArrowRight, ShieldAlert, Activity, HeartHandshake, Building2, Timer } f
 import Link from 'next/link';
 import Navbar from '@/components/navigation/Navbar';
 import Footer from '@/components/navigation/Footer';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LandingPage() {
+  const { user, isAuthenticated, loading } = useAuth();
+
+  const getPortalLink = () => {
+    if (!user) return '/';
+    if (user.role === 'Admin') return '/admin/dashboard';
+    if (user.role === 'Hospital') return '/hospital/dashboard';
+    if (user.role === 'Donor') return '/donor/dashboard';
+    if (user.role === 'Patient') return '/patient/dashboard';
+    return '/';
+  };
 
   // Animation variants
   const fadeInUp = {
@@ -86,10 +97,10 @@ export default function LandingPage() {
               >
                 {/* Primary Button */}
                 <Link 
-                  href="/get-started" 
+                  href={loading ? '#' : isAuthenticated ? getPortalLink() : '/register'} 
                   className="flex items-center justify-center gap-2 px-6 py-4 min-w-[213px] h-[65px] font-syne font-semibold text-lg text-white bg-gradient-to-r from-[#123e20] to-[#1b4d2c] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_25px_-5px_rgba(18,62,32,0.3)] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
                 >
-                  <span>Get Started</span>
+                  <span>{loading ? 'Verifying...' : isAuthenticated ? 'Go to Portal' : 'Get Started'}</span>
                   <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
                 </Link>
 

@@ -16,7 +16,7 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  loading: false,
+  loading: true,
 };
 
 const authSlice = createSlice({
@@ -26,6 +26,7 @@ const authSlice = createSlice({
     setUser(state, action: PayloadAction<AuthUser>) {
       state.user = action.payload;
       state.isAuthenticated = true;
+      state.loading = false;
     },
     clearUser(state) {
       state.user = null;
