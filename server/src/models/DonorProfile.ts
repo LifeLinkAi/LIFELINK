@@ -49,6 +49,14 @@ const donorProfileSchema = new Schema(
       type: String,
       default: '',
     },
+    inviteToken: {
+      type: String,
+      default: null,
+    },
+    inviteTokenExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

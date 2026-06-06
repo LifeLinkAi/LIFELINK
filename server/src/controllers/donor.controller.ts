@@ -1,9 +1,11 @@
 import { Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { sendDonorInviteEmail } from '../services/notifications/email.service';
 
 export const getDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -43,7 +45,6 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     const {
       name,
       email,
-      password,
       location,
       bloodType,
       tier,
@@ -66,8 +67,9 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     const salt = await bcrypt.genSalt(10);
-    const pass = password || 'donor1234';
-    const hashedPassword = await bcrypt.hash(pass, salt);
+    // Generate secure random password initially so standard logins are blocked
+    const tempPass = crypto.randomBytes(16).toString('hex');
+    const hashedPassword = await bcrypt.hash(tempPass, salt);
 
     const user = await User.create({
       name,
@@ -76,17 +78,31 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       role: 'Donor',
     });
 
+    // Generate invitation token and 7 days expiration
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
     const profile = await DonorProfile.create({
       userId: user._id,
       location: location || '',
       bloodType: bloodType || 'O-',
       tier: tier || 'Bronze',
-      status: status || 'Pending',
+      status: status || 'Pending', // Defaults to Pending until activated
       phone: phone || '',
       lastDonation: lastDonation || 'N/A',
       totalDonated: totalDonated || '0 Liters',
       details: details || '',
       avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+      inviteToken,
+      inviteTokenExpires,
+    });
+
+    // Send donor invite email asynchronously
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
+    
+    sendDonorInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+      console.error(`Error sending invite email to ${emailLower}:`, err);
     });
 
     res.status(201).json({
