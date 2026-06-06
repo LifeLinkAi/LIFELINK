@@ -112,20 +112,14 @@ export default function DonorManagementPage() {
   // Submit hander for adding new donor to database
   const handleAddDonorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDonorName || !newDonorEmail || !newDonorLocation) {
-      showToast('❌ Name, email, and location are required.');
+    if (!newDonorName || !newDonorEmail) {
+      showToast('❌ Name and email are required.');
       return;
     }
     try {
       const payload = {
         name: newDonorName,
         email: newDonorEmail,
-        bloodType: newDonorBlood,
-        tier: newDonorTier,
-        location: newDonorLocation,
-        phone: newDonorPhone || '+1 (555) 0199',
-        status: 'Pending',
-        details: 'Registered donor. Verification and documentation pending review.',
       };
       const res = await api.post('/donors', payload);
       setDonors(prev => [res.data, ...prev]);
@@ -133,10 +127,6 @@ export default function DonorManagementPage() {
       // Reset inputs
       setNewDonorName('');
       setNewDonorEmail('');
-      setNewDonorLocation('');
-      setNewDonorPhone('');
-      setNewDonorBlood('O-');
-      setNewDonorTier('Bronze');
       showToast('🎉 Donor successfully registered in the database!');
     } catch (error: any) {
       console.error(error);
@@ -668,49 +658,6 @@ export default function DonorManagementPage() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Blood Group</label>
-                  <select 
-                    value={newDonorBlood}
-                    onChange={(e) => setNewDonorBlood(e.target.value)}
-                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
-                  >
-                    <option value="O-">O-</option>
-                    <option value="O+">O+</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB-">AB-</option>
-                    <option value="AB+">AB+</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Tier Level</label>
-                  <select 
-                    value={newDonorTier}
-                    onChange={(e) => setNewDonorTier(e.target.value)}
-                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
-                  >
-                    <option value="Bronze">Bronze</option>
-                    <option value="Silver">Silver</option>
-                    <option value="Gold">Gold</option>
-                    <option value="Platinum">Platinum</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Location (City, State)</label>
-                <input 
-                  type="text" 
-                  value={newDonorLocation}
-                  onChange={(e) => setNewDonorLocation(e.target.value)}
-                  placeholder="e.g. New York, NY" 
-                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
-                  required
-                />
-              </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Email Address</label>
                 <input 
@@ -720,16 +667,6 @@ export default function DonorManagementPage() {
                   placeholder="name@example.com" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Phone Number (Optional)</label>
-                <input 
-                  type="text" 
-                  value={newDonorPhone}
-                  onChange={(e) => setNewDonorPhone(e.target.value)}
-                  placeholder="+1 (555) 0199" 
-                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                 />
               </div>
               <div className="flex gap-3 justify-end pt-4">

@@ -49,6 +49,10 @@ const donorProfileSchema = new Schema(
       type: String,
       default: '',
     },
+    isSetupComplete: {
+      type: Boolean,
+      default: false,
+    },
     inviteToken: {
       type: String,
       default: null,
