@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -137,6 +138,96 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
     res.status(200).json({
       success: true,
       message: 'Logged out successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInviteDetails = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const { token } = req.query;
+
+  try {
+    if (!token) {
+      return next(new ApiError(400, 'Invitation token is required.'));
+    }
+
+    const profile = await DonorProfile.findOne({ inviteToken: token });
+    if (!profile) {
+      return next(new ApiError(400, 'Invalid invitation token.'));
+    }
+
+    if (!profile.inviteTokenExpires || new Date() > profile.inviteTokenExpires) {
+      return next(new ApiError(400, 'Invitation token has expired.'));
+    }
+
+    const user = await User.findById(profile.userId);
+    if (!user) {
+      return next(new ApiError(404, 'Associated user account not found.'));
+    }
+
+    res.status(200).json({
+      success: true,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeSetup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const { token, password } = req.body;
+
+  try {
+    if (!token || !password) {
+      return next(new ApiError(400, 'Token and password are required.'));
+    }
+
+    const profile = await DonorProfile.findOne({ inviteToken: token });
+    if (!profile) {
+      return next(new ApiError(400, 'Invalid invitation token.'));
+    }
+
+    if (!profile.inviteTokenExpires || new Date() > profile.inviteTokenExpires) {
+      return next(new ApiError(400, 'Invitation token has expired.'));
+    }
+
+    const user = await User.findById(profile.userId);
+    if (!user) {
+      return next(new ApiError(404, 'Associated user account not found.'));
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    profile.status = 'Available';
+    profile.inviteToken = null;
+    profile.inviteTokenExpires = null;
+    await profile.save();
+
+    const jwtToken = generateToken(user._id.toString(), user.email, user.role);
+
+    res.cookie('token', jwtToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Account activated successfully',
+      token: jwtToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
     next(error);
