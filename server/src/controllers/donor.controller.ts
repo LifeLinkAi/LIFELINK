@@ -32,6 +32,7 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
         lastDonation: profile.lastDonation,
         totalDonated: profile.totalDonated,
         details: profile.details,
+        isSetupComplete: profile.isSetupComplete,
       });
     }
     res.status(200).json(result);
@@ -45,15 +46,6 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     const {
       name,
       email,
-      location,
-      bloodType,
-      tier,
-      status,
-      phone,
-      lastDonation,
-      totalDonated,
-      details,
-      avatar,
     } = req.body;
 
     if (!name || !email) {
@@ -84,17 +76,18 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
 
     const profile = await DonorProfile.create({
       userId: user._id,
-      location: location || '',
-      bloodType: bloodType || 'O-',
-      tier: tier || 'Bronze',
-      status: status || 'Pending', // Defaults to Pending until activated
-      phone: phone || '',
-      lastDonation: lastDonation || 'N/A',
-      totalDonated: totalDonated || '0 Liters',
-      details: details || '',
-      avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+      location: '',
+      bloodType: 'O-',
+      tier: 'Bronze',
+      status: 'Pending', // Defaults to Pending until activated
+      phone: '',
+      lastDonation: 'N/A',
+      totalDonated: '0 Liters',
+      details: 'Registered donor. Setup pending.',
+      avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
       inviteToken,
       inviteTokenExpires,
+      isSetupComplete: false,
     });
 
     // Send donor invite email asynchronously
@@ -118,6 +111,7 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       lastDonation: profile.lastDonation,
       totalDonated: profile.totalDonated,
       details: profile.details,
+      isSetupComplete: profile.isSetupComplete,
     });
   } catch (error) {
     next(error);
@@ -231,6 +225,7 @@ export const updateDonor = async (req: AuthRequest, res: Response, next: NextFun
       lastDonation: profile.lastDonation,
       totalDonated: profile.totalDonated,
       details: profile.details,
+      isSetupComplete: profile.isSetupComplete,
     });
   } catch (error) {
     next(error);
@@ -250,6 +245,95 @@ export const deleteDonor = async (req: AuthRequest, res: Response, next: NextFun
     await DonorProfile.findOneAndDelete({ userId: id });
 
     res.status(200).json({ success: true, message: 'Donor deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, 'Not authenticated.'));
+    }
+
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user || user.role !== 'Donor') {
+      return next(new ApiError(404, 'Donor user not found.'));
+    }
+
+    let profile = await DonorProfile.findOne({ userId: user._id });
+    if (!profile) {
+      profile = await DonorProfile.create({
+        userId: user._id,
+        avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
+      });
+    }
+
+    res.status(200).json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      location: profile.location,
+      bloodType: profile.bloodType,
+      tier: profile.tier,
+      status: profile.status,
+      avatar: profile.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
+      phone: profile.phone,
+      lastDonation: profile.lastDonation,
+      totalDonated: profile.totalDonated,
+      details: profile.details,
+      isSetupComplete: profile.isSetupComplete,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeDonorSetup = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, 'Not authenticated.'));
+    }
+
+    const { bloodType, location, phone } = req.body;
+    if (!bloodType || !location || !phone) {
+      return next(new ApiError(400, 'Blood type, location, and phone number are required.'));
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || user.role !== 'Donor') {
+      return next(new ApiError(404, 'Donor user not found.'));
+    }
+
+    const profile = await DonorProfile.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $set: {
+          bloodType,
+          location,
+          phone,
+          isSetupComplete: true,
+          status: 'Available',
+        },
+      },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      location: profile.location,
+      bloodType: profile.bloodType,
+      tier: profile.tier,
+      status: profile.status,
+      avatar: profile.avatar,
+      phone: profile.phone,
+      lastDonation: profile.lastDonation,
+      totalDonated: profile.totalDonated,
+      details: profile.details,
+      isSetupComplete: profile.isSetupComplete,
+    });
   } catch (error) {
     next(error);
   }
