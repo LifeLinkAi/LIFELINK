@@ -13,6 +13,11 @@ const hospitalProfileSchema = new Schema(
       default: '',
       trim: true,
     },
+    governmentLicenseId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     city: {
       type: String,
       default: '',
@@ -22,6 +27,47 @@ const hospitalProfileSchema = new Schema(
       type: String,
       default: '',
       trim: true,
+    },
+    phone: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    website: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    accreditation: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    hospitalLicenseUrl: {
+      type: String,
+      default: '',
+    },
+    kidneyTransplantLicenseUrl: {
+      type: String,
+      default: '',
+    },
+    liverTransplantLicenseUrl: {
+      type: String,
+      default: '',
+    },
+    heartTransplantLicenseUrl: {
+      type: String,
+      default: '',
+    },
+    lungTransplantLicenseUrl: {
+      type: String,
+      default: '',
+    },
+    contactPerson: {
+      name: { type: String, default: '' },
+      designation: { type: String, default: '' },
+      email: { type: String, default: '' },
+      phone: { type: String, default: '' },
     },
     logo: {
       type: String,
@@ -35,6 +81,18 @@ const hospitalProfileSchema = new Schema(
       type: String,
       enum: ['Active', 'Pending', 'Suspended', 'Verified'],
       default: 'Pending',
+    },
+    isSetupComplete: {
+      type: Boolean,
+      default: false,
+    },
+    inviteToken: {
+      type: String,
+      default: null,
+    },
+    inviteTokenExpires: {
+      type: Date,
+      default: null,
     },
     patientCount: {
       type: Number,

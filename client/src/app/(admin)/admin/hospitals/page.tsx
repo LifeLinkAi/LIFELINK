@@ -30,6 +30,21 @@ interface Hospital {
     time: string;
     type: 'admission' | 'blood' | 'dispatch' | 'other';
   }[];
+  governmentLicenseId?: string;
+  hospitalLicenseUrl?: string;
+  kidneyTransplantLicenseUrl?: string;
+  liverTransplantLicenseUrl?: string;
+  heartTransplantLicenseUrl?: string;
+  lungTransplantLicenseUrl?: string;
+  contactPerson?: {
+    name: string;
+    designation: string;
+    email: string;
+    phone: string;
+  };
+  phone?: string;
+  website?: string;
+  isSetupComplete?: boolean;
 }
 
 export default function HospitalManagementPage() {
@@ -95,7 +110,17 @@ export default function HospitalManagementPage() {
         ],
         recentActivity: h.recentActivity || [
           { title: 'Facility Synchronized', description: 'Central registry connection verified', time: 'Just now', type: 'other' }
-        ]
+        ],
+        governmentLicenseId: h.governmentLicenseId || '',
+        hospitalLicenseUrl: h.hospitalLicenseUrl || '',
+        kidneyTransplantLicenseUrl: h.kidneyTransplantLicenseUrl || '',
+        liverTransplantLicenseUrl: h.liverTransplantLicenseUrl || '',
+        heartTransplantLicenseUrl: h.heartTransplantLicenseUrl || '',
+        lungTransplantLicenseUrl: h.lungTransplantLicenseUrl || '',
+        contactPerson: h.contactPerson || { name: '', designation: '', email: '', phone: '' },
+        phone: h.phone || '',
+        website: h.website || '',
+        isSetupComplete: h.isSetupComplete || false
       }));
       setHospitals(mapped);
     } catch (error) {
@@ -123,48 +148,38 @@ export default function HospitalManagementPage() {
   // Submit handler for registering a new hospital
   const handleAddHospitalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHospitalName || !newHospitalLicense || !newHospitalEmail) {
-      showToast('❌ Hospital Name, License ID, and Email are required.');
+    if (!newHospitalName || !newHospitalEmail) {
+      showToast('❌ Hospital Name and Email are required.');
       return;
     }
     try {
       const payload = {
         name: newHospitalName,
         email: newHospitalEmail,
-        licenseId: newHospitalLicense,
-        city: newHospitalCity,
-        location: `${newHospitalCity}, CA`,
-        specialties: newHospitalSpecialties ? newHospitalSpecialties.split(',').map(s => s.trim()) : ['General'],
-        status: 'Pending',
-        patientCount: 0,
-        rating: '--',
-        bloodHealthStatus: 'Stable',
       };
       const res = await api.post('/hospitals', payload);
       
       // Map return value
       const newHosp: Hospital = {
         id: res.data.id,
-        licenseId: res.data.licenseId,
+        licenseId: res.data.licenseId || 'LIC-PENDING',
         name: res.data.name,
-        city: res.data.city,
-        location: res.data.location,
+        city: res.data.city || 'Pending Setup',
+        location: res.data.location || 'Pending Setup',
         logo: res.data.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(res.data.name)}`,
-        specialties: res.data.specialties,
-        status: res.data.status,
-        patientCount: res.data.patientCount,
-        rating: res.data.rating,
+        specialties: res.data.specialties || ['General'],
+        status: res.data.status || 'Pending',
+        patientCount: 0,
+        rating: '--',
         bloodHealthLevels: [60, 40, 80, 50],
-        bloodHealthStatus: res.data.bloodHealthStatus,
+        bloodHealthStatus: 'Stable',
         bloodStock: {
-          'A+': 120, 'A-': 40, 'B+': 32, 'B-': 18,
-          'O+': 200, 'O-': 12, 'AB+': 45, 'AB-': 10
+          'A+': 0, 'A-': 0, 'B+': 0, 'B-': 0,
+          'O+': 0, 'O-': 0, 'AB+': 0, 'AB-': 0
         },
-        documents: [
-          { name: 'State License 2024', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDy5y70gpE0tPIcMnCrXsXqPXSNqtaM6n-JBTDphwD4cWI5WkL7O7SBpKCTi0O_RP_qDeHvnAIgWYD8Kg8ut5ulvj7zcRH6TLhMQnX5U1yULQ3LVHRS4i4QZ7iWkWV2tSBTJeHZ0tr_U8Oku9AHlB9ZwSd_-cIMHWrrYB7MnUdoo6JPFi5MY5pYxXsR3_VwyBdf5Q78o2OMP_l5raVCKfuSS75azX5sTeAv_PFIaUyrv_acWdW5FLWzg30zYLePY1wsXDMolZYuwuGW' }
-        ],
+        documents: [],
         recentActivity: [
-          { title: 'Facility Synchronized', description: 'Central registry connection verified', time: 'Just now', type: 'other' }
+          { title: 'Facility Invited', description: 'Institutional activation email sent', time: 'Just now', type: 'other' }
         ]
       };
       
@@ -173,10 +188,7 @@ export default function HospitalManagementPage() {
       
       // Reset form
       setNewHospitalName('');
-      setNewHospitalLicense('');
       setNewHospitalEmail('');
-      setNewHospitalSpecialties('');
-      setNewHospitalCity('San Francisco');
       showToast('🎉 Facility registered successfully!');
     } catch (error: any) {
       console.error(error);
@@ -727,69 +739,250 @@ export default function HospitalManagementPage() {
                 </div>
               </div>
 
-              {/* Verified Documents Previews */}
-              <div className="space-y-sm">
-                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Verified Documents</h4>
-                <div className="grid grid-cols-2 gap-md">
-                  {selectedHospital.documents.map((doc, idx) => (
-                    <div key={idx} className="group cursor-pointer">
-                      <div className="aspect-[3/4] bg-neutral-100 rounded-xl overflow-hidden border border-outline-variant/30 mb-1 relative shadow-sm">
-                        <img 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          src={doc.image}
-                          alt={doc.name}
-                        />
-                      </div>
-                      <p className="text-[11px] font-bold text-on-surface-variant group-hover:text-primary transition-colors truncate">{doc.name}</p>
+              {/* Onboarding & Verification Audit */}
+              <div className="space-y-md pt-4 border-t border-outline-variant/20">
+                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Verification Audit Profile</h4>
+                
+                {!selectedHospital.isSetupComplete ? (
+                  <div className="p-4 bg-amber-50/60 border border-amber-200/50 text-amber-800 rounded-xl space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="material-symbols-outlined text-[18px] text-amber-600">warning</span>
+                      Setup Incomplete
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Activity Timeline */}
-              <div className="space-y-sm pt-4 border-t border-outline-variant/20">
-                <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Recent Activity</h4>
-                <div className="space-y-4 pt-2">
-                  {selectedHospital.recentActivity.map((act, idx) => (
-                    <div key={idx} className="flex gap-4">
-                      {/* Timeline Node Icon/Dot */}
-                      <div className="flex flex-col items-center">
-                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm mt-1 ${
-                          act.type === 'admission' ? 'bg-primary' :
-                          act.type === 'blood' ? 'bg-amber-500' :
-                          act.type === 'dispatch' ? 'bg-red-600' : 'bg-neutral-400'
-                        }`} />
-                        {idx < selectedHospital.recentActivity.length - 1 && (
-                          <div className="w-[1px] bg-outline-variant/40 flex-1 my-1" />
+                    <p className="text-[11px] text-amber-700/95 leading-relaxed">
+                      This facility node was registered by the admin but has not yet completed the first-login Setup Wizard. Awaiting document submissions.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* General Metadata */}
+                    <div className="grid grid-cols-2 gap-3 bg-neutral-50/50 p-3 rounded-xl border border-outline-variant/20">
+                      <div>
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">Govt License ID</span>
+                        <span className="block text-xs font-semibold text-gray-700">{selectedHospital.governmentLicenseId || 'Not provided'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">Direct Phone</span>
+                        <span className="block text-xs font-semibold text-gray-700">{selectedHospital.phone || 'Not provided'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">Official Website</span>
+                        {selectedHospital.website ? (
+                          <a href={selectedHospital.website} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+                            {selectedHospital.website}
+                            <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                          </a>
+                        ) : (
+                          <span className="block text-xs font-semibold text-gray-700">Not provided</span>
                         )}
                       </div>
-                      <div className="pb-1">
-                        <p className="text-sm font-bold text-on-surface leading-tight">{act.title}</p>
-                        <p className="text-xs text-on-surface-variant mt-0.5">{act.description} • <span className="italic">{act.time}</span></p>
-                      </div>
                     </div>
-                  ))}
+
+                    {/* Contact Person Details */}
+                    {selectedHospital.contactPerson && (
+                      <div className="p-3 bg-neutral-50/50 rounded-xl border border-outline-variant/20 space-y-2">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-primary">Primary Contact Person</span>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="block text-[9px] text-gray-400">Name</span>
+                            <span className="font-semibold text-gray-700">{selectedHospital.contactPerson.name || '--'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] text-gray-400">Designation</span>
+                            <span className="font-semibold text-gray-700">{selectedHospital.contactPerson.designation || '--'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] text-gray-400">Direct Phone</span>
+                            <span className="font-semibold text-gray-700">{selectedHospital.contactPerson.phone || '--'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] text-gray-400">Email Address</span>
+                            <span className="font-semibold text-gray-700 truncate block">{selectedHospital.contactPerson.email || '--'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Uploaded Certificates */}
+                    <div className="space-y-2">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-primary">Verification Certificates</span>
+                      
+                      {/* Compulsory Hospital License */}
+                      {selectedHospital.hospitalLicenseUrl ? (
+                        <a 
+                          href={selectedHospital.hospitalLicenseUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex items-center gap-3 p-3 bg-white hover:bg-[#f3f9ea] border border-outline-variant/30 rounded-xl transition-all group shadow-sm"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                            PDF
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-xs font-bold text-gray-800">Hospital License Certificate</span>
+                            <span className="block text-[10px] text-gray-400 truncate">Compulsory Operating License</span>
+                          </div>
+                          <span className="material-symbols-outlined text-[16px] text-gray-400 group-hover:text-primary transition-colors shrink-0">open_in_new</span>
+                        </a>
+                      ) : (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[18px]">error</span>
+                          Compulsory Hospital License Certificate is missing!
+                        </div>
+                      )}
+
+                      {/* Kidney Transplant Cert */}
+                      {selectedHospital.specialties.includes('Kidney Transplant') && (
+                        selectedHospital.kidneyTransplantLicenseUrl ? (
+                          <a 
+                            href={selectedHospital.kidneyTransplantLicenseUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex items-center gap-3 p-3 bg-white hover:bg-[#f3f9ea] border border-outline-variant/30 rounded-xl transition-all group shadow-sm"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                              PDF
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-xs font-bold text-gray-800">Kidney Transplant Certification</span>
+                              <span className="block text-[10px] text-gray-400 truncate">Specialty Operating License</span>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-gray-400 group-hover:text-primary transition-colors shrink-0">open_in_new</span>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            Kidney Certification is missing!
+                          </div>
+                        )
+                      )}
+
+                      {/* Liver Transplant Cert */}
+                      {selectedHospital.specialties.includes('Liver Transplant') && (
+                        selectedHospital.liverTransplantLicenseUrl ? (
+                          <a 
+                            href={selectedHospital.liverTransplantLicenseUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex items-center gap-3 p-3 bg-white hover:bg-[#f3f9ea] border border-outline-variant/30 rounded-xl transition-all group shadow-sm"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                              PDF
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-xs font-bold text-gray-800">Liver Transplant Certification</span>
+                              <span className="block text-[10px] text-gray-400 truncate">Specialty Operating License</span>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-gray-400 group-hover:text-primary transition-colors shrink-0">open_in_new</span>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            Liver Certification is missing!
+                          </div>
+                        )
+                      )}
+
+                      {/* Heart Transplant Cert */}
+                      {selectedHospital.specialties.includes('Heart Transplant') && (
+                        selectedHospital.heartTransplantLicenseUrl ? (
+                          <a 
+                            href={selectedHospital.heartTransplantLicenseUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex items-center gap-3 p-3 bg-white hover:bg-[#f3f9ea] border border-outline-variant/30 rounded-xl transition-all group shadow-sm"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                              PDF
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-xs font-bold text-gray-800">Heart Transplant Certification</span>
+                              <span className="block text-[10px] text-gray-400 truncate">Specialty Operating License</span>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-gray-400 group-hover:text-primary transition-colors shrink-0">open_in_new</span>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            Heart Certification is missing!
+                          </div>
+                        )
+                      )}
+
+                      {/* Lung Transplant Cert */}
+                      {selectedHospital.specialties.includes('Lung Transplant') && (
+                        selectedHospital.lungTransplantLicenseUrl ? (
+                          <a 
+                            href={selectedHospital.lungTransplantLicenseUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex items-center gap-3 p-3 bg-white hover:bg-[#f3f9ea] border border-outline-variant/30 rounded-xl transition-all group shadow-sm"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                              PDF
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-xs font-bold text-gray-800">Lung Transplant Certification</span>
+                              <span className="block text-[10px] text-gray-400 truncate">Specialty Operating License</span>
+                            </div>
+                            <span className="material-symbols-outlined text-[16px] text-gray-400 group-hover:text-primary transition-colors shrink-0">open_in_new</span>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            Lung Certification is missing!
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity Timeline */}
+                <div className="space-y-sm pt-4 border-t border-outline-variant/20">
+                  <h4 className="font-syne font-bold text-xs text-primary uppercase tracking-wider">Recent Activity</h4>
+                  <div className="space-y-4 pt-2">
+                    {selectedHospital.recentActivity.map((act, idx) => (
+                      <div key={idx} className="flex gap-4">
+                        {/* Timeline Node Icon/Dot */}
+                        <div className="flex flex-col items-center">
+                          <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm mt-1 ${
+                            act.type === 'admission' ? 'bg-primary' :
+                            act.type === 'blood' ? 'bg-amber-500' :
+                            act.type === 'dispatch' ? 'bg-red-600' : 'bg-neutral-400'
+                          }`} />
+                          {idx < selectedHospital.recentActivity.length - 1 && (
+                            <div className="w-[1px] bg-outline-variant/40 flex-1 my-1" />
+                          )}
+                        </div>
+                        <div className="pb-1">
+                          <p className="text-sm font-bold text-on-surface leading-tight">{act.title}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">{act.description} • <span className="italic">{act.time}</span></p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Sticky Bottom Actions */}
-            <div className="p-6 bg-white border-t border-outline-variant/30 flex flex-col gap-sm shrink-0">
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, selectedHospital.status === 'Suspended' ? 'Active' : 'Suspended')}
-                  className="flex-1 py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors text-center"
-                >
-                  {selectedHospital.status === 'Suspended' ? 'Activate' : 'Suspend'}
-                </button>
-                <button 
-                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, 'Verified')}
-                  className="flex-1 py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center"
-                  disabled={selectedHospital.status === 'Verified'}
-                >
-                  {selectedHospital.status === 'Verified' ? 'Verified ✓' : 'Verify'}
-                </button>
-              </div>
+              {/* Sticky Bottom Actions */}
+              <div className="p-6 bg-white border-t border-outline-variant/30 flex flex-col gap-sm shrink-0">
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleUpdateHospitalStatus(selectedHospital.id, selectedHospital.status === 'Suspended' ? 'Active' : 'Suspended')}
+                    className="flex-1 py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors text-center"
+                  >
+                    {selectedHospital.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateHospitalStatus(selectedHospital.id, 'Active')}
+                    className="flex-1 py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center"
+                    disabled={selectedHospital.status === 'Active' || !selectedHospital.isSetupComplete}
+                  >
+                    {selectedHospital.status === 'Active' ? 'Verified ✓' : 'Verify & Activate'}
+                  </button>
+                </div>
               <button 
                 onClick={() => handleDeleteHospital(selectedHospital.id)}
                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-syne font-bold text-sm shadow-md transition-colors text-center"
@@ -824,32 +1017,6 @@ export default function HospitalManagementPage() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">License ID</label>
-                  <input 
-                    type="text" 
-                    value={newHospitalLicense}
-                    onChange={(e) => setNewHospitalLicense(e.target.value)}
-                    placeholder="LIC-12345-X" 
-                    className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">City Location</label>
-                  <select 
-                    value={newHospitalCity}
-                    onChange={(e) => setNewHospitalCity(e.target.value)}
-                    className="w-full bg-neutral-50 border border-outline-variant/40 rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
-                  >
-                    <option value="San Francisco">San Francisco</option>
-                    <option value="Oakland">Oakland</option>
-                    <option value="San Jose">San Jose</option>
-                    <option value="Sacramento">Sacramento</option>
-                  </select>
-                </div>
-              </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Email Address</label>
                 <input 
@@ -857,17 +1024,6 @@ export default function HospitalManagementPage() {
                   value={newHospitalEmail}
                   onChange={(e) => setNewHospitalEmail(e.target.value)}
                   placeholder="hospital@example.com" 
-                  className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Facility Specialties (comma-separated)</label>
-                <input 
-                  type="text" 
-                  value={newHospitalSpecialties}
-                  onChange={(e) => setNewHospitalSpecialties(e.target.value)}
-                  placeholder="e.g. ER, Trauma, Cardiology" 
                   className="w-full bg-neutral-50 border border-outline-variant/40 focus:border-primary rounded-xl px-4 py-2 text-sm outline-none transition-all" 
                   required
                 />
