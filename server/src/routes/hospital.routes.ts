@@ -6,17 +6,21 @@ import {
   updateHospital, 
   deleteHospital,
   getMeHospitalProfile,
-  completeHospitalSetup
+  completeHospitalSetup,
+  getHospitalDashboardData, // Added
+  updateBloodInventory      // Added
 } from '../controllers/hospital.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Routes require authentication
+// --- Hospital Role Routes ---
 router.get('/me', authenticate, getMeHospitalProfile);
 router.put('/setup-complete', authenticate, completeHospitalSetup);
+router.get('/dashboard', authenticate, authorize('Hospital'), getHospitalDashboardData); // New
+router.put('/inventory', authenticate, authorize('Hospital'), updateBloodInventory);      // New
 
-// mutate actions require Admin role
+// --- Admin Role Routes ---
 router.get('/', authenticate, getHospitals);
 router.post('/', authenticate, authorize('Admin'), createHospital);
 router.post('/bulk', authenticate, authorize('Admin'), createHospitalBulk);

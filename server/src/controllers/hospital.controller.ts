@@ -411,3 +411,88 @@ export const completeHospitalSetup = async (req: AuthRequest, res: Response, nex
     next(error);
   }
 };
+
+// ==========================================
+// DASHBOARD & INVENTORY SPECIFIC CONTROLLERS
+// ==========================================
+
+export const getHospitalDashboardData = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const profile = await HospitalProfile.findOne({ userId: req.user.id });
+    
+    if (!profile) {
+      return next(new ApiError(404, 'Hospital profile not found.'));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bloodInventory: profile.bloodInventory,
+        liveStats: profile.liveStats,
+        bloodHealthStatus: profile.bloodHealthStatus,
+        patientCount: profile.patientCount,
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateBloodInventory = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { bloodGroup, units, maxCapacity, status } = req.body;
+
+    if (!bloodGroup) {
+      return next(new ApiError(400, 'Blood group is required.'));
+    }
+
+    const profile = await HospitalProfile.findOne({ userId: req.user.id });
+    if (!profile) {
+      return next(new ApiError(404, 'Hospital profile not found.'));
+    }
+
+    // Find the specific blood group in the Mongoose DocumentArray
+    const inventoryIndex = profile.bloodInventory.findIndex(inv => inv.bloodGroup === bloodGroup);
+
+    if (inventoryIndex === -1) {
+      // If it doesn't exist for some reason, add it
+      profile.bloodInventory.push({ bloodGroup, units, maxCapacity, status });
+    } else {
+      // Update existing values if they are provided in the request body
+      if (units !== undefined) profile.bloodInventory[inventoryIndex].units = units;
+      if (maxCapacity !== undefined) profile.bloodInventory[inventoryIndex].maxCapacity = maxCapacity;
+      
+      // Auto-calculate status if units and maxCapacity are present and status isn't manually forced
+      const currentUnits = units !== undefined ? units : profile.bloodInventory[inventoryIndex].units;
+      const currentMax = maxCapacity !== undefined ? maxCapacity : profile.bloodInventory[inventoryIndex].maxCapacity;
+      const percentage = (currentUnits / currentMax) * 100;
+
+      if (!status) {
+        if (percentage <= 15) profile.bloodInventory[inventoryIndex].status = 'critical';
+        else if (percentage <= 30) profile.bloodInventory[inventoryIndex].status = 'low';
+        else if (percentage >= 80) profile.bloodInventory[inventoryIndex].status = 'optimal';
+        else profile.bloodInventory[inventoryIndex].status = 'adequate';
+      } else {
+        profile.bloodInventory[inventoryIndex].status = status;
+      }
+    }
+
+    await profile.save();
+
+    res.status(200).json({
+      success: true,
+      message: `${bloodGroup} inventory updated successfully.`,
+      data: profile.bloodInventory
+    });
+  } catch (error) {
+    next(error);
+  }
+};
