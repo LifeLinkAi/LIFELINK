@@ -1,0 +1,67 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import { Readable } from 'stream';
+import cloudinary from '../config/cloudinary';
+import { ApiError } from '../middlewares/error.middleware';
+import { authenticate } from '../middlewares/auth.middleware';
+import { logger } from '../utils/logger';
+
+const router = Router();
+
+// Configure multer memory storage
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
+
+router.post('/', authenticate, upload.single('file'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.file) {
+      return next(new ApiError(400, 'No file uploaded.'));
+    }
+
+    const fileBuffer = req.file.buffer;
+    
+    // Create a promise-based wrapper for Cloudinary upload stream
+    const uploadToCloudinary = (buffer: Buffer, originalname: string): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'lifelink_documents',
+            resource_type: 'auto',
+            public_id: originalname.split('.')[0] + '-' + Date.now(),
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
+            }
+          }
+        );
+
+        const readableStream = new Readable();
+        readableStream.push(buffer);
+        readableStream.push(null);
+        readableStream.pipe(uploadStream);
+      });
+    };
+
+    logger.info(`Uploading file ${req.file.originalname} to Cloudinary...`);
+    const result = await uploadToCloudinary(fileBuffer, req.file.originalname);
+    logger.info(`File uploaded successfully. Cloudinary URL: ${result.secure_url}`);
+
+    res.status(200).json({
+      success: true,
+      url: result.secure_url,
+    });
+  } catch (error: any) {
+    logger.error(`Failed to upload file to Cloudinary: ${error.message}`);
+    next(new ApiError(500, `Cloudinary upload failed: ${error.message}`));
+  }
+});
+
+export default router;

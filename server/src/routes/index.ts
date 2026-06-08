@@ -5,6 +5,7 @@ import campaignRouter from './campaign.routes';
 import donorRouter from './donor.routes';
 import hospitalRouter from './hospital.routes';
 import requestRouter from './request.routes';
+import uploadRouter from './upload.routes';
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use('/campaigns', campaignRouter);
 router.use('/donors', donorRouter);
 router.use('/hospitals', hospitalRouter);
 router.use('/requests', requestRouter);
+router.use('/upload', uploadRouter);
 
 export default router;
