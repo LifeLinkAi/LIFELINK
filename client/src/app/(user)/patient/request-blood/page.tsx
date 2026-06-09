@@ -1,6 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '@/lib/axios';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 // -- Types ------------------------------------------------
@@ -57,6 +60,8 @@ export default function RequestBloodPage() {
     hospital: '', reason: '', contactPhone: '',
   });
   const [requestId, setRequestId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const isValid = form.bloodGroup !== '' && form.hospital !== '' && form.contactPhone !== '';
 
@@ -65,9 +70,45 @@ export default function RequestBloodPage() {
     setStep('confirming');
   };
 
-  const handleConfirm = () => {
-    setRequestId(`BR-${Math.floor(2000 + Math.random() * 999)}`);
-    setStep('submitted');
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const requestBody = {
+      patientName: user?.name || '',
+      facility: form.hospital,
+      age: 0,
+      gender: 'Unknown',
+      organType: '',
+      bloodGroup: form.bloodGroup,
+      units: form.units,
+      urgency: form.urgency,
+      facilityType: 'Hospital',
+      notes: form.reason || '',
+      type: 'Blood',
+    };
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await api.post('/requests/patient', requestBody, { headers });
+
+      if (response.status === 201 && response.data?.success && response.data?.data) {
+        toast.success('Blood request submitted successfully.');
+        setRequestId(response.data.data.id || `BR-${Math.floor(2000 + Math.random() * 999)}`);
+        setForm({ bloodGroup: '', units: 1, urgency: 'high', hospital: '', reason: '', contactPhone: '' });
+        setStep('submitted');
+      } else {
+        throw new Error('Unexpected response from server.');
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.error?.message || error?.message || 'Failed to submit blood request. Please try again.';
+      toast.error(errorMessage);
+      setStep('form');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleNew = () => {
@@ -173,9 +214,17 @@ export default function RequestBloodPage() {
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleConfirm}
-              className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2">
-              <Droplets size={16} /> Confirm & Broadcast
+            <button
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+              className={cn(
+                'flex-1 py-3 font-bold text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2',
+                isSubmitting
+                  ? 'bg-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed'
+                  : 'bg-red-600 hover:bg-red-700 text-white'
+              )}
+            >
+              <Droplets size={16} /> {isSubmitting ? 'Submitting...' : 'Confirm & Broadcast'}
             </button>
             <button onClick={() => setStep('form')}
               className="px-5 py-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium rounded-xl hover:border-red-300 transition-colors">

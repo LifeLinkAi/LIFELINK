@@ -107,10 +107,53 @@ const hospitalProfileSchema = new Schema(
       enum: ['Optimal', 'Stable', 'Critical'],
       default: 'Stable',
     },
+    // --- NEW FIELDS FOR UI INTEGRATION ---
+    bloodInventory: [
+      {
+        bloodGroup: {
+          type: String,
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+          required: true,
+        },
+        units: { type: Number, default: 0 },
+        maxCapacity: { type: Number, default: 100 },
+        status: {
+          type: String,
+          enum: ['critical', 'low', 'adequate', 'optimal'],
+          default: 'adequate',
+        },
+      },
+    ],
+    liveStats: {
+      icuCapacityPct: { type: Number, default: 0, min: 0, max: 100 },
+      erWaitTimeMins: { type: Number, default: 0 },
+      onCallStaff: { type: Number, default: 0 },
+    },
+    // --------------------------------------
   },
   {
     timestamps: true,
   }
 );
+
+// Middleware to automatically initialize a default blood inventory for new hospitals
+// Middleware to automatically initialize a default blood inventory for new hospitals
+hospitalProfileSchema.pre('save', function (next) {
+  // Mongoose automatically initializes arrays to an empty [], so it's safe to check length and push
+  if (this.isNew && this.bloodInventory.length === 0) {
+    // 'as const' tells TypeScript these are exact literal strings, not just any strings
+    const defaultBloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+    
+    defaultBloodGroups.forEach((group) => {
+      this.bloodInventory.push({
+        bloodGroup: group,
+        units: 0,
+        maxCapacity: 100,
+        status: 'critical',
+      });
+    });
+  }
+  next();
+});
 
 export const HospitalProfile = model('HospitalProfile', hospitalProfileSchema);

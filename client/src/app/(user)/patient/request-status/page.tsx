@@ -1,10 +1,34 @@
 ﻿'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '@/lib/axios';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 type RequestType   = 'Blood' | 'Organ';
 type RequestStatus = 'PENDING' | 'MATCHING' | 'DONOR_FOUND' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+interface BackendRequest {
+  id: string;
+  userId: string;
+  patientName: string;
+  facility: string;
+  age: number;
+  gender: string;
+  organType: string;
+  bloodGroup: string;
+  units: number;
+  urgency: 'critical' | 'high' | 'medium' | 'low';
+  status: RequestStatus;
+  matchPercentage: number;
+  registeredDate: string;
+  distance?: string;
+  facilityType: string;
+  time?: string;
+  notes?: string;
+  type: RequestType;
+}
 
 interface PatientRequest {
   id: string;
@@ -19,50 +43,52 @@ interface PatientRequest {
   canCancel: boolean;
 }
 
-const REQUESTS: PatientRequest[] = [
-  {
-    id: 'BR-2533', type: 'Blood', status: 'MATCHING',
-    createdAt: '10 mins ago', updatedAt: '2 mins ago',
-    urgency: 'critical', detail: 'O− · 2 units · LifeLink Main Campus',
-    hospital: 'LifeLink Main Campus',
-    canCancel: true,
-    timeline: [
-      { time: '10:42 AM', event: 'Request submitted',           done: true  },
-      { time: '10:43 AM', event: 'AI matching started',         done: true  },
-      { time: '—',        event: 'Donor found & notified',      done: false },
-      { time: '—',        event: 'Donation confirmed',          done: false },
-      { time: '—',        event: 'Request fulfilled',           done: false },
-    ],
-  },
-  {
-    id: 'ORG-441', type: 'Organ', status: 'DONOR_FOUND',
-    createdAt: '2 hrs ago', updatedAt: '30 mins ago',
-    urgency: 'critical', detail: 'Kidney · O+ · LifeLink Main Campus',
-    hospital: 'LifeLink Main Campus',
-    canCancel: true,
-    timeline: [
-      { time: '08:30 AM', event: 'Request submitted',           done: true  },
-      { time: '08:31 AM', event: 'AI matching started',         done: true  },
-      { time: '09:15 AM', event: 'Compatible donor found',      done: true  },
-      { time: '—',        event: 'Medical verification',        done: false },
-      { time: '—',        event: 'Legal clearance',             done: false },
-      { time: '—',        event: 'Surgery scheduled',           done: false },
-    ],
-  },
-  {
-    id: 'BR-2028', type: 'Blood', status: 'COMPLETED',
-    createdAt: '3 days ago', updatedAt: '3 days ago',
-    urgency: 'medium', detail: 'O− · 1 unit · Baby Memorial Hospital',
-    hospital: 'Baby Memorial Hospital',
-    canCancel: false,
-    timeline: [
-      { time: 'Day 1', event: 'Request submitted',              done: true },
-      { time: 'Day 1', event: 'Donor matched',                  done: true },
-      { time: 'Day 1', event: 'Donation completed',             done: true },
-      { time: 'Day 1', event: 'Request fulfilled',              done: true },
-    ],
-  },
-];
+const STATUS_ORDER: RequestStatus[] = ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'];
+
+function formatRegisteredDate(value: string): string {
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }).format(date);
+  } catch {
+    return value;
+  }
+}
+
+function buildTimeline(req: BackendRequest): PatientRequest['timeline'] {
+  const baseEvents = [
+    { event: 'Request submitted', done: true },
+    { event: 'AI matching started', done: ['MATCHING', 'DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'].includes(req.status) },
+    { event: req.type === 'Blood' ? 'Compatible donor found' : 'Compatible donor found', done: ['DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'].includes(req.status) },
+    { event: req.status === 'COMPLETED' ? (req.type === 'Blood' ? 'Donation completed' : 'Organ donation completed') : 'Request processing', done: req.status === 'COMPLETED' },
+    { event: req.status === 'COMPLETED' ? 'Request fulfilled' : '—', done: req.status === 'COMPLETED' },
+  ];
+
+  return baseEvents.map((event, index) => ({
+    time: index === 0 ? formatRegisteredDate(req.registeredDate) : req.time || '—',
+    event: event.event,
+    done: event.done,
+  }));
+}
+
+function mapBackendRequest(req: BackendRequest): PatientRequest {
+  const detail = req.type === 'Blood'
+    ? `${req.bloodGroup || 'Unknown'} · ${req.units} unit${req.units === 1 ? '' : 's'} · ${req.facility}`
+    : `${req.organType || 'Organ'} · ${req.bloodGroup || 'Unknown'} · ${req.facility}`;
+
+  return {
+    id: req.id,
+    type: req.type,
+    status: req.status,
+    createdAt: formatRegisteredDate(req.registeredDate),
+    updatedAt: req.time || formatRegisteredDate(req.registeredDate),
+    urgency: req.urgency,
+    detail,
+    hospital: req.facility,
+    timeline: buildTimeline(req),
+    canCancel: ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'].includes(req.status),
+  };
+}
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
   PENDING:     { label: '● Pending',     color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
@@ -193,27 +219,53 @@ function RequestCard({ req }: { req: PatientRequest }) {
 
 export default function RequestStatusPage() {
   const [filter, setFilter] = useState('all');
+  const [requests, setRequests] = useState<BackendRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   const ACTIVE_STATUSES = ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'];
 
-  const visible = REQUESTS.filter(r => {
-    if (filter === 'all')       return true;
-    if (filter === 'active')    return ACTIVE_STATUSES.includes(r.status);
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const response = await api.get<{ success: true; data: BackendRequest[] }>('/requests/my-history', { headers });
+      setRequests(response.data.data || []);
+    } catch (error: any) {
+      const message = error?.response?.data?.error?.message || error?.message || 'Unable to load request history.';
+      toast.error(message);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchHistory();
+  }, [user]);
+
+  const displayRequests = requests.map(mapBackendRequest);
+
+  const visible = displayRequests.filter(r => {
+    if (filter === 'all') return true;
+    if (filter === 'active') return ACTIVE_STATUSES.includes(r.status);
     return r.status === filter;
   });
 
   const counts = {
-    all:       REQUESTS.length,
-    active:    REQUESTS.filter(r => ACTIVE_STATUSES.includes(r.status)).length,
-    COMPLETED: REQUESTS.filter(r => r.status === 'COMPLETED').length,
-    CANCELLED: REQUESTS.filter(r => r.status === 'CANCELLED').length,
+    all:       displayRequests.length,
+    active:    displayRequests.filter(r => ACTIVE_STATUSES.includes(r.status)).length,
+    COMPLETED: displayRequests.filter(r => r.status === 'COMPLETED').length,
+    CANCELLED: displayRequests.filter(r => r.status === 'CANCELLED').length,
   };
 
   const stats = [
-    { label: 'Total',    value: REQUESTS.length,    color: '' },
-    { label: 'Active',   value: counts.active,       color: 'text-red-600'   },
-    { label: 'Completed',value: counts.COMPLETED,    color: 'text-green-700' },
-    { label: 'Cancelled',value: counts.CANCELLED,    color: 'text-[#8A9A7A]' },
+    { label: 'Total',    value: displayRequests.length,    color: '' },
+    { label: 'Active',   value: counts.active,              color: 'text-red-600'   },
+    { label: 'Completed',value: counts.COMPLETED,           color: 'text-green-700' },
+    { label: 'Cancelled',value: counts.CANCELLED,           color: 'text-[#8A9A7A]' },
   ];
 
   return (
@@ -226,8 +278,18 @@ export default function RequestStatusPage() {
             Track all your blood and organ requests.
           </p>
         </div>
-        <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors">
-          <RefreshCw size={13} /> Refresh
+        <button
+          type="button"
+          onClick={fetchHistory}
+          disabled={loading}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors',
+            loading
+              ? 'border-[#E8E4D8] bg-[#F5F5F3] text-[#8A9A7A] cursor-not-allowed'
+              : 'border-[#D0CCBC] bg-white text-[#3A4A2A] hover:border-[#7AB648]'
+          )}
+        >
+          <RefreshCw size={13} /> {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
@@ -264,14 +326,17 @@ export default function RequestStatusPage() {
 
       {/* Request list */}
       <div className="flex flex-col gap-3">
-        {visible.length > 0
-          ? visible.map(r => <RequestCard key={r.id} req={r} />)
-          : (
-            <div className="bg-white rounded-xl border border-[#E8E4D8] p-12 text-center text-[#8A9A7A]">
-              No requests in this category.
-            </div>
-          )
-        }
+        {loading ? (
+          <div className="bg-white rounded-xl border border-[#E8E4D8] p-12 text-center text-[#8A9A7A]">
+            Loading your request history…
+          </div>
+        ) : visible.length > 0 ? (
+          visible.map(r => <RequestCard key={r.id} req={r} />)
+        ) : (
+          <div className="bg-white rounded-xl border border-[#E8E4D8] p-12 text-center text-[#8A9A7A]">
+            No requests in this category.
+          </div>
+        )}
       </div>
 
       {/* Quick links */}
