@@ -2,6 +2,13 @@ import { Schema, model } from 'mongoose';
 
 const requestSchema = new Schema(
   {
+    // --- CONNECTS THE REQUEST TO A SPECIFIC USER ACCOUNT ---
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null, // Left optional so legacy Admin-created requests don't break
+    },
+    // -----------------------------------------------------
     patientName: {
       type: String,
       trim: true,
@@ -46,7 +53,7 @@ const requestSchema = new Schema(
       required: true,
     },
     registeredDate: {
-      type: String,
+      type: Date, // Changed from String to Date to match standard JS Date instances smoothly
       required: true,
     },
     distance: {
@@ -77,4 +84,3 @@ const requestSchema = new Schema(
 );
 
 export const Request = model('Request', requestSchema);
-
