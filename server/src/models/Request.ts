@@ -47,6 +47,11 @@ const requestSchema = new Schema(
       type: Number,
       default: null,
     },
+    requestedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     registeredDate: {
       type: Date, // Changed from String to Date to match standard JS Date instances smoothly
       required: true,

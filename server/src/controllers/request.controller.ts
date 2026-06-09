@@ -29,7 +29,12 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const requestData = req.body;
+    const requestData = {
+      ...req.body,
+      requestedBy: req.body.requestedBy || req.user?.id,
+      registeredDate: req.body.registeredDate || new Date().toISOString(),
+    };
+
     if (!requestData.type || !requestData.urgency || !requestData.status) {
       return next(new ApiError(400, 'Request type, urgency, and status are required.'));
     }
@@ -42,6 +47,57 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
       id: obj._id.toString(),
       ...obj,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createPatientRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, 'Authentication required.'));
+    }
+
+    const payload = {
+      ...req.body,
+      status: req.body.status || 'PENDING',
+      requestedBy: req.user.id,
+      registeredDate: req.body.registeredDate || new Date().toISOString(),
+    };
+
+    if (!payload.type || !payload.urgency || !payload.bloodGroup) {
+      return next(new ApiError(400, 'Request type, urgency, and blood group are required.'));
+    }
+
+    const newReq = new Request(payload);
+    await newReq.save();
+
+    const obj = newReq.toObject();
+    res.status(201).json({
+      id: obj._id.toString(),
+      ...obj,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, 'Authentication required.'));
+    }
+
+    const requests = await Request.find({ requestedBy: req.user.id }).sort({ createdAt: -1 });
+    const mapped = requests.map(r => {
+      const obj = r.toObject();
+      return {
+        id: obj._id.toString(),
+        ...obj,
+      };
+    });
+
+    res.status(200).json(mapped);
   } catch (error) {
     next(error);
   }
