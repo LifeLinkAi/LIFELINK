@@ -44,6 +44,7 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
 
     const obj = newReq.toObject();
     res.status(201).json({
+      success: true,
       id: obj._id.toString(),
       ...obj,
     });
@@ -74,6 +75,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
 
     const obj = newReq.toObject();
     res.status(201).json({
+      success: true,
       id: obj._id.toString(),
       ...obj,
     });
@@ -115,6 +117,7 @@ export const updateRequest = async (req: AuthRequest, res: Response, next: NextF
 
     const obj = requestObj.toObject();
     res.status(200).json({
+      success: true,
       id: obj._id.toString(),
       ...obj,
     });
@@ -136,4 +139,3 @@ export const deleteRequest = async (req: AuthRequest, res: Response, next: NextF
     next(error);
   }
 };
-
