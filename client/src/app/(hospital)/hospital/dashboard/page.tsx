@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/axios';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { 
   AlertTriangle, Droplets, Users, Heart,
   TrendingUp, TrendingDown, Activity, CheckCircle, Award, ShieldAlert, FileText, UploadCloud, Trash2
@@ -52,7 +52,23 @@ interface HospitalProfileData {
     phone: string;
   };
 }
+// New dashboard data interfaces
+interface DashboardMetrics {
+  icuCapacity: number;
+  erWaitTime: number;
+  onCallStaff: number;
+  organRequests: number;
+  icuTrend?: string;
+  staffTrend?: string;
+}
 
+interface DashboardData {
+  metrics: DashboardMetrics;
+  bloodLevels: BloodLevel[];
+  activity: ActivityItem[];
+}
+
+// Keep fallback arrays intact so the UI never crashes if data is loading
 const BLOOD_LEVELS: BloodLevel[] = [
   { type: 'O Negative', units: 12, max: 80, status: 'critical' },
   { type: 'A Positive', units: 84, max: 120, status: 'adequate' },
@@ -77,6 +93,13 @@ const STATUS_COLORS = {
 export default function HospitalDashboard() {
   const [profile, setProfile] = useState<HospitalProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Dynamic state for your live metrics
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    metrics: { icuCapacity: 92, erWaitTime: 45, onCallStaff: 142, organRequests: 4 },
+    bloodLevels: BLOOD_LEVELS,
+    activity: ACTIVITY
+  });
 
   // Multi-step Wizard States
   const [currentStep, setCurrentStep] = useState(1);
@@ -110,29 +133,47 @@ export default function HospitalDashboard() {
   const fetchProfile = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/hospitals/me');
-      setProfile(res.data);
-      if (res.data) {
-        setCity(res.data.city || '');
-        setAddress(res.data.location || '');
-        setPhone(res.data.phone || '');
-        setWebsite(res.data.website || '');
-        setSpecialties(res.data.specialties || ['General']);
-        setGovernmentLicenseId(res.data.governmentLicenseId || '');
-        setHospitalLicenseUrl(res.data.hospitalLicenseUrl || '');
-        setKidneyTransplantLicenseUrl(res.data.kidneyTransplantLicenseUrl || '');
-        setLiverTransplantLicenseUrl(res.data.liverTransplantLicenseUrl || '');
-        setHeartTransplantLicenseUrl(res.data.heartTransplantLicenseUrl || '');
-        setLungTransplantLicenseUrl(res.data.lungTransplantLicenseUrl || '');
-        if (res.data.contactPerson) {
-          setContactName(res.data.contactPerson.name || '');
-          setContactDesignation(res.data.contactPerson.designation || '');
-          setContactEmail(res.data.contactPerson.email || '');
-          setContactPhone(res.data.contactPerson.phone || '');
+
+      // Fire requests concurrently using Promise.all
+      const [profileRes, dashboardRes] = await Promise.all([
+        api.get('/hospitals/me'),
+        api.get('/hospitals/dashboard').catch(err => {
+          console.warn("Dashboard metrics endpoint not fully deployed yet. Using fallbacks.", err);
+          return null; // Safe degradation if endpoint is still being pushed
+        })
+      ]);
+
+      // Set Profile Data
+      setProfile(profileRes.data);
+      if (profileRes.data) {
+        setCity(profileRes.data.city || '');
+        setAddress(profileRes.data.location || '');
+        setPhone(profileRes.data.phone || '');
+        setWebsite(profileRes.data.website || '');
+        setSpecialties(profileRes.data.specialties || ['General']);
+        setGovernmentLicenseId(profileRes.data.governmentLicenseId || '');
+        setHospitalLicenseUrl(profileRes.data.hospitalLicenseUrl || '');
+        setKidneyTransplantLicenseUrl(profileRes.data.kidneyTransplantLicenseUrl || '');
+        setLiverTransplantLicenseUrl(profileRes.data.liverTransplantLicenseUrl || '');
+        setHeartTransplantLicenseUrl(profileRes.data.heartTransplantLicenseUrl || '');
+        setLungTransplantLicenseUrl(profileRes.data.lungTransplantLicenseUrl || '');
+        if (profileRes.data.contactPerson) {
+          setContactName(profileRes.data.contactPerson.name || '');
+          setContactDesignation(profileRes.data.contactPerson.designation || '');
+          setContactEmail(profileRes.data.contactPerson.email || '');
+          setContactPhone(profileRes.data.contactPerson.phone || '');
         }
       }
+
+      // Set Dashboard live metrics if the backend returned data successfully
+      if (dashboardRes && dashboardRes.data?.success) {
+        setDashboardData(dashboardRes.data.data);
+      } else if (dashboardRes && dashboardRes.data) {
+        setDashboardData(dashboardRes.data); // fallback to raw response object if not nested
+      }
+
     } catch (error) {
-      console.error('Error fetching hospital profile:', error);
+      console.error('Error fetching hospital environment profile:', error);
       toast.error('Failed to load facility configuration.');
     } finally {
       setIsLoading(false);
@@ -694,12 +735,48 @@ export default function HospitalDashboard() {
           </div>
         </div>
 
-        {/* Stat cards */}
+        {/* Stat cards (dynamic) */}
         <div className="grid grid-cols-4 gap-4">
-          <StatCard title="ICU Capacity" subtitle="Critical beds" value="92" suffix="%" tag="NEAR CAPACITY" tagVariant="warn" icon={<AlertTriangle size={18} />} trend="+2%" trendUp={false} />
-          <StatCard title="ER Wait Time" subtitle="Average today" value="45" suffix="min" tag="LEVEL 1 — ELEVATED" tagVariant="critical" icon={<Activity size={18} />} />
-          <StatCard title="On-Call Staff" subtitle="Active shift" value="142" suffix="total" tag="✓ Optimal coverage" tagVariant="ok" icon={<Users size={18} />} trend="+8" trendUp={true} />
-          <StatCard title="Organ Requests" subtitle="Pending reviews" value="4" suffix="active" tag="2 urgent" tagVariant="warn" icon={<Heart size={18} />} />
+          <StatCard 
+            title="ICU Capacity" 
+            subtitle="Critical beds" 
+            value={String(dashboardData.metrics.icuCapacity)} 
+            suffix="%" 
+            tag={dashboardData.metrics.icuCapacity > 90 ? "NEAR CAPACITY" : "OPTIMAL"} 
+            tagVariant={dashboardData.metrics.icuCapacity > 90 ? "warn" : "ok"} 
+            icon={<AlertTriangle size={18} />} 
+            trend={dashboardData.metrics.icuTrend || "+2%"} 
+            trendUp={false} 
+          />
+          <StatCard 
+            title="ER Wait Time" 
+            subtitle="Average today" 
+            value={String(dashboardData.metrics.erWaitTime)} 
+            suffix="min" 
+            tag={dashboardData.metrics.erWaitTime > 30 ? "LEVEL 1 — ELEVATED" : "NORMAL"} 
+            tagVariant={dashboardData.metrics.erWaitTime > 30 ? "critical" : "ok"} 
+            icon={<Activity size={18} />} 
+          />
+          <StatCard 
+            title="On-Call Staff" 
+            subtitle="Active shift" 
+            value={String(dashboardData.metrics.onCallStaff)} 
+            suffix="total" 
+            tag="✓ Optimal coverage" 
+            tagVariant="ok" 
+            icon={<Users size={18} />} 
+            trend={dashboardData.metrics.staffTrend || "+8"} 
+            trendUp={true} 
+          />
+          <StatCard 
+            title="Organ Requests" 
+            subtitle="Pending reviews" 
+            value={String(dashboardData.metrics.organRequests)} 
+            suffix="active" 
+            tag={`${dashboardData.metrics.organRequests} to verify`} 
+            tagVariant="warn" 
+            icon={<Heart size={18} />} 
+          />
         </div>
 
         {/* Blood bank card */}
@@ -712,7 +789,7 @@ export default function HospitalDashboard() {
             <a href="/hospital/blood-stock" className="text-[12px] font-medium text-[#3d6b1e] hover:underline">Manage stock →</a>
           </div>
           <div className="grid grid-cols-4 gap-5">
-            {BLOOD_LEVELS.map(b => <BloodLevelBar key={b.type} item={b} />)}
+            {dashboardData.bloodLevels.map(b => <BloodLevelBar key={b.type} item={b} />)}
           </div>
         </div>
 
@@ -723,11 +800,11 @@ export default function HospitalDashboard() {
             <span className="text-[14px] font-semibold text-[#1a2e0a]">Live Activity</span>
           </div>
           <div className="flex flex-col">
-            {ACTIVITY.map((item, i) => (
+            {dashboardData.activity.map((item, i) => (
               <div key={i} className="flex gap-3">
                 <div className="flex flex-col items-center flex-shrink-0 w-3">
                   <div className={cn('w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0', item.urgent ? 'bg-red-500' : 'bg-[#3d6b1e]')} />
-                  {i < ACTIVITY.length - 1 && <div className="w-px flex-1 bg-[#E8E4D8] my-1" />}
+                  {i < dashboardData.activity.length - 1 && <div className="w-px flex-1 bg-[#E8E4D8] my-1" />}
                 </div>
                 <div className="pb-4">
                   <p className="text-[10.5px] font-semibold text-[#8A9A7A] tracking-wide mb-0.5">{item.time}</p>
