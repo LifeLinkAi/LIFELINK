@@ -1,11 +1,15 @@
 import { Router } from 'express';
-import { getRequests, createRequest, updateRequest, deleteRequest } from '../controllers/request.controller';
+import { getRequests, createRequest, createPatientRequest, getMyRequests, updateRequest, deleteRequest } from '../controllers/request.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Routes require authentication; mutate actions require Admin role
-router.get('/', authenticate, getRequests);
+// Patient-facing request endpoints
+router.post('/patient', authenticate, createPatientRequest);
+router.get('/my-history', authenticate, getMyRequests);
+
+// Admin routes
+router.get('/', authenticate, authorize('Admin'), getRequests);
 router.post('/', authenticate, authorize('Admin'), createRequest);
 router.put('/:id', authenticate, authorize('Admin'), updateRequest);
 router.delete('/:id', authenticate, authorize('Admin'), deleteRequest);

@@ -40,6 +40,11 @@ const requestSchema = new Schema(
       type: Number,
       default: null,
     },
+    requestedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     registeredDate: {
       type: String,
       required: true,
