@@ -1,6 +1,9 @@
 ﻿'use client';
 import { useState } from 'react';
 import { Heart, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '@/lib/axios';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 // -- Types ------------------------------------------------
@@ -63,6 +66,8 @@ export default function RequestOrganPage() {
     hasConsent: false,
   });
   const [requestId, setRequestId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const isValid = form.organType !== '' &&
     form.bloodGroup !== '' &&
@@ -73,9 +78,43 @@ export default function RequestOrganPage() {
 
   const handleSubmit = () => { if (isValid) setStep('confirming'); };
 
-  const handleConfirm = () => {
-    setRequestId(`ORG-${Math.floor(400 + Math.random() * 99)}`);
-    setStep('submitted');
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const requestBody = {
+      patientName: user?.name || '',
+      facility: form.hospital,
+      age: 0,
+      gender: 'Unknown',
+      organType: form.organType,
+      bloodGroup: form.bloodGroup,
+      urgency: form.urgency,
+      facilityType: 'Hospital',
+      notes: form.medicalCondition || '',
+      type: 'Organ',
+    };
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const res = await api.post('/requests/patient', requestBody, { headers });
+
+      if (res.status === 201 && res.data?.success && res.data?.data) {
+        toast.success('Organ request submitted successfully.');
+        setRequestId(res.data.data.id || `ORG-${Math.floor(400 + Math.random() * 99)}`);
+        setForm({ organType: '', bloodGroup: '', urgency: 'high', hospital: '', medicalCondition: '', contactPhone: '', hasConsent: false });
+        setStep('submitted');
+      } else {
+        throw new Error('Unexpected server response');
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Failed to submit organ request.';
+      toast.error(msg);
+      setStep('form');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleNew = () => {
@@ -195,9 +234,15 @@ export default function RequestOrganPage() {
             <p className="text-[13px] text-[#3A4A2A]">{form.medicalCondition}</p>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleConfirm}
-              className="flex-1 py-3 bg-[#1a2e0a] hover:bg-[#2B4A18] text-white font-bold text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2">
-              <Heart size={16} /> Confirm & Submit
+            <button
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+              className={cn(
+                'flex-1 py-3 font-bold text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2',
+                isSubmitting ? 'bg-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed' : 'bg-[#1a2e0a] hover:bg-[#2B4A18] text-white'
+              )}
+            >
+              <Heart size={16} /> {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
             </button>
             <button onClick={() => setStep('form')}
               className="px-5 py-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium rounded-xl hover:border-red-300 transition-colors">
