@@ -6,6 +6,7 @@ import { store } from '@/store';
 import { useAppDispatch } from '@/store/hooks';
 import { setUser, setLoading } from '@/features/auth/authSlice';
 import { Toaster } from 'react-hot-toast';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function AuthInitializer({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
@@ -31,18 +32,22 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
   return (
     <Provider store={store}>
-      <AuthInitializer>
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: { fontSize: '13.5px' },
-          }}
-        />
-      </AuthInitializer>
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <AuthInitializer>
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: { fontSize: '13.5px' },
+            }}
+          />
+        </AuthInitializer>
+      </GoogleOAuthProvider>
     </Provider>
   );
 }
