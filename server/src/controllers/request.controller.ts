@@ -21,7 +21,7 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
       };
     });
 
-    res.status(200).json(mapped);
+    res.status(200).json({ success: true, data: mapped });
   } catch (error) {
     next(error);
   }
@@ -43,11 +43,7 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
     await newReq.save();
 
     const obj = newReq.toObject();
-    res.status(201).json({
-      success: true,
-      id: obj._id.toString(),
-      ...obj,
-    });
+    res.status(201).json({ success: true, data: { id: obj._id.toString(), ...obj } });
   } catch (error) {
     next(error);
   }
@@ -74,11 +70,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     await newReq.save();
 
     const obj = newReq.toObject();
-    res.status(201).json({
-      success: true,
-      id: obj._id.toString(),
-      ...obj,
-    });
+    res.status(201).json({ success: true, data: { id: obj._id.toString(), ...obj } });
   } catch (error) {
     next(error);
   }
@@ -99,7 +91,7 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
       };
     });
 
-    res.status(200).json(mapped);
+    res.status(200).json({ success: true, data: mapped });
   } catch (error) {
     next(error);
   }
@@ -116,11 +108,7 @@ export const updateRequest = async (req: AuthRequest, res: Response, next: NextF
     }
 
     const obj = requestObj.toObject();
-    res.status(200).json({
-      success: true,
-      id: obj._id.toString(),
-      ...obj,
-    });
+    res.status(200).json({ success: true, data: { id: obj._id.toString(), ...obj } });
   } catch (error) {
     next(error);
   }
