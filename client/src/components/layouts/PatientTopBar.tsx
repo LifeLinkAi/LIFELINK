@@ -4,6 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, ChevronDown, LogOut, Search, Settings, User } from 'lucide-react';
+import Cookies from 'js-cookie';
+import { useAppDispatch } from '@/store/hooks';
+import { clearUser } from '@/features/auth/authSlice';
 import { cn } from '@/lib/utils';
 
 const NOTIFICATIONS = [
@@ -18,11 +21,32 @@ export function PatientTopBar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
+  const dispatch = useAppDispatch();
+
   const handleLogout = () => {
+    // 1. Clear client-side auth state
+    dispatch(clearUser());
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('lifelink-auth');
+    Cookies.remove('ll_access_token');
     sessionStorage.clear();
-    router.push('/login');
+
+    // 2. Fire backend logout to clear httpOnly refresh cookie (best-effort)
+    (async () => {
+      try {
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        if (!apiUrl.endsWith('/api')) apiUrl = `${apiUrl}/api`;
+        await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // ignore network errors
+      } finally {
+        router.push('/login');
+      }
+    })();
   };
+
+  const dispatch = useAppDispatch();
 
   return (
     <header className="sticky top-0 z-40 h-16 bg-[#F5F2E8]/95 backdrop-blur border-b border-[#E8E4D8] px-6 flex items-center justify-between">
