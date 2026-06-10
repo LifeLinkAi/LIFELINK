@@ -1,7 +1,28 @@
 import { Response, NextFunction } from 'express';
+import { isValidObjectId } from 'mongoose';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+
+const PENDING_REQUEST_STATUSES = ['Pending', 'PENDING'] as const;
+const HOSPITAL_REQUEST_STATUSES = ['APPROVED', 'IN_PROGRESS', 'FULFILLED'] as const;
+
+type HospitalRequestStatus = typeof HOSPITAL_REQUEST_STATUSES[number];
+type RequestRecord = {
+  _id: {
+    toString(): string;
+  };
+  [key: string]: unknown;
+};
+
+const isHospitalRequestStatus = (status: unknown): status is HospitalRequestStatus => {
+  return typeof status === 'string' && HOSPITAL_REQUEST_STATUSES.includes(status as HospitalRequestStatus);
+};
+
+const toRequestDto = (request: RequestRecord) => ({
+  id: request._id.toString(),
+  ...request,
+});
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -47,57 +68,6 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
       id: obj._id.toString(),
       ...obj,
     });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const createPatientRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!req.user) {
-      return next(new ApiError(401, 'Authentication required.'));
-    }
-
-    const payload = {
-      ...req.body,
-      status: req.body.status || 'PENDING',
-      requestedBy: req.user.id,
-      registeredDate: req.body.registeredDate || new Date().toISOString(),
-    };
-
-    if (!payload.type || !payload.urgency || !payload.bloodGroup) {
-      return next(new ApiError(400, 'Request type, urgency, and blood group are required.'));
-    }
-
-    const newReq = new Request(payload);
-    await newReq.save();
-
-    const obj = newReq.toObject();
-    res.status(201).json({
-      id: obj._id.toString(),
-      ...obj,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getMyRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!req.user) {
-      return next(new ApiError(401, 'Authentication required.'));
-    }
-
-    const requests = await Request.find({ requestedBy: req.user.id }).sort({ createdAt: -1 });
-    const mapped = requests.map(r => {
-      const obj = r.toObject();
-      return {
-        id: obj._id.toString(),
-        ...obj,
-      };
-    });
-
-    res.status(200).json(mapped);
   } catch (error) {
     next(error);
   }
@@ -159,6 +129,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     // Build the request object, strictly controlling the status and metadata
     const newReq = new Request({
       userId: req.user.id, // Tie the request to the logged-in patient account
+      requestedBy: req.user.id,
       patientName,
       facility,
       age,
@@ -210,6 +181,68 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
     res.status(200).json({
       success: true,
       data: mapped
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// HOSPITAL MODULE SPECIFIC CONTROLLERS
+// ==========================================
+
+export const getHospitalIncomingRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const requests = await Request.find({
+      type: { $in: ['Blood', 'Organ'] },
+      status: { $in: PENDING_REQUEST_STATUSES },
+    })
+      .sort({ createdAt: -1 })
+      .lean() as RequestRecord[];
+
+    res.status(200).json({
+      success: true,
+      data: requests.map(toRequestDto),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateRequestStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: unknown };
+
+    if (!isValidObjectId(id)) {
+      return next(new ApiError(400, 'Invalid request ID.'));
+    }
+
+    if (!isHospitalRequestStatus(status)) {
+      return next(new ApiError(400, 'Status must be one of: APPROVED, IN_PROGRESS, FULFILLED.'));
+    }
+
+    const requestObj = await Request.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).lean() as RequestRecord | null;
+
+    if (!requestObj) {
+      return next(new ApiError(404, 'Request not found.'));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: toRequestDto(requestObj),
     });
   } catch (error) {
     next(error);
