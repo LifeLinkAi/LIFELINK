@@ -46,8 +46,6 @@ export function PatientTopBar() {
     })();
   };
 
-  const dispatch = useAppDispatch();
-
   return (
     <header className="sticky top-0 z-40 h-16 bg-[#F5F2E8]/95 backdrop-blur border-b border-[#E8E4D8] px-6 flex items-center justify-between">
       <div className="relative w-full max-w-md">
