@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
+import { HospitalProfile } from '../models/HospitalProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -152,7 +153,11 @@ export const getInviteDetails = async (req: Request, res: Response, next: NextFu
       return next(new ApiError(400, 'Invitation token is required.'));
     }
 
-    const profile = await DonorProfile.findOne({ inviteToken: token });
+    let profile: any = await DonorProfile.findOne({ inviteToken: token });
+    if (!profile) {
+      profile = await HospitalProfile.findOne({ inviteToken: token });
+    }
+
     if (!profile) {
       return next(new ApiError(400, 'Invalid invitation token.'));
     }
@@ -185,7 +190,16 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
       return next(new ApiError(400, 'Token and password are required.'));
     }
 
-    const profile = await DonorProfile.findOne({ inviteToken: token });
+    let profile: any = await DonorProfile.findOne({ inviteToken: token });
+    let isHospital = false;
+
+    if (!profile) {
+      profile = await HospitalProfile.findOne({ inviteToken: token });
+      if (profile) {
+        isHospital = true;
+      }
+    }
+
     if (!profile) {
       return next(new ApiError(400, 'Invalid invitation token.'));
     }
@@ -205,9 +219,15 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
     user.password = hashedPassword;
     await user.save();
 
-    profile.status = 'Available';
-    profile.inviteToken = null;
-    profile.inviteTokenExpires = null;
+    if (isHospital) {
+      // Hospitals remain 'Pending' until they complete setup wizard
+      profile.inviteToken = null;
+      profile.inviteTokenExpires = null;
+    } else {
+      profile.status = 'Available';
+      profile.inviteToken = null;
+      profile.inviteTokenExpires = null;
+    }
     await profile.save();
 
     const jwtToken = generateToken(user._id.toString(), user.email, user.role);
@@ -220,10 +240,10 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
 
     res.status(200).json({
       success: true,
-      message: 'Account activated successfully',
+      message: 'Account setup completed successfully.',
       token: jwtToken,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
