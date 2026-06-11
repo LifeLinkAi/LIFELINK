@@ -8,7 +8,8 @@ import {
   getMeHospitalProfile,
   completeHospitalSetup,
   getHospitalDashboardData, // Added
-  updateBloodInventory      // Added
+  updateBloodInventory,      // Added
+  bulkInviteHospitals,
 } from '../controllers/hospital.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -24,6 +25,7 @@ router.put('/inventory', authenticate, authorize('Hospital'), updateBloodInvento
 router.get('/', authenticate, getHospitals);
 router.post('/', authenticate, authorize('Admin'), createHospital);
 router.post('/bulk', authenticate, authorize('Admin'), createHospitalBulk);
+router.post('/bulk-invite', authenticate, authorize('Admin'), bulkInviteHospitals);
 router.put('/:id', authenticate, authorize('Admin'), updateHospital);
 router.delete('/:id', authenticate, authorize('Admin'), deleteHospital);
 

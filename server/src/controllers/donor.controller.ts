@@ -343,6 +343,81 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
   }
 };
 
+export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { users } = req.body;
+    if (!users || !Array.isArray(users)) {
+      return next(new ApiError(400, 'users array is required for bulk invite operations.'));
+    }
+
+    const invited = [];
+    const skipped = [];
+
+    const salt = await bcrypt.genSalt(10);
+
+    for (const u of users) {
+      const { name, email } = u;
+      if (!name || !email) continue;
+      const emailLower = email.toLowerCase().trim();
+
+      const existingUser = await User.findOne({ email: emailLower });
+      if (existingUser) {
+        skipped.push({ name, email: emailLower, reason: 'Already registered.' });
+        continue;
+      }
+
+      // Generate random secure password
+      const tempPass = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPass, salt);
+
+      const user = await User.create({
+        name,
+        email: emailLower,
+        password: hashedPassword,
+        role: 'Donor',
+      });
+
+      const inviteToken = crypto.randomBytes(32).toString('hex');
+      const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      await DonorProfile.create({
+        userId: user._id,
+        location: '',
+        bloodType: 'O-',
+        tier: 'Bronze',
+        status: 'Pending',
+        phone: '',
+        lastDonation: 'N/A',
+        totalDonated: '0 Liters',
+        details: 'Registered donor. Setup pending.',
+        avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+        inviteToken,
+        inviteTokenExpires,
+        isSetupComplete: false,
+      });
+
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
+
+      sendDonorInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+        logger.error(`Error sending bulk invite email to ${emailLower}: ${err.message}`);
+      });
+
+      invited.push({ id: user._id.toString(), name, email: emailLower });
+    }
+
+    res.status(200).json({
+      success: true,
+      invitedCount: invited.length,
+      skippedCount: skipped.length,
+      invited,
+      skipped,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── Helpers for certificate date extraction ──────────────────────────────────
 
 const MONTH_NAMES: Record<string, number> = {
