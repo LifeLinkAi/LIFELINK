@@ -20,7 +20,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://lifelink-client-coral.vercel.app"
+      "https://lifelink-client-coral.vercel.app",
+      "http://localhost:3001"
     ],
     credentials: true,
   })

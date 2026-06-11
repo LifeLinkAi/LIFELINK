@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { findNearbyCompatibleDonors } from '../services/matching/donor-match.service';
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
+import { Schema } from 'mongoose';
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -205,6 +206,53 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
       success: true,
       data: mapped
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const respondToRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { token, response: donorResponse } = req.body as { token?: string; response?: 'ACCEPTED' | 'DECLINED' };
+
+    if (!token || !donorResponse) {
+      return next(new ApiError(400, 'Missing token or response.'));
+    }
+
+    const requestObj = await Request.findById(id);
+    if (!requestObj) return next(new ApiError(404, 'Request not found.'));
+
+    const matched = requestObj.matchedDonors.find(m => m.inviteToken === token);
+    if (!matched) return next(new ApiError(400, 'Invalid token.'));
+
+    const now = new Date();
+    if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
+      matched.status = 'EXPIRED';
+      await requestObj.save();
+      return next(new ApiError(400, 'Token has expired.'));
+    }
+
+    if (donorResponse === 'ACCEPTED') {
+      if (requestObj.acceptedDonorId) {
+        return next(new ApiError(400, 'Request already accepted by another donor.'));
+      }
+
+      matched.status = 'ACCEPTED';
+      matched.respondedAt = now;
+      requestObj.acceptedDonorId = matched.donorId as any;
+      requestObj.status = 'APPROVED';
+      await requestObj.save();
+
+      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
+      return;
+    }
+
+    // DECLINED
+    matched.status = 'DECLINED';
+    matched.respondedAt = now;
+    await requestObj.save();
+    res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
   } catch (error) {
     next(error);
   }
