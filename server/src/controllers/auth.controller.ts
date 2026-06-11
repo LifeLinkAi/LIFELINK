@@ -316,7 +316,6 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       if (role === 'Donor') {
         await DonorProfile.create({
           userId: user._id,
-          location: '',
           bloodType: 'O-',
           tier: 'Bronze',
           status: 'Pending',
