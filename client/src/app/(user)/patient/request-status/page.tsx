@@ -1,6 +1,7 @@
 ﻿'use client';
 import { useEffect, useState } from 'react';
-import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -104,7 +105,7 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: s
 
 const TYPE_CONFIG: Record<RequestType, { icon: React.ReactNode; color: string; bg: string }> = {
   Blood:     { icon: <Droplets size={15} />, color: '#CC0000', bg: '#FFE5E5' },
-  Organ:     { icon: <Heart    size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
+  Organ:     { icon: <Heart     size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
 };
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -203,12 +204,23 @@ function RequestCard({ req }: { req: PatientRequest }) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2.5 mt-2">
+          <div className="flex items-center gap-2.5 mt-2 w-full">
             {req.status === 'COMPLETED' && (
               <div className="flex items-center gap-1.5 text-[12.5px] text-green-700 font-medium">
                 <CheckCircle size={14} /> Fulfilled successfully
               </div>
             )}
+            
+            {/* Conditional Matching Access Option */}
+            {['PENDING', 'MATCHING', 'DONOR_FOUND'].includes(req.status) && (
+              <Link 
+                href={`/patient/match-donors?requestId=${req.id}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a2e0a] text-white text-[12px] font-medium rounded-lg hover:bg-[#2B4A18] transition-colors"
+              >
+                <Search size={13} /> View Matches
+              </Link>
+            )}
+
             {req.canCancel && (
               <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-[12px] font-medium rounded-lg hover:bg-red-50 transition-colors ml-auto">
                 <XCircle size={13} /> Cancel Request
@@ -347,7 +359,7 @@ export default function RequestStatusPage() {
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
-          { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart     size={16} />, color: '#5B21B6' },
+          { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart      size={16} />, color: '#5B21B6' },
         ].map(l => (
           <a key={l.label} href={l.href}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E8E4D8] hover:border-[#7AB648] transition-colors text-center">
@@ -362,4 +374,3 @@ export default function RequestStatusPage() {
     </div>
   );
 }
-
