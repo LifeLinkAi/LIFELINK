@@ -9,6 +9,7 @@ import {
   getMeProfile,
   completeDonorSetup,
   uploadCertificate,
+  bulkInviteDonors,
 } from '../controllers/donor.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -35,6 +36,7 @@ router.put('/setup-complete', authenticate, completeDonorSetup);
 router.get('/', authenticate, getDonors);
 router.post('/', authenticate, authorize('Admin'), createDonor);
 router.post('/bulk', authenticate, authorize('Admin'), createDonorBulk);
+router.post('/bulk-invite', authenticate, authorize('Admin'), bulkInviteDonors);
 router.put('/:id', authenticate, authorize('Admin'), updateDonor);
 router.delete('/:id', authenticate, authorize('Admin'), deleteDonor);
 

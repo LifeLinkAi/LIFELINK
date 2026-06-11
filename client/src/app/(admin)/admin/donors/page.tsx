@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '@/lib/axios';
+import BulkAddModal from '@/components/BulkAddModal';
 
 // Define the interface for our Donor data model
 interface Donor {
@@ -34,6 +35,7 @@ export default function DonorManagementPage() {
 
   // State for modal (e.g. Add Donor)
   const [isAddDonorOpen, setIsAddDonorOpen] = useState(false);
+  const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
 
   // Real Database Donors State
   const [donors, setDonors] = useState<Donor[]>([]);
@@ -187,6 +189,13 @@ export default function DonorManagementPage() {
             className="px-4 py-2 border border-outline-variant/50 text-on-surface-variant hover:text-primary rounded-xl font-label-caps text-[12px] bg-white transition-colors"
           >
             Reset Filters
+          </button>
+          <button 
+            onClick={() => setIsBulkAddOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#EFF2EE] text-primary border border-primary/20 rounded-xl shadow-sm hover:bg-neutral-50 transition-all font-label-caps text-[12px]"
+          >
+            <span className="material-symbols-outlined text-[18px]">upload_file</span>
+            Bulk Add
           </button>
           <button 
             onClick={() => setIsAddDonorOpen(true)}
@@ -688,6 +697,14 @@ export default function DonorManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Add Modal */}
+      <BulkAddModal
+        isOpen={isBulkAddOpen}
+        onClose={() => setIsBulkAddOpen(false)}
+        onSuccess={fetchDonors}
+        type="donor"
+      />
     </div>
   );
 }
