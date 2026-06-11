@@ -1,4 +1,5 @@
 import { Response, NextFunction } from 'express';
+import { isValidObjectId } from 'mongoose';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -37,6 +38,26 @@ const parseGeoLocation = (body: any) => {
 // ==========================================
 // CORE ADMINISTRATIVE CONTROLLERS (FROM MAIN)
 // ==========================================
+
+const PENDING_REQUEST_STATUSES = ['Pending', 'PENDING'] as const;
+const HOSPITAL_REQUEST_STATUSES = ['APPROVED', 'IN_PROGRESS', 'FULFILLED'] as const;
+
+type HospitalRequestStatus = typeof HOSPITAL_REQUEST_STATUSES[number];
+type RequestRecord = {
+  _id: {
+    toString(): string;
+  };
+  [key: string]: unknown;
+};
+
+const isHospitalRequestStatus = (status: unknown): status is HospitalRequestStatus => {
+  return typeof status === 'string' && HOSPITAL_REQUEST_STATUSES.includes(status as HospitalRequestStatus);
+};
+
+const toRequestDto = (request: RequestRecord) => ({
+  id: request._id.toString(),
+  ...request,
+});
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -132,7 +153,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const { 
-      patientName, facility,contactPhone, age, gender, organType, 
+      patientName, facility, contactPhone, age, gender, organType, 
       bloodGroup, units, urgency, facilityType, notes, type
     } = req.body;
 
@@ -141,7 +162,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const newReq = new Request({
-      userId: req.user.id,
+      userId: req.user.id, 
+      requestedBy: req.user.id, // Support structural identity metrics across dashboards
       patientName,
       facility,
       age,
@@ -155,7 +177,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facilityType,
       notes,
       type,
-      status: 'Pending',
+      status: 'Pending', 
       registeredDate: new Date(),
       matchPercentage: 0,
     });
@@ -202,7 +224,7 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
 
     const matchedEntries = selectedDonorIds.map(did => {
       const inviteToken = crypto.randomBytes(20).toString('hex');
-      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
       return {
         donorId: did as any,
         inviteToken,
@@ -295,24 +317,4 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       const update = {
         $set: {
           'matchedDonors.$.status': 'ACCEPTED',
-          'matchedDonors.$.respondedAt': now,
-          status: 'APPROVED',
-          acceptedDonorId: donorId,
-        },
-      };
-
-      const updated = await Request.findOneAndUpdate(filter, update, { new: true });
-      if (!updated) {
-        return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
-      }
-
-      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
-      return;
-    }
-
-    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
-    res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
-  } catch (error) {
-    next(error);
-  }
-};
+          'matchedDonors.$.respondedAt':
