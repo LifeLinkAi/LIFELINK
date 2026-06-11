@@ -317,4 +317,86 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       const update = {
         $set: {
           'matchedDonors.$.status': 'ACCEPTED',
-          'matchedDonors.$.respondedAt':
+          'matchedDonors.$.respondedAt': now,
+          status: 'APPROVED',
+          acceptedDonorId: donorId,
+        },
+      };
+
+      const updated = await Request.findOneAndUpdate(filter, update, { new: true });
+      if (!updated) {
+        return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
+      }
+
+      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
+      return;
+    }
+
+    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
+    res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// HOSPITAL MODULE SPECIFIC CONTROLLERS
+// ==========================================
+
+export const getHospitalIncomingRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const requests = await Request.find({
+      type: { $in: ['Blood', 'Organ'] },
+      status: { $in: PENDING_REQUEST_STATUSES },
+    })
+      .sort({ createdAt: -1 })
+      .lean() as RequestRecord[];
+
+    res.status(200).json({
+      success: true,
+      data: requests.map(toRequestDto),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateRequestStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: unknown };
+
+    if (!isValidObjectId(id)) {
+      return next(new ApiError(400, 'Invalid request ID.'));
+    }
+
+    if (!isHospitalRequestStatus(status)) {
+      return next(new ApiError(400, 'Status must be one of: APPROVED, IN_PROGRESS, FULFILLED.'));
+    }
+
+    const requestObj = await Request.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).lean() as RequestRecord | null;
+
+    if (!requestObj) {
+      return next(new ApiError(404, 'Request not found.'));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: toRequestDto(requestObj),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
