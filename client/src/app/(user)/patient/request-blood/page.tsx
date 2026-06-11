@@ -25,9 +25,9 @@ interface BloodRequestForm {
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: string; bg: string }[] = [
-  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',    color: '#CC0000', bg: '#FFE5E5' },
-  { key: 'high',     label: 'High',      desc: 'Required within a few hours',     color: '#B86E00', bg: '#FFF3E0' },
-  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',        color: '#1A5FAA', bg: '#E3F0FF' },
+  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',     color: '#CC0000', bg: '#FFE5E5' },
+  { key: 'high',     label: 'High',      desc: 'Required within a few hours',      color: '#B86E00', bg: '#FFF3E0' },
+  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',         color: '#1A5FAA', bg: '#E3F0FF' },
   { key: 'low',      label: 'Low',       desc: 'Scheduled or elective procedure', color: '#2B6B0A', bg: '#E8F5E0' },
 ];
 
@@ -81,7 +81,7 @@ export default function RequestBloodPage() {
     setIsSubmitting(true);
 
     const requestBody = {
-      patientName: user?.name || '',
+      patientName: user?.name || 'Patient',
       facility: form.hospital,
       age: typeof age === 'number' ? age : undefined,
       gender: gender || undefined,
@@ -91,6 +91,7 @@ export default function RequestBloodPage() {
       urgency: form.urgency,
       facilityType: 'Hospital',
       notes: form.reason || '',
+      contactPhone: form.contactPhone, // Added: explicit phone forwarding
       location: coordinates ? { type: 'Point', coordinates } : undefined,
       type: 'Blood',
     };
@@ -102,15 +103,19 @@ export default function RequestBloodPage() {
 
       if (response.status === 201 && response.data?.success && response.data?.data) {
         toast.success('Blood request submitted successfully.');
-        const id = response.data.data.id || `BR-${Math.floor(2000 + Math.random() * 999)}`;
-        // Redirect to manual donor selection flow
-        router.push(`/patient/select-donors?requestId=${id}`);
+        
+        // Use backend parsed document ID cleanly mapping to string id
+        const targetId = response.data.data.id || response.data.data._id;
+        setRequestId(targetId);
+        
+        // Smoothly hands off context to manual selection pipeline
+        router.push(`/patient/select-donors?requestId=${targetId}`);
       } else {
-        throw new Error('Unexpected response from server.');
+        throw new Error('Unexpected response configuration from server.');
       }
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.error?.message || error?.message || 'Failed to submit blood request. Please try again.';
+        error?.response?.data?.message || error?.message || 'Failed to submit blood request. Please try again.';
       toast.error(errorMessage);
       setStep('form');
     } finally {
