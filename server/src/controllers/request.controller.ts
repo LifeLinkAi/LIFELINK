@@ -1,4 +1,5 @@
 import { Response, NextFunction } from 'express';
+import { isValidObjectId } from 'mongoose';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -11,6 +12,26 @@ import { DonorProfile } from '../models/DonorProfile';
 // ==========================================
 // CORE ADMINISTRATIVE CONTROLLERS (FROM MAIN)
 // ==========================================
+
+const PENDING_REQUEST_STATUSES = ['Pending', 'PENDING'] as const;
+const HOSPITAL_REQUEST_STATUSES = ['APPROVED', 'IN_PROGRESS', 'FULFILLED'] as const;
+
+type HospitalRequestStatus = typeof HOSPITAL_REQUEST_STATUSES[number];
+type RequestRecord = {
+  _id: {
+    toString(): string;
+  };
+  [key: string]: unknown;
+};
+
+const isHospitalRequestStatus = (status: unknown): status is HospitalRequestStatus => {
+  return typeof status === 'string' && HOSPITAL_REQUEST_STATUSES.includes(status as HospitalRequestStatus);
+};
+
+const toRequestDto = (request: RequestRecord) => ({
+  id: request._id.toString(),
+  ...request,
+});
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -109,7 +130,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const newReq = new Request({
-      userId: req.user.id, // Tie the request to the logged-in user's account identifier
+      userId: req.user.id, 
+      requestedBy: req.user.id, // Support structural identity metrics across dashboards
       patientName,
       facility,
       age,
@@ -122,7 +144,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facilityType,
       notes,
       type,
-      status: 'Pending', // Force all patient-created requests to start as Pending
+      status: 'Pending', 
       registeredDate: new Date(),
       matchPercentage: 0,
     });
@@ -142,7 +164,6 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
   }
 };
 
-// Find matching donors for a request without modifying the request document
 export const findMatchesForRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -156,7 +177,6 @@ export const findMatchesForRequest = async (req: AuthRequest, res: Response, nex
   }
 };
 
-// Dispatch selected donors: persist matchedDonors and send notifications
 export const dispatchToDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -169,10 +189,9 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
     const requestObj = await Request.findById(id);
     if (!requestObj) return next(new ApiError(404, 'Request not found.'));
 
-    // Generate matchedDonor entries for selected donors
     const matchedEntries = selectedDonorIds.map(did => {
       const inviteToken = crypto.randomBytes(20).toString('hex');
-      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
       return {
         donorId: did as any,
         inviteToken,
@@ -181,12 +200,10 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
       };
     });
 
-    // Append to existing matchedDonors
     requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(matchedEntries as any)];
     requestObj.status = 'DONOR_NOTIFIED';
     await requestObj.save();
 
-    // Fetch donor profiles to send emails
     const donors = await DonorProfile.find({ _id: { $in: selectedDonorIds } }).populate('userId', 'name email phone').lean();
 
     const emailPromises = donors.map((d: any) => {
@@ -221,7 +238,6 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
-    // Find only the records that match the logged-in user's ID
     const requests = await Request.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
     const mapped = requests.map(r => {
@@ -250,7 +266,6 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(400, 'Missing token or response.'));
     }
 
-    // Find the matched donor entry (projection of the matching array element)
     const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1 });
     if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
 
@@ -259,13 +274,11 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     const now = new Date();
     if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
-      // mark expired atomically
       await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
       return next(new ApiError(400, 'Token has expired.'));
     }
 
     if (donorResponse === 'ACCEPTED') {
-      // Attempt atomic accept: only succeed if no acceptedDonorId exists and the matchedDonor is still NOTIFIED
       const donorId = matched.donorId;
       const filter = { _id: id, 'matchedDonors.inviteToken': token, 'matchedDonors.status': 'NOTIFIED', acceptedDonorId: { $exists: false } };
       const update = {
@@ -286,9 +299,70 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return;
     }
 
-    // DECLINED: atomically set the matched donor status to DECLINED
     await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
     res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// HOSPITAL MODULE SPECIFIC CONTROLLERS
+// ==========================================
+
+export const getHospitalIncomingRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const requests = await Request.find({
+      type: { $in: ['Blood', 'Organ'] },
+      status: { $in: PENDING_REQUEST_STATUSES },
+    })
+      .sort({ createdAt: -1 })
+      .lean() as RequestRecord[];
+
+    res.status(200).json({
+      success: true,
+      data: requests.map(toRequestDto),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateRequestStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { id } = req.params;
+    const { status } = req.body as { status?: unknown };
+
+    if (!isValidObjectId(id)) {
+      return next(new ApiError(400, 'Invalid request ID.'));
+    }
+
+    if (!isHospitalRequestStatus(status)) {
+      return next(new ApiError(400, 'Status must be one of: APPROVED, IN_PROGRESS, FULFILLED.'));
+    }
+
+    const requestObj = await Request.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).lean() as RequestRecord | null;
+
+    if (!requestObj) {
+      return next(new ApiError(404, 'Request not found.'));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: toRequestDto(requestObj),
+    });
   } catch (error) {
     next(error);
   }
