@@ -6,6 +6,9 @@ import {
   Clock, MapPin, FileHeart,
   Settings, HelpCircle, LogOut,
 } from 'lucide-react';
+import Cookies from 'js-cookie';
+import { useAppDispatch } from '@/store/hooks';
+import { clearUser } from '@/features/auth/authSlice';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -22,10 +25,29 @@ export function PatientSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const dispatch = useAppDispatch();
+
   const handleLogout = () => {
+    // clear client state
+    dispatch(clearUser());
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('lifelink-auth');
+    Cookies.remove('ll_access_token');
     sessionStorage.clear();
-    router.push('/login');
+
+    // best-effort backend logout
+    (async () => {
+      try {
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        if (!apiUrl.endsWith('/api')) apiUrl = `${apiUrl}/api`;
+        await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // ignore
+      } finally {
+        router.push('/login');
+      }
+    })();
   };
 
   return (

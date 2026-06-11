@@ -1,6 +1,7 @@
 ﻿'use client';
 import { useState } from 'react';
-import { Heart, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, CheckCircle, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -68,6 +69,12 @@ export default function RequestOrganPage() {
   const [requestId, setRequestId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
+
+  const [age, setAge] = useState<number | undefined>(undefined);
+  const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
+  const [isLocLoading, setIsLocLoading] = useState(false);
 
   const isValid = form.organType !== '' &&
     form.bloodGroup !== '' &&
@@ -85,13 +92,14 @@ export default function RequestOrganPage() {
     const requestBody = {
       patientName: user?.name || '',
       facility: form.hospital,
-      age: 0,
-      gender: 'Unknown',
+      age: typeof age === 'number' ? age : undefined,
+      gender: gender || undefined,
       organType: form.organType,
       bloodGroup: form.bloodGroup,
       urgency: form.urgency,
       facilityType: 'Hospital',
       notes: form.medicalCondition || '',
+      location: coordinates ? { type: 'Point', coordinates } : undefined,
       type: 'Organ',
     };
 
@@ -102,9 +110,8 @@ export default function RequestOrganPage() {
 
       if (res.status === 201 && res.data?.success && res.data?.data) {
         toast.success('Organ request submitted successfully.');
-        setRequestId(res.data.data.id || `ORG-${Math.floor(400 + Math.random() * 99)}`);
-        setForm({ organType: '', bloodGroup: '', urgency: 'high', hospital: '', medicalCondition: '', contactPhone: '', hasConsent: false });
-        setStep('submitted');
+        const id = res.data.data.id || `ORG-${Math.floor(400 + Math.random() * 99)}`;
+        router.push(`/patient/select-donors?requestId=${id}`);
       } else {
         throw new Error('Unexpected server response');
       }
@@ -120,6 +127,32 @@ export default function RequestOrganPage() {
   const handleNew = () => {
     setForm({ organType: '', bloodGroup: '', urgency: 'high', hospital: '', medicalCondition: '', contactPhone: '', hasConsent: false });
     setStep('form');
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        setCoordinates([lng, lat]);
+        toast.success('Location captured.');
+        setIsLocLoading(false);
+      },
+      err => {
+        setIsLocLoading(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error('Location permission denied. Please allow location access.');
+        } else {
+          toast.error('Failed to get location: ' + err.message);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   // -- Submitted -----------------------------------------
@@ -389,12 +422,60 @@ export default function RequestOrganPage() {
           />
         </div>
 
+        {/* Age & Gender */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">Age</label>
+            <input
+              type="number"
+              min={0}
+              value={age ?? ''}
+              onChange={e => setAge(e.target.value ? Number(e.target.value) : undefined)}
+              className="w-full h-10 px-3 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-[#7AB648] transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">Gender</label>
+            <select
+              value={gender}
+              onChange={e => setGender(e.target.value as any)}
+              className="w-full h-10 px-3 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-[#7AB648] transition-colors text-[#3A4A2A]"
+            >
+              <option value="">Prefer not to say</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
         {/* Medical reports note */}
         <div className="flex items-start gap-2.5 bg-[#F5F2E8] rounded-lg px-4 py-3">
           <FileText size={14} className="text-[#6B7A5A] mt-0.5 flex-shrink-0" />
           <p className="text-[12.5px] text-[#6B7A5A]">
             Medical reports and documents can be uploaded after submission from your request status page.
           </p>
+        </div>
+
+        {/* Location */}
+        <div className="bg-white rounded-xl border border-[#E8E4D8] p-4 flex flex-col gap-3">
+          <div className="flex items-start gap-2.5">
+            <MapPin size={14} className="text-[#7AB648] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-[12px] font-semibold text-[#1a2e0a]">Your Location</p>
+              <p className="text-[11.5px] text-[#6B7A5A] mt-0.5">{coordinates ? `Lat: ${coordinates[1].toFixed(4)}, Lng: ${coordinates[0].toFixed(4)}` : 'Not set'}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleUseCurrentLocation}
+              disabled={isLocLoading}
+              className="flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-[#7AB648] transition-colors"
+            >
+              {isLocLoading ? 'Detecting…' : '📍 Use My Current Location'}
+            </button>
+            <button onClick={() => { setCoordinates(null); toast('Location cleared'); }} className="py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg">Clear</button>
+          </div>
         </div>
 
         {/* Consent */}

@@ -1,9 +1,26 @@
 ﻿'use client';
-import { useState } from 'react';
-import { FileText, Plus, ChevronDown, ChevronUp, Download, Calendar, Droplets } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, Plus, ChevronDown, ChevronUp, Download, Calendar, Droplets, Loader } from 'lucide-react';
+import api from '@/lib/axios';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
-type RecordType = 'Diagnosis' | 'Surgery' | 'Lab Report' | 'Prescription' | 'Allergy' | 'Vaccination';
+type RecordType = 'Blood Request' | 'Organ Request' | 'Diagnosis' | 'Surgery' | 'Lab Report' | 'Prescription' | 'Allergy' | 'Vaccination';
+
+interface BackendRequest {
+  _id?: string;
+  id?: string;
+  type?: string;
+  bloodGroup?: string;
+  organType?: string;
+  units?: number;
+  status?: string;
+  urgency?: string;
+  createdAt?: string;
+  facility?: string;
+  registeredDate?: string;
+  notes?: string;
+}
 
 interface MedicalRecord {
   id: string;
@@ -29,51 +46,6 @@ interface Vaccination {
   nextDue?: string;
 }
 
-const RECORDS: MedicalRecord[] = [
-  {
-    id: 'MR-001', type: 'Diagnosis', critical: true,
-    title: 'End-stage Renal Disease',
-    date: '15 Jan 2024', doctor: 'Dr. Anitha Kumar',
-    hospital: 'LifeLink Main Campus',
-    notes: 'Patient diagnosed with ESRD. Currently on dialysis 3x/week. Recommended for kidney transplant evaluation.',
-    documents: [
-      { name: 'Diagnosis_Report.pdf', size: '2.4 MB' },
-      { name: 'Kidney_Ultrasound.pdf', size: '5.1 MB' },
-    ],
-  },
-  {
-    id: 'MR-002', type: 'Lab Report', critical: false,
-    title: 'Blood Panel — Q1 2024',
-    date: '10 Mar 2024', doctor: 'Dr. Rahul Menon',
-    hospital: 'Kozhikode Medical College',
-    notes: 'Creatinine: 8.2 mg/dL (high). BUN: 45 mg/dL. Hemoglobin: 9.1 g/dL. Platelets: 180k.',
-    documents: [
-      { name: 'Blood_Panel_Mar2024.pdf', size: '1.1 MB' },
-    ],
-  },
-  {
-    id: 'MR-003', type: 'Prescription', critical: false,
-    title: 'Dialysis Medication Protocol',
-    date: '15 Jan 2024', doctor: 'Dr. Anitha Kumar',
-    hospital: 'LifeLink Main Campus',
-    notes: 'Erythropoietin 4000 IU 3x/week. Calcium carbonate 500mg with meals. Furosemide 40mg daily.',
-    documents: [
-      { name: 'Prescription_Jan2024.pdf', size: '0.8 MB' },
-    ],
-  },
-  {
-    id: 'MR-004', type: 'Surgery', critical: false,
-    title: 'AV Fistula Creation',
-    date: '20 Feb 2023', doctor: 'Dr. James Vargese',
-    hospital: 'Baby Memorial Hospital',
-    notes: 'Successful creation of arteriovenous fistula in left forearm for dialysis access. No complications.',
-    documents: [
-      { name: 'Surgery_Report.pdf',      size: '3.2 MB' },
-      { name: 'Post_Op_Instructions.pdf', size: '0.5 MB' },
-    ],
-  },
-];
-
 const ALLERGIES: Allergy[] = [
   { name: 'Penicillin',  severity: 'severe',   reaction: 'Anaphylaxis — carry EpiPen'    },
   { name: 'Sulfa drugs', severity: 'moderate', reaction: 'Rash and hives'                },
@@ -88,12 +60,14 @@ const VACCINATIONS: Vaccination[] = [
 ];
 
 const TYPE_CONFIG: Record<RecordType, { color: string; bg: string; icon: string }> = {
-  Diagnosis:    { color: '#CC0000', bg: '#FFE5E5', icon: '🔴' },
-  Surgery:      { color: '#5B21B6', bg: '#EDE8FF', icon: '🔪' },
-  'Lab Report': { color: '#1A5FAA', bg: '#E3F0FF', icon: '🧪' },
-  Prescription: { color: '#2B6B0A', bg: '#E8F5E0', icon: '💊' },
-  Allergy:      { color: '#B86E00', bg: '#FFF3E0', icon: '⚠️' },
-  Vaccination:  { color: '#0369a1', bg: '#E0F2FE', icon: '💉' },
+  'Blood Request': { color: '#CC0000', bg: '#FFE5E5', icon: '🩸' },
+  'Organ Request': { color: '#5B21B6', bg: '#EDE8FF', icon: '❤️' },
+  Diagnosis:      { color: '#CC0000', bg: '#FFE5E5', icon: '🔴' },
+  Surgery:        { color: '#5B21B6', bg: '#EDE8FF', icon: '🔪' },
+  'Lab Report':   { color: '#1A5FAA', bg: '#E3F0FF', icon: '🧪' },
+  Prescription:   { color: '#2B6B0A', bg: '#E8F5E0', icon: '💊' },
+  Allergy:        { color: '#B86E00', bg: '#FFF3E0', icon: '⚠️' },
+  Vaccination:    { color: '#0369a1', bg: '#E0F2FE', icon: '💉' },
 };
 
 const SEVERITY_CONFIG = {
@@ -175,12 +149,61 @@ function MedicalRecordCard({ record: r }: { record: MedicalRecord }) {
 }
 
 export default function MedicalHistoryPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'records' | 'allergies' | 'vaccinations'>('records');
+  const [records, setRecords] = useState<MedicalRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRequestHistory = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await api.get<{ success: true; data: BackendRequest[] }>('/requests/my-history', { headers });
+        
+        if (response.data?.success && response.data?.data) {
+          const mapped: MedicalRecord[] = response.data.data.map(req => {
+            const recordType = req.type === 'Blood' ? 'Blood Request' : 'Organ Request';
+            const title = req.type === 'Blood' 
+              ? `Blood Request — ${req.bloodGroup} (${req.units} unit${(req.units || 1) > 1 ? 's' : ''})`
+              : `Organ Request — ${req.organType}`;
+            const createdDate = new Date(req.createdAt || req.registeredDate || Date.now());
+            const dateStr = createdDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            
+            return {
+              id: req._id || req.id || '',
+              type: recordType as RecordType,
+              title,
+              date: dateStr,
+              doctor: 'LifeLink System',
+              hospital: req.facility || 'LifeLink',
+              notes: req.notes || `Status: ${req.status || 'Pending'} · Urgency: ${req.urgency || 'Normal'}`,
+              documents: [],
+              critical: req.urgency === 'critical' || req.status === 'CANCELLED',
+            };
+          });
+          setRecords(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching request history:', err);
+        setError('Failed to load your request history. Please try again.');
+        setRecords([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRequestHistory();
+  }, [user]);
 
   const TABS = [
-    { key: 'records',      label: 'Medical Records', count: RECORDS.length      },
-    { key: 'allergies',    label: 'Allergies',        count: ALLERGIES.length    },
-    { key: 'vaccinations', label: 'Vaccinations',     count: VACCINATIONS.length },
+    { key: 'records',      label: 'Request History', count: records.length      },
+    { key: 'allergies',    label: 'Allergies',       count: ALLERGIES.length    },
+    { key: 'vaccinations', label: 'Vaccinations',    count: VACCINATIONS.length },
   ];
 
   return (
@@ -252,7 +275,29 @@ export default function MedicalHistoryPage() {
       {/* Records tab */}
       {activeTab === 'records' && (
         <div className="flex flex-col gap-3">
-          {RECORDS.map(r => <MedicalRecordCard key={r.id} record={r} />)}
+          {isLoading && (
+            <div className="flex flex-col items-center gap-3 py-12">
+              <Loader size={32} className="animate-spin text-[#7AB648]" />
+              <p className="text-[14px] text-[#6B7A5A]">Loading your request history...</p>
+            </div>
+          )}
+          {!isLoading && error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-[13px] text-red-700">
+              {error}
+            </div>
+          )}
+          {!isLoading && records.length === 0 && !error && (
+            <div className="flex flex-col items-center gap-3 py-12 bg-white rounded-xl border border-[#E8E4D8]">
+              <Droplets size={32} className="text-[#8A9A7A]" />
+              <p className="text-[14px] font-semibold text-[#1a2e0a]">No requests yet</p>
+              <p className="text-[13px] text-[#6B7A5A] text-center max-w-xs">
+                When you submit blood or organ requests, they will appear here.
+              </p>
+            </div>
+          )}
+          {!isLoading && records.length > 0 && (
+            records.map(r => <MedicalRecordCard key={r.id} record={r} />)
+          )}
         </div>
       )}
 

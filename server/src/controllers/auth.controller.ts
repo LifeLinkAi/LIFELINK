@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
+import { HospitalProfile } from '../models/HospitalProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { verifyGoogleIdToken } from '../config/google';
 
 const generateToken = (userId: string, email: string, role: string): string => {
   const secret = process.env.JWT_SECRET || 'dev_jwt_secret_key_change_in_production_123456789';
@@ -152,7 +155,11 @@ export const getInviteDetails = async (req: Request, res: Response, next: NextFu
       return next(new ApiError(400, 'Invitation token is required.'));
     }
 
-    const profile = await DonorProfile.findOne({ inviteToken: token });
+    let profile: any = await DonorProfile.findOne({ inviteToken: token });
+    if (!profile) {
+      profile = await HospitalProfile.findOne({ inviteToken: token });
+    }
+
     if (!profile) {
       return next(new ApiError(400, 'Invalid invitation token.'));
     }
@@ -185,7 +192,16 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
       return next(new ApiError(400, 'Token and password are required.'));
     }
 
-    const profile = await DonorProfile.findOne({ inviteToken: token });
+    let profile: any = await DonorProfile.findOne({ inviteToken: token });
+    let isHospital = false;
+
+    if (!profile) {
+      profile = await HospitalProfile.findOne({ inviteToken: token });
+      if (profile) {
+        isHospital = true;
+      }
+    }
+
     if (!profile) {
       return next(new ApiError(400, 'Invalid invitation token.'));
     }
@@ -205,9 +221,15 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
     user.password = hashedPassword;
     await user.save();
 
-    profile.status = 'Available';
-    profile.inviteToken = null;
-    profile.inviteTokenExpires = null;
+    if (isHospital) {
+      // Hospitals remain 'Pending' until they complete setup wizard
+      profile.inviteToken = null;
+      profile.inviteTokenExpires = null;
+    } else {
+      profile.status = 'Available';
+      profile.inviteToken = null;
+      profile.inviteTokenExpires = null;
+    }
     await profile.save();
 
     const jwtToken = generateToken(user._id.toString(), user.email, user.role);
@@ -220,8 +242,134 @@ export const completeSetup = async (req: Request, res: Response, next: NextFunct
 
     res.status(200).json({
       success: true,
-      message: 'Account activated successfully',
+      message: 'Account setup completed successfully.',
       token: jwtToken,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const { credential, accessToken, role } = req.body;
+
+  try {
+    let email = '';
+    let name = '';
+    let avatar = '';
+
+    if (credential) {
+      const decoded = await verifyGoogleIdToken(credential);
+      email = decoded.email;
+      name = decoded.name;
+      avatar = decoded.avatar;
+    } else if (accessToken) {
+      const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        return next(new ApiError(400, 'Invalid Google access token.'));
+      }
+      const data: any = await response.json();
+      email = data.email?.toLowerCase().trim() || '';
+      name = data.name || '';
+      avatar = data.picture || '';
+    } else {
+      return next(new ApiError(400, 'Either credential (ID Token) or accessToken is required.'));
+    }
+
+    if (!email) {
+      return next(new ApiError(400, 'Could not retrieve email from Google account.'));
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // If user does not exist, check if a role was provided (sign-up flow)
+      if (!role) {
+        return next(new ApiError(400, 'No account associated with this email. Please register first.'));
+      }
+
+      if (!['Patient', 'Donor', 'Hospital'].includes(role)) {
+        return next(new ApiError(400, 'Invalid role specified.'));
+      }
+
+      // Create new user with a random password
+      const salt = await bcrypt.genSalt(10);
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, salt);
+
+      user = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        role,
+      });
+
+      // Create corresponding profiles
+      if (role === 'Donor') {
+        await DonorProfile.create({
+          userId: user._id,
+          location: '',
+          bloodType: 'O-',
+          tier: 'Bronze',
+          status: 'Pending',
+          phone: '',
+          avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+          isSetupComplete: false,
+        });
+      } else if (role === 'Hospital') {
+        await HospitalProfile.create({
+          userId: user._id,
+          licenseId: '',
+          governmentLicenseId: '',
+          city: '',
+          location: '',
+          logo: avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+          specialties: ['General'],
+          status: 'Pending',
+          isSetupComplete: false,
+        });
+      }
+    } else {
+      // If the user already exists, check if they have an active invitation token to clear
+      if (user.role === 'Donor') {
+        const donorProfile = await DonorProfile.findOne({ userId: user._id });
+        if (donorProfile && donorProfile.inviteToken) {
+          donorProfile.status = 'Available';
+          donorProfile.inviteToken = null;
+          donorProfile.inviteTokenExpires = null;
+          await donorProfile.save();
+        }
+      } else if (user.role === 'Hospital') {
+        const hospitalProfile = await HospitalProfile.findOne({ userId: user._id });
+        if (hospitalProfile && hospitalProfile.inviteToken) {
+          hospitalProfile.inviteToken = null;
+          hospitalProfile.inviteTokenExpires = null;
+          await hospitalProfile.save();
+        }
+      }
+    }
+
+    const token = generateToken(user._id.toString(), user.email, user.role);
+
+    // Set token in HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in successfully via Google',
+      token,
       user: {
         id: user._id,
         name: user.name,
