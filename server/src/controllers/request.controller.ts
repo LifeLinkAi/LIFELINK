@@ -2,6 +2,10 @@ import { Response, NextFunction } from 'express';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import crypto from 'crypto';
+import { findNearbyCompatibleDonors } from '../services/matching/donor-match.service';
+import { sendDonorRequestNotification } from '../services/notifications/email.service';
+import { logger } from '../utils/logger';
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -121,6 +125,51 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     });
 
     await newReq.save();
+
+    // Start matching and notification in background (non-blocking)
+    void (async () => {
+      try {
+        const matches = await findNearbyCompatibleDonors(newReq as any);
+        if (matches && matches.length > 0) {
+          // Generate invite tokens and persist matchedDonors
+          const matchedEntries = matches.map(m => {
+            const inviteToken = crypto.randomBytes(20).toString('hex');
+            const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+            return {
+              donorId: m.donorId,
+              inviteToken,
+              tokenExpiresAt,
+              status: 'NOTIFIED',
+            };
+          });
+
+          newReq.matchedDonors = matchedEntries as any;
+          newReq.status = 'DONOR_NOTIFIED';
+          await newReq.save();
+
+          // Fire emails asynchronously; do not await them in the main request thread
+          const emailPromises = matches.map((m, i) => {
+            const toEmail = (m as any).email || (m as any).userId?.email;
+            const donorName = (m as any).name || 'Donor';
+            if (!toEmail) return Promise.resolve();
+            const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/respond?requestId=${newReq._id}&token=${(matchedEntries as any)[i].inviteToken}`;
+            const requestDetails = {
+              urgency: newReq.urgency,
+              type: newReq.type,
+              bloodGroup: newReq.bloodGroup,
+              organType: newReq.organType,
+              facility: newReq.facility,
+              patientName: newReq.patientName,
+            };
+            return sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
+          });
+
+          Promise.all(emailPromises).catch(err => logger.error('Error sending donor notifications', err));
+        }
+      } catch (err) {
+        logger.error('Error running matching job for request', err as any);
+      }
+    })();
 
     const obj = newReq.toObject();
     res.status(201).json({

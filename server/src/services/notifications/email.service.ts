@@ -125,3 +125,40 @@ export const sendHospitalInviteEmail = async (
     html: htmlContent,
   });
 };
+
+/**
+ * Sends an urgent donor notification when a new patient request matches a donor.
+ */
+export const sendDonorRequestNotification = async (
+  toEmail: string,
+  donorName: string,
+  requestDetails: { urgency?: string; type?: string; bloodGroup?: string; organType?: string; facility?: string; patientName?: string },
+  inviteUrl: string
+): Promise<void> => {
+  const subject = `URGENT: New ${requestDetails.type || 'Donation'} Request`;
+  const htmlContent = `
+    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 12px; background-color: #fff8f8;">
+      <h2 style="color: #7f1d1d; font-family: 'Syne', sans-serif; margin-top: 0;">URGENT: New ${requestDetails.type || 'Donation'} Request</h2>
+      <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hello <strong>${donorName}</strong>,</p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+        A new ${requestDetails.type || 'donation'} request requires immediate attention. Below are the details:
+      </p>
+      <ul style="color: #334155; font-size: 14px; line-height: 1.6;">
+        ${requestDetails.patientName ? `<li><strong>Patient:</strong> ${requestDetails.patientName}</li>` : ''}
+        ${requestDetails.facility ? `<li><strong>Facility:</strong> ${requestDetails.facility}</li>` : ''}
+        ${requestDetails.urgency ? `<li><strong>Urgency:</strong> ${requestDetails.urgency}</li>` : ''}
+        ${requestDetails.bloodGroup ? `<li><strong>Blood Group:</strong> ${requestDetails.bloodGroup}</li>` : ''}
+        ${requestDetails.organType ? `<li><strong>Organ:</strong> ${requestDetails.organType}</li>` : ''}
+      </ul>
+      <div style="text-align: center; margin: 18px 0;">
+        <a href="${inviteUrl}" style="background-color: #7f1d1d; color: #ffffff; padding: 12px 22px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
+          View Request & Respond
+        </a>
+      </div>
+      <p style="color: #64748b; font-size: 12px;">If the button above does not work, copy and paste the link below into your browser:<br/><a href="${inviteUrl}" style="color: #2563eb;">${inviteUrl}</a></p>
+      <p style="color: #64748b; font-size: 12px; margin-top: 12px; border-top: 1px solid #fee2e2; padding-top: 12px;">This invitation link will expire in 24 hours.</p>
+    </div>
+  `;
+
+  await sendMail({ to: toEmail, subject, html: htmlContent });
+};
