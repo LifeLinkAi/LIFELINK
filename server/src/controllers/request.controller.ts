@@ -253,38 +253,44 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(400, 'Missing token or response.'));
     }
 
-    const requestObj = await Request.findById(id);
-    if (!requestObj) return next(new ApiError(404, 'Request not found.'));
+    // Find the matched donor entry (projection of the matching array element)
+    const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1 });
+    if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
 
-    const matched = requestObj.matchedDonors.find(m => m.inviteToken === token);
+    const matched = (requestObj.matchedDonors && requestObj.matchedDonors[0]) as any;
     if (!matched) return next(new ApiError(400, 'Invalid token.'));
 
     const now = new Date();
     if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
-      matched.status = 'EXPIRED';
-      await requestObj.save();
+      // mark expired atomically
+      await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
       return next(new ApiError(400, 'Token has expired.'));
     }
 
     if (donorResponse === 'ACCEPTED') {
-      if (requestObj.acceptedDonorId) {
-        return next(new ApiError(400, 'Request already accepted by another donor.'));
-      }
+      // Attempt atomic accept: only succeed if no acceptedDonorId exists and the matchedDonor is still NOTIFIED
+      const donorId = matched.donorId;
+      const filter = { _id: id, 'matchedDonors.inviteToken': token, 'matchedDonors.status': 'NOTIFIED', acceptedDonorId: { $exists: false } };
+      const update = {
+        $set: {
+          'matchedDonors.$.status': 'ACCEPTED',
+          'matchedDonors.$.respondedAt': now,
+          status: 'APPROVED',
+          acceptedDonorId: donorId,
+        },
+      };
 
-      matched.status = 'ACCEPTED';
-      matched.respondedAt = now;
-      requestObj.acceptedDonorId = matched.donorId as any;
-      requestObj.status = 'APPROVED';
-      await requestObj.save();
+      const updated = await Request.findOneAndUpdate(filter, update, { new: true });
+      if (!updated) {
+        return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
+      }
 
       res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
       return;
     }
 
-    // DECLINED
-    matched.status = 'DECLINED';
-    matched.respondedAt = now;
-    await requestObj.save();
+    // DECLINED: atomically set the matched donor status to DECLINED
+    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
     res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
   } catch (error) {
     next(error);
