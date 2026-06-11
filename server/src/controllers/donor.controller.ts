@@ -27,7 +27,7 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
         id: user._id.toString(),
         name: user.name,
         email: user.email,
-        location: profile.location,
+        location: '',
         bloodType: profile.bloodType,
         tier: profile.tier,
         status: profile.status,
@@ -80,7 +80,6 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
 
     const profile = await DonorProfile.create({
       userId: user._id,
-      location: '',
       bloodType: 'O-',
       tier: 'Bronze',
       status: 'Pending', // Defaults to Pending until activated
@@ -106,7 +105,7 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location,
+      location: '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -163,7 +162,6 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
 
       const profile = await DonorProfile.create({
         userId: user._id,
-        location: location || '',
         bloodType: bloodType || 'O-',
         tier: tier || 'Bronze',
         status: status || 'Pending',
@@ -178,7 +176,7 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
         id: user._id.toString(),
         name: user.name,
         email: user.email,
-        location: profile.location,
+        location: '',
         bloodType: profile.bloodType,
         tier: profile.tier,
         status: profile.status,
@@ -220,7 +218,7 @@ export const updateDonor = async (req: AuthRequest, res: Response, next: NextFun
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location,
+      location: '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -277,7 +275,7 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location,
+      location: '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -299,9 +297,9 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
-    const { bloodType, location, phone } = req.body;
-    if (!bloodType || !location || !phone) {
-      return next(new ApiError(400, 'Blood type, location, and phone number are required.'));
+    const { bloodType, phone } = req.body;
+    if (!bloodType || !phone) {
+      return next(new ApiError(400, 'Blood type and phone number are required.'));
     }
 
     const user = await User.findById(req.user.id);
@@ -314,7 +312,6 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       {
         $set: {
           bloodType,
-          location,
           phone,
           isSetupComplete: true,
           status: 'Available',
@@ -327,7 +324,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location,
+      location: '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -382,7 +379,6 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
 
       await DonorProfile.create({
         userId: user._id,
-        location: '',
         bloodType: 'O-',
         tier: 'Bronze',
         status: 'Pending',
