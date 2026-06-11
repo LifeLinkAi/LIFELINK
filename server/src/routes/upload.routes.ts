@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { Readable } from 'stream';
-import cloudinary from '../config/cloudinary';
+import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { ApiError } from '../middlewares/error.middleware';
 import { authenticate } from '../middlewares/auth.middleware';
 import { logger } from '../utils/logger';
@@ -62,6 +62,10 @@ router.post('/', authenticate, upload.single('file'), async (req: Request, res: 
   try {
     if (!req.file) {
       return next(new ApiError(400, 'No file uploaded.'));
+    }
+
+    if (!isCloudinaryConfigured()) {
+      return next(new ApiError(503, 'Cloudinary upload is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in server/.env, then restart the server.'));
     }
 
     const fileBuffer = req.file.buffer;

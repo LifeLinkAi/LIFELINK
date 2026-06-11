@@ -76,17 +76,20 @@ function mapBackendRequest(req: BackendRequest): PatientRequest {
     ? `${req.bloodGroup || 'Unknown'} · ${req.units} unit${req.units === 1 ? '' : 's'} · ${req.facility}`
     : `${req.organType || 'Organ'} · ${req.bloodGroup || 'Unknown'} · ${req.facility}`;
 
+  const rawStatus = typeof req.status === 'string' ? req.status.toUpperCase() : 'PENDING';
+  const status = (rawStatus in STATUS_CONFIG ? rawStatus : 'PENDING') as RequestStatus;
+
   return {
     id: req.id,
     type: req.type,
-    status: req.status,
+    status,
     createdAt: formatRegisteredDate(req.registeredDate),
     updatedAt: req.time || formatRegisteredDate(req.registeredDate),
-    urgency: req.urgency,
+    urgency: req.urgency || 'low',
     detail,
     hospital: req.facility,
-    timeline: buildTimeline(req),
-    canCancel: ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'].includes(req.status),
+    timeline: buildTimeline({ ...req, status }),
+    canCancel: ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'].includes(status),
   };
 }
 
@@ -117,9 +120,10 @@ const FILTERS = [
 
 function RequestCard({ req }: { req: PatientRequest }) {
   const [expanded, setExpanded] = useState(req.status !== 'COMPLETED' && req.status !== 'CANCELLED');
-  const sc = STATUS_CONFIG[req.status];
+  const statusKey = (req.status in STATUS_CONFIG ? req.status : 'PENDING') as RequestStatus;
+  const sc = STATUS_CONFIG[statusKey];
   const tc = TYPE_CONFIG[req.type];
-  const borderColor = URGENCY_COLORS[req.urgency];
+  const borderColor = URGENCY_COLORS[req.urgency] ?? URGENCY_COLORS.low;
 
   return (
     <div className="bg-white rounded-xl border border-[#E8E4D8] overflow-hidden"

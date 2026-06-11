@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -24,9 +25,9 @@ interface BloodRequestForm {
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: string; bg: string }[] = [
-  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',    color: '#CC0000', bg: '#FFE5E5' },
-  { key: 'high',     label: 'High',      desc: 'Required within a few hours',     color: '#B86E00', bg: '#FFF3E0' },
-  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',        color: '#1A5FAA', bg: '#E3F0FF' },
+  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',     color: '#CC0000', bg: '#FFE5E5' },
+  { key: 'high',     label: 'High',      desc: 'Required within a few hours',      color: '#B86E00', bg: '#FFF3E0' },
+  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',         color: '#1A5FAA', bg: '#E3F0FF' },
   { key: 'low',      label: 'Low',       desc: 'Scheduled or elective procedure', color: '#2B6B0A', bg: '#E8F5E0' },
 ];
 
@@ -59,9 +60,14 @@ export default function RequestBloodPage() {
     bloodGroup: '', units: 1, urgency: 'high',
     hospital: '', reason: '', contactPhone: '',
   });
+  const [age, setAge] = useState<number | undefined>(undefined);
+  const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
+  const [isLocLoading, setIsLocLoading] = useState(false);
   const [requestId, setRequestId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
 
   const isValid = form.bloodGroup !== '' && form.hospital !== '' && form.contactPhone !== '';
 
@@ -75,16 +81,18 @@ export default function RequestBloodPage() {
     setIsSubmitting(true);
 
     const requestBody = {
-      patientName: user?.name || '',
+      patientName: user?.name || 'Patient',
       facility: form.hospital,
-      age: 0,
-      gender: 'Unknown',
+      age: typeof age === 'number' ? age : undefined,
+      gender: gender || undefined,
       organType: '',
       bloodGroup: form.bloodGroup,
       units: form.units,
       urgency: form.urgency,
       facilityType: 'Hospital',
       notes: form.reason || '',
+      contactPhone: form.contactPhone, // Added: explicit phone forwarding
+      location: coordinates ? { type: 'Point', coordinates } : undefined,
       type: 'Blood',
     };
 
@@ -95,15 +103,19 @@ export default function RequestBloodPage() {
 
       if (response.status === 201 && response.data?.success && response.data?.data) {
         toast.success('Blood request submitted successfully.');
-        setRequestId(response.data.data.id || `BR-${Math.floor(2000 + Math.random() * 999)}`);
-        setForm({ bloodGroup: '', units: 1, urgency: 'high', hospital: '', reason: '', contactPhone: '' });
-        setStep('submitted');
+        
+        // Use backend parsed document ID cleanly mapping to string id
+        const targetId = response.data.data.id || response.data.data._id;
+        setRequestId(targetId);
+        
+        // Smoothly hands off context to manual selection pipeline
+        router.push(`/patient/select-donors?requestId=${targetId}`);
       } else {
-        throw new Error('Unexpected response from server.');
+        throw new Error('Unexpected response configuration from server.');
       }
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.error?.message || error?.message || 'Failed to submit blood request. Please try again.';
+        error?.response?.data?.message || error?.message || 'Failed to submit blood request. Please try again.';
       toast.error(errorMessage);
       setStep('form');
     } finally {
@@ -114,6 +126,32 @@ export default function RequestBloodPage() {
   const handleNew = () => {
     setForm({ bloodGroup: '', units: 1, urgency: 'high', hospital: '', reason: '', contactPhone: '' });
     setStep('form');
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lng = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        setCoordinates([lng, lat]);
+        toast.success('Location captured.');
+        setIsLocLoading(false);
+      },
+      err => {
+        setIsLocLoading(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error('Location permission denied. Please allow location access.');
+        } else {
+          toast.error('Failed to get location: ' + err.message);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   // -- Submitted state -----------------------------------
@@ -435,11 +473,28 @@ export default function RequestBloodPage() {
           </div>
 
           {/* Location */}
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-4 flex items-start gap-2.5">
-            <MapPin size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-[12px] font-semibold text-[#1a2e0a]">Your Location</p>
-              <p className="text-[11.5px] text-[#6B7A5A] mt-0.5">Kozhikode Medical College Rd, Kerala</p>
+          <div className="bg-white rounded-xl border border-[#E8E4D8] p-4 flex flex-col gap-3">
+            <div className="flex items-start gap-2.5">
+              <MapPin size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-[12px] font-semibold text-[#1a2e0a]">Your Location</p>
+                <p className="text-[11.5px] text-[#6B7A5A] mt-0.5">
+                  {coordinates ? `Lat: ${coordinates[1].toFixed(4)}, Lng: ${coordinates[0].toFixed(4)}` : 'Not set'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleUseCurrentLocation}
+                disabled={isLocLoading}
+                className="flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-red-300 transition-colors"
+              >
+                {isLocLoading ? 'Detecting…' : '📍 Use My Current Location'}
+              </button>
+              <button
+                onClick={() => { setCoordinates(null); toast('Location cleared'); }}
+                className="py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg"
+              >Clear</button>
             </div>
           </div>
         </div>
