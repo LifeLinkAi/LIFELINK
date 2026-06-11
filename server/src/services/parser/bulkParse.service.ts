@@ -1,6 +1,4 @@
 import * as XLSX from 'xlsx';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse: (buffer: Buffer, options?: any) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
 
 const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i;
 
@@ -15,43 +13,47 @@ const cleanName = (rawName: string): string => {
 
 export async function parsePdfBuffer(buffer: Buffer): Promise<{ name: string; email: string }[]> {
   try {
-    const data = await pdfParse(buffer, {
-      pagerender: (pageData: any) => {
-        return pageData.getTextContent().then((textContent: any) => {
-          let lastY: number | null = null;
-          let text = '';
-          
-          // Sort items by Y descending, then by X ascending
-          const items = [...textContent.items];
-          items.sort((a: any, b: any) => {
-            const yA = a.transform[5];
-            const yB = b.transform[5];
-            const xA = a.transform[4];
-            const xB = b.transform[4];
-            
-            if (Math.abs(yA - yB) > 2) {
-              return yB - yA;
-            }
-            return xA - xB;
-          });
+    const { getDocumentProxy } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    
+    let text = '';
+    
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      let lastY: number | null = null;
+      let pageText = '';
+      
+      // Sort items by Y descending, then by X ascending
+      const items = [...textContent.items] as any[];
+      items.sort((a, b) => {
+        const yA = a.transform[5];
+        const yB = b.transform[5];
+        const xA = a.transform[4];
+        const xB = b.transform[4];
+        
+        if (Math.abs(yA - yB) > 2) {
+          return yB - yA;
+        }
+        return xA - xB;
+      });
 
-          for (let item of items) {
-            const currentY = item.transform[5];
-            if (lastY === null) {
-              text += item.str;
-            } else if (Math.abs(currentY - lastY) <= 2) {
-              text += ' ' + item.str;
-            } else {
-              text += '\n' + item.str;
-            }
-            lastY = currentY;
-          }
-          return text;
-        });
+      for (let item of items) {
+        const currentY = item.transform[5];
+        if (lastY === null) {
+          pageText += item.str;
+        } else if (Math.abs(currentY - lastY) <= 2) {
+          pageText += ' ' + item.str;
+        } else {
+          pageText += '\n' + item.str;
+        }
+        lastY = currentY;
       }
-    });
+      
+      text += pageText + '\n';
+    }
 
-    const text = data.text || '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const results: { name: string; email: string }[] = [];
     const seenEmails = new Set<string>();
@@ -65,7 +67,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<{ name: string; em
         seenEmails.add(email);
 
         // Look for name in same line (excluding email)
-        let nameCandidate = line.replace(match[0], '').trim();
+        const nameCandidate = line.replace(match[0], '').trim();
         let name = cleanName(nameCandidate);
         
         // If empty/short, try checking the previous line
