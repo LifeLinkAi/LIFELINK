@@ -8,6 +8,32 @@ import { sendDonorRequestNotification } from '../services/notifications/email.se
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
 
+// Helper function to safely parse and structure valid GeoJSON locations
+const parseGeoLocation = (body: any) => {
+  const location = body.location;
+  // Default fallback coordinates to safeguard the 2dsphere index from missing types
+  let coords = [0, 0]; 
+
+  if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+    const lng = parseFloat(location.coordinates[0]);
+    const lat = parseFloat(location.coordinates[1]);
+    if (!isNaN(lng) && !isNaN(lat)) {
+      coords = [lng, lat];
+    }
+  } else if (body.longitude && body.latitude) {
+    const lng = parseFloat(body.longitude);
+    const lat = parseFloat(body.latitude);
+    if (!isNaN(lng) && !isNaN(lat)) {
+      coords = [lng, lat];
+    }
+  }
+
+  return {
+    type: 'Point',
+    coordinates: coords
+  };
+};
+
 // ==========================================
 // CORE ADMINISTRATIVE CONTROLLERS (FROM MAIN)
 // ==========================================
@@ -38,15 +64,16 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.body.type || !req.body.urgency || !req.body.status) {
+      return next(new ApiError(400, 'Request type, urgency, and status are required.'));
+    }
+
     const requestData = {
       ...req.body,
+      location: parseGeoLocation(req.body),
       requestedBy: req.body.requestedBy || req.user?.id,
       registeredDate: req.body.registeredDate || new Date().toISOString(),
     };
-
-    if (!requestData.type || !requestData.urgency || !requestData.status) {
-      return next(new ApiError(400, 'Request type, urgency, and status are required.'));
-    }
 
     const newReq = new Request(requestData);
     await newReq.save();
@@ -61,7 +88,12 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
 export const updateRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
+
+    // If an update contains location details, ensure it remains GeoJSON-compliant
+    if (updateData.location || updateData.longitude || updateData.latitude) {
+      updateData.location = parseGeoLocation(updateData);
+    }
 
     const requestObj = await Request.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
     if (!requestObj) {
@@ -100,8 +132,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const { 
-      patientName, facility, age, gender, organType, 
-      bloodGroup, units, urgency, facilityType, notes, type, location
+      patientName, facility,contactPhone, age, gender, organType, 
+      bloodGroup, units, urgency, facilityType, notes, type
     } = req.body;
 
     if (!type || !urgency || !bloodGroup || !patientName) {
@@ -109,12 +141,13 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const newReq = new Request({
-      userId: req.user.id, // Tie the request to the logged-in user's account identifier
+      userId: req.user.id,
       patientName,
       facility,
       age,
       gender,
-      location,
+      contactPhone,
+      location: parseGeoLocation(req.body),
       organType,
       bloodGroup,
       units,
@@ -122,7 +155,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facilityType,
       notes,
       type,
-      status: 'Pending', // Force all patient-created requests to start as Pending
+      status: 'Pending',
       registeredDate: new Date(),
       matchPercentage: 0,
     });
@@ -142,7 +175,6 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
   }
 };
 
-// Find matching donors for a request without modifying the request document
 export const findMatchesForRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -156,7 +188,6 @@ export const findMatchesForRequest = async (req: AuthRequest, res: Response, nex
   }
 };
 
-// Dispatch selected donors: persist matchedDonors and send notifications
 export const dispatchToDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -169,10 +200,9 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
     const requestObj = await Request.findById(id);
     if (!requestObj) return next(new ApiError(404, 'Request not found.'));
 
-    // Generate matchedDonor entries for selected donors
     const matchedEntries = selectedDonorIds.map(did => {
       const inviteToken = crypto.randomBytes(20).toString('hex');
-      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       return {
         donorId: did as any,
         inviteToken,
@@ -181,12 +211,10 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
       };
     });
 
-    // Append to existing matchedDonors
     requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(matchedEntries as any)];
     requestObj.status = 'DONOR_NOTIFIED';
     await requestObj.save();
 
-    // Fetch donor profiles to send emails
     const donors = await DonorProfile.find({ _id: { $in: selectedDonorIds } }).populate('userId', 'name email phone').lean();
 
     const emailPromises = donors.map((d: any) => {
@@ -221,7 +249,6 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
-    // Find only the records that match the logged-in user's ID
     const requests = await Request.find({ userId: req.user.id }).sort({ createdAt: -1 });
 
     const mapped = requests.map(r => {
@@ -250,7 +277,6 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(400, 'Missing token or response.'));
     }
 
-    // Find the matched donor entry (projection of the matching array element)
     const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1 });
     if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
 
@@ -259,13 +285,11 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     const now = new Date();
     if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
-      // mark expired atomically
       await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
       return next(new ApiError(400, 'Token has expired.'));
     }
 
     if (donorResponse === 'ACCEPTED') {
-      // Attempt atomic accept: only succeed if no acceptedDonorId exists and the matchedDonor is still NOTIFIED
       const donorId = matched.donorId;
       const filter = { _id: id, 'matchedDonors.inviteToken': token, 'matchedDonors.status': 'NOTIFIED', acceptedDonorId: { $exists: false } };
       const update = {
@@ -286,7 +310,6 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return;
     }
 
-    // DECLINED: atomically set the matched donor status to DECLINED
     await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
     res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
   } catch (error) {
