@@ -18,6 +18,7 @@ export interface IRequest extends Document {
   facility?: string;
   age?: number;
   gender?: string;
+  location?: { type: 'Point'; coordinates: number[] } | null;
   organType?: string;
   bloodGroup: string;
   units?: number;
@@ -150,6 +151,18 @@ const requestSchema = new Schema<IRequest>(
       ref: 'User',
       default: null,
     },
+    // GeoJSON location for spatial queries (e.g., $near)
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point',
+      },
+      coordinates: {
+        type: [Number],
+        required: false,
+      },
+    },
     // ----------------------------------------
   },
   {
@@ -162,5 +175,7 @@ requestSchema.index({ userId: 1, createdAt: -1 });
 requestSchema.index({ status: 1 });
 requestSchema.index({ 'matchedDonors.inviteToken': 1 });
 requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
+// 2dsphere index on location for geo queries
+requestSchema.index({ location: '2dsphere' });
 
 export const Request = model<IRequest>('Request', requestSchema);

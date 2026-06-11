@@ -9,9 +9,15 @@ const donorProfileSchema = new Schema(
       unique: true,
     },
     location: {
-      type: String,
-      default: '',
-      trim: true,
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point',
+      },
+      coordinates: {
+        type: [Number],
+        required: false,
+      },
     },
     bloodType: {
       type: String,
@@ -66,5 +72,8 @@ const donorProfileSchema = new Schema(
     timestamps: true,
   }
 );
+
+// Create 2dsphere index on location for geographic queries
+donorProfileSchema.index({ location: '2dsphere' });
 
 export const DonorProfile = model('DonorProfile', donorProfileSchema);

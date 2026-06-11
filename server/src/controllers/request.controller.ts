@@ -93,7 +93,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
 
     const { 
       patientName, facility, age, gender, organType, 
-      bloodGroup, units, urgency, facilityType, notes, type 
+      bloodGroup, units, urgency, facilityType, notes, type, location
     } = req.body;
 
     if (!type || !urgency || !bloodGroup || !patientName) {
@@ -107,6 +107,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facility,
       age,
       gender,
+      location,
       organType,
       bloodGroup,
       units,
