@@ -31,6 +31,7 @@ export interface IRequest extends Document {
   facilityType?: string;
   time?: string;
   notes?: string;
+  contactPhone?: string; // Added to interface
   type: 'Organ' | 'Blood';
   matchedDonors: IMatchedDonor[];
   acceptedDonorId?: Schema.Types.ObjectId | null;
@@ -76,7 +77,7 @@ const requestSchema = new Schema<IRequest>(
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      default: null, // Left optional so legacy Admin-created requests don't break
+      default: null,
     },
     // -----------------------------------------------------
     patientName: {
@@ -84,6 +85,10 @@ const requestSchema = new Schema<IRequest>(
       trim: true,
     },
     facility: {
+      type: String,
+      trim: true,
+    },
+    contactPhone: { // Added to schema
       type: String,
       trim: true,
     },
@@ -123,7 +128,7 @@ const requestSchema = new Schema<IRequest>(
       required: true,
     },
     registeredDate: {
-      type: Date, // Changed from String to Date to match standard JS Date instances smoothly
+      type: Date,
       required: true,
     },
     distance: {
@@ -147,7 +152,6 @@ const requestSchema = new Schema<IRequest>(
       enum: ['Organ', 'Blood'],
       required: true,
     },
-    // --- NEW: DONOR MATCHING & DEEP LINKING ---
     matchedDonors: {
       type: [matchedDonorSchema],
       default: [],
@@ -157,7 +161,6 @@ const requestSchema = new Schema<IRequest>(
       ref: 'User',
       default: null,
     },
-    // GeoJSON location for spatial queries (e.g., $near)
     location: {
       type: {
         type: String,
@@ -169,19 +172,16 @@ const requestSchema = new Schema<IRequest>(
         required: false,
       },
     },
-    // ----------------------------------------
   },
   {
     timestamps: true,
   }
 );
 
-// Create indexes for fast queries on common operations
 requestSchema.index({ userId: 1, createdAt: -1 });
 requestSchema.index({ status: 1 });
 requestSchema.index({ 'matchedDonors.inviteToken': 1 });
 requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
-// 2dsphere index on location for geo queries
 requestSchema.index({ location: '2dsphere' });
 
 export const Request = model<IRequest>('Request', requestSchema);

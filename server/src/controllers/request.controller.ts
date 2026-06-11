@@ -9,6 +9,32 @@ import { sendDonorRequestNotification } from '../services/notifications/email.se
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
 
+// Helper function to safely parse and structure valid GeoJSON locations
+const parseGeoLocation = (body: any) => {
+  const location = body.location;
+  // Default fallback coordinates to safeguard the 2dsphere index from missing types
+  let coords = [0, 0]; 
+
+  if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+    const lng = parseFloat(location.coordinates[0]);
+    const lat = parseFloat(location.coordinates[1]);
+    if (!isNaN(lng) && !isNaN(lat)) {
+      coords = [lng, lat];
+    }
+  } else if (body.longitude && body.latitude) {
+    const lng = parseFloat(body.longitude);
+    const lat = parseFloat(body.latitude);
+    if (!isNaN(lng) && !isNaN(lat)) {
+      coords = [lng, lat];
+    }
+  }
+
+  return {
+    type: 'Point',
+    coordinates: coords
+  };
+};
+
 // ==========================================
 // CORE ADMINISTRATIVE CONTROLLERS (FROM MAIN)
 // ==========================================
@@ -59,15 +85,16 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.body.type || !req.body.urgency || !req.body.status) {
+      return next(new ApiError(400, 'Request type, urgency, and status are required.'));
+    }
+
     const requestData = {
       ...req.body,
+      location: parseGeoLocation(req.body),
       requestedBy: req.body.requestedBy || req.user?.id,
       registeredDate: req.body.registeredDate || new Date().toISOString(),
     };
-
-    if (!requestData.type || !requestData.urgency || !requestData.status) {
-      return next(new ApiError(400, 'Request type, urgency, and status are required.'));
-    }
 
     const newReq = new Request(requestData);
     await newReq.save();
@@ -82,7 +109,12 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
 export const updateRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
+
+    // If an update contains location details, ensure it remains GeoJSON-compliant
+    if (updateData.location || updateData.longitude || updateData.latitude) {
+      updateData.location = parseGeoLocation(updateData);
+    }
 
     const requestObj = await Request.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
     if (!requestObj) {
@@ -121,8 +153,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const { 
-      patientName, facility, age, gender, organType, 
-      bloodGroup, units, urgency, facilityType, notes, type, location
+      patientName, facility, contactPhone, age, gender, organType, 
+      bloodGroup, units, urgency, facilityType, notes, type
     } = req.body;
 
     if (!type || !urgency || !bloodGroup || !patientName) {
@@ -136,7 +168,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facility,
       age,
       gender,
-      location,
+      contactPhone,
+      location: parseGeoLocation(req.body),
       organType,
       bloodGroup,
       units,
@@ -284,86 +317,4 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       const update = {
         $set: {
           'matchedDonors.$.status': 'ACCEPTED',
-          'matchedDonors.$.respondedAt': now,
-          status: 'APPROVED',
-          acceptedDonorId: donorId,
-        },
-      };
-
-      const updated = await Request.findOneAndUpdate(filter, update, { new: true });
-      if (!updated) {
-        return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
-      }
-
-      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
-      return;
-    }
-
-    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
-    res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// ==========================================
-// HOSPITAL MODULE SPECIFIC CONTROLLERS
-// ==========================================
-
-export const getHospitalIncomingRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!req.user || req.user.role !== 'Hospital') {
-      return next(new ApiError(403, 'Access denied. Hospital role required.'));
-    }
-
-    const requests = await Request.find({
-      type: { $in: ['Blood', 'Organ'] },
-      status: { $in: PENDING_REQUEST_STATUSES },
-    })
-      .sort({ createdAt: -1 })
-      .lean() as RequestRecord[];
-
-    res.status(200).json({
-      success: true,
-      data: requests.map(toRequestDto),
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateRequestStatus = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!req.user || req.user.role !== 'Hospital') {
-      return next(new ApiError(403, 'Access denied. Hospital role required.'));
-    }
-
-    const { id } = req.params;
-    const { status } = req.body as { status?: unknown };
-
-    if (!isValidObjectId(id)) {
-      return next(new ApiError(400, 'Invalid request ID.'));
-    }
-
-    if (!isHospitalRequestStatus(status)) {
-      return next(new ApiError(400, 'Status must be one of: APPROVED, IN_PROGRESS, FULFILLED.'));
-    }
-
-    const requestObj = await Request.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true, runValidators: true }
-    ).lean() as RequestRecord | null;
-
-    if (!requestObj) {
-      return next(new ApiError(404, 'Request not found.'));
-    }
-
-    res.status(200).json({
-      success: true,
-      data: toRequestDto(requestObj),
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+          'matchedDonors.$.respondedAt':
