@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -66,6 +67,7 @@ export default function RequestBloodPage() {
   const [requestId, setRequestId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
 
   const isValid = form.bloodGroup !== '' && form.hospital !== '' && form.contactPhone !== '';
 
@@ -100,9 +102,9 @@ export default function RequestBloodPage() {
 
       if (response.status === 201 && response.data?.success && response.data?.data) {
         toast.success('Blood request submitted successfully.');
-        setRequestId(response.data.data.id || `BR-${Math.floor(2000 + Math.random() * 999)}`);
-        setForm({ bloodGroup: '', units: 1, urgency: 'high', hospital: '', reason: '', contactPhone: '' });
-        setStep('submitted');
+        const id = response.data.data.id || `BR-${Math.floor(2000 + Math.random() * 999)}`;
+        // Redirect to manual donor selection flow
+        router.push(`/patient/select-donors?requestId=${id}`);
       } else {
         throw new Error('Unexpected response from server.');
       }

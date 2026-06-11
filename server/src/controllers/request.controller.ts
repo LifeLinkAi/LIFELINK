@@ -7,6 +7,7 @@ import { findNearbyCompatibleDonors } from '../services/matching/donor-match.ser
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
 import { Schema } from 'mongoose';
+import { DonorProfile } from '../models/DonorProfile';
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -127,50 +128,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
 
     await newReq.save();
 
-    // Start matching and notification in background (non-blocking)
-    void (async () => {
-      try {
-        const matches = await findNearbyCompatibleDonors(newReq as any);
-        if (matches && matches.length > 0) {
-          // Generate invite tokens and persist matchedDonors
-          const matchedEntries = matches.map(m => {
-            const inviteToken = crypto.randomBytes(20).toString('hex');
-            const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-            return {
-              donorId: m.donorId,
-              inviteToken,
-              tokenExpiresAt,
-              status: 'NOTIFIED',
-            };
-          });
-
-          newReq.matchedDonors = matchedEntries as any;
-          newReq.status = 'DONOR_NOTIFIED';
-          await newReq.save();
-
-          // Fire emails asynchronously; do not await them in the main request thread
-          const emailPromises = matches.map((m, i) => {
-            const toEmail = (m as any).email || (m as any).userId?.email;
-            const donorName = (m as any).name || 'Donor';
-            if (!toEmail) return Promise.resolve();
-            const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/respond?requestId=${newReq._id}&token=${(matchedEntries as any)[i].inviteToken}`;
-            const requestDetails = {
-              urgency: newReq.urgency,
-              type: newReq.type,
-              bloodGroup: newReq.bloodGroup,
-              organType: newReq.organType,
-              facility: newReq.facility,
-              patientName: newReq.patientName,
-            };
-            return sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
-          });
-
-          Promise.all(emailPromises).catch(err => logger.error('Error sending donor notifications', err));
-        }
-      } catch (err) {
-        logger.error('Error running matching job for request', err as any);
-      }
-    })();
+    // Previously this endpoint auto-dispatched to donors; in Manual Selection flow
+    // matching and dispatch are handled by separate endpoints.
 
     const obj = newReq.toObject();
     res.status(201).json({
@@ -180,6 +139,80 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
         ...obj,
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Find matching donors for a request without modifying the request document
+export const findMatchesForRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const requestObj = await Request.findById(id);
+    if (!requestObj) return next(new ApiError(404, 'Request not found.'));
+
+    const matches = await findNearbyCompatibleDonors(requestObj as any);
+    res.status(200).json({ success: true, data: matches });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Dispatch selected donors: persist matchedDonors and send notifications
+export const dispatchToDonors = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { selectedDonorIds } = req.body as { selectedDonorIds?: string[] };
+
+    if (!selectedDonorIds || !Array.isArray(selectedDonorIds) || selectedDonorIds.length === 0) {
+      return next(new ApiError(400, 'selectedDonorIds must be a non-empty array.'));
+    }
+
+    const requestObj = await Request.findById(id);
+    if (!requestObj) return next(new ApiError(404, 'Request not found.'));
+
+    // Generate matchedDonor entries for selected donors
+    const matchedEntries = selectedDonorIds.map(did => {
+      const inviteToken = crypto.randomBytes(20).toString('hex');
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      return {
+        donorId: did as any,
+        inviteToken,
+        tokenExpiresAt,
+        status: 'NOTIFIED',
+      };
+    });
+
+    // Append to existing matchedDonors
+    requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(matchedEntries as any)];
+    requestObj.status = 'DONOR_NOTIFIED';
+    await requestObj.save();
+
+    // Fetch donor profiles to send emails
+    const { DonorProfile } = require('../models/DonorProfile');
+    const donors = await DonorProfile.find({ _id: { $in: selectedDonorIds } }).populate('userId', 'name email phone').lean();
+
+    const emailPromises = donors.map((d: any) => {
+      const toEmail = d.userId?.email;
+      const donorName = d.userId?.name || 'Donor';
+      if (!toEmail) return Promise.resolve();
+      const entry = matchedEntries.find((e: any) => e.donorId?.toString() === d._id.toString());
+      if (!entry) return Promise.resolve();
+      const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/respond?requestId=${requestObj._id}&token=${entry.inviteToken}`;
+      const requestDetails = {
+        urgency: requestObj.urgency,
+        type: requestObj.type,
+        bloodGroup: requestObj.bloodGroup,
+        organType: requestObj.organType,
+        facility: requestObj.facility,
+        patientName: requestObj.patientName,
+      };
+      return sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
+    });
+
+    Promise.all(emailPromises).catch(err => logger.error('Error sending dispatch notifications', err));
+
+    res.status(200).json({ success: true, message: 'Donors notified', data: { matchedCount: matchedEntries.length } });
   } catch (error) {
     next(error);
   }

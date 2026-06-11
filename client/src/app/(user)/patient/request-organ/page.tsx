@@ -1,5 +1,6 @@
 ﻿'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Heart, CheckCircle, AlertTriangle, FileText, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -68,6 +69,7 @@ export default function RequestOrganPage() {
   const [requestId, setRequestId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
 
   const [age, setAge] = useState<number | undefined>(undefined);
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
@@ -108,9 +110,8 @@ export default function RequestOrganPage() {
 
       if (res.status === 201 && res.data?.success && res.data?.data) {
         toast.success('Organ request submitted successfully.');
-        setRequestId(res.data.data.id || `ORG-${Math.floor(400 + Math.random() * 99)}`);
-        setForm({ organType: '', bloodGroup: '', urgency: 'high', hospital: '', medicalCondition: '', contactPhone: '', hasConsent: false });
-        setStep('submitted');
+        const id = res.data.data.id || `ORG-${Math.floor(400 + Math.random() * 99)}`;
+        router.push(`/patient/select-donors?requestId=${id}`);
       } else {
         throw new Error('Unexpected server response');
       }
