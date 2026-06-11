@@ -14,6 +14,7 @@ export interface IMatchedDonor {
 
 export interface IRequest extends Document {
   userId: Schema.Types.ObjectId | null;
+  requestedBy: Schema.Types.ObjectId;
   patientName?: string;
   facility?: string;
   age?: number;
