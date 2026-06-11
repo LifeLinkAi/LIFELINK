@@ -8,6 +8,7 @@ import Cookies from 'js-cookie';
 import { useAppDispatch } from '@/store/hooks';
 import { setUser } from '@/features/auth/authSlice';
 import { useAuth } from '@/hooks/useAuth';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,12 +30,64 @@ export default function LoginPage() {
       }
     }
   }, [authLoading, isAuthenticated, user, router]);
-  const [role, setRole] = useState<'Patient' | 'Donor' | 'Hospital'>('Patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        setError(null);
+        setLoading(true);
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        if (!apiUrl.endsWith('/api')) {
+          apiUrl = `${apiUrl}/api`;
+        }
+        const res = await fetch(`${apiUrl}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: tokenResponse.access_token }),
+        });
+        const data = await res.json();
+        setLoading(false);
+
+        if (!res.ok) {
+          setError(data.message || 'Google authentication failed.');
+          return;
+        }
+
+        // Store credentials in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        Cookies.set('ll_access_token', data.token, { expires: 7 });
+
+        // Dispatch user state to Redux
+        dispatch(setUser(data.user));
+
+        // Redirect based on database user role
+        const userRole = data.user.role;
+        if (userRole === 'Admin') {
+          router.push('/admin/dashboard');
+        } else if (userRole === 'Hospital') {
+          router.push('/hospital/dashboard');
+        } else if (userRole === 'Donor') {
+          router.push('/donor/dashboard');
+        } else if (userRole === 'Patient') {
+          router.push('/patient/dashboard');
+        } else {
+          router.push('/');
+        }
+      } catch (err) {
+        setLoading(false);
+        setError('Network error during Google sign in.');
+      }
+    },
+    onError: () => {
+      setError('Google Sign-In failed or was cancelled.');
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,23 +211,7 @@ export default function LoginPage() {
             <p className="font-dmsans text-sm text-on-surface-variant">Sign in to your account or create a new one to access the network.</p>
           </div>
 
-          {/* Role Selection */}
-          <div className="bg-surface-variant rounded-xl p-1 mb-6 flex shadow-[0_4px_15px_rgba(85,107,47,0.05)]">
-            {(['Patient', 'Donor', 'Hospital'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`flex-1 py-2 px-1 text-center rounded-lg font-syne font-semibold text-[13px] transition-all ${
-                  role === r
-                    ? 'bg-surface shadow-sm text-primary'
-                    : 'text-outline hover:text-on-surface-variant'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+
 
           {/* Form */}
           {error && (
@@ -250,7 +287,11 @@ export default function LoginPage() {
 
           {/* Social Logins */}
           <div className="grid  gap-4">
-            <button className="h-[48px] flex items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-dmsans text-sm font-medium">
+            <button 
+              type="button"
+              onClick={() => handleGoogleLogin()}
+              className="h-[48px] flex items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-variant transition-colors font-dmsans text-sm font-medium w-full"
+            >
               <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>

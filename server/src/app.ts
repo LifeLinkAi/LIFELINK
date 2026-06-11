@@ -49,7 +49,7 @@ app.use(
   })
 );
 
-// Apply rate limiting to all requests starting with /api
+// Apply rate limiting to all requests starting with /api or /api/v1
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per window
@@ -57,15 +57,15 @@ const limiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   message: 'Too many requests from this IP, please try again after 15 minutes',
 });
-app.use('/api', limiter);
+app.use(['/api', '/api/v1'], limiter);
 
 // Root path confirmation check
 app.get('/', (req, res) => {
   res.send('LifeLink Backend Running 🚀');
 });
 
-// Mount main application router under /api
-app.use('/api', apiRouter);
+// Mount main application router under /api and /api/v1 for compatibility
+app.use(['/api', '/api/v1'], apiRouter);
 
 // Catch-all route handler for non-existent routes
 app.use((req, res, next) => {

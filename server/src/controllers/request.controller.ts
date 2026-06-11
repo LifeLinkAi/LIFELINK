@@ -6,8 +6,11 @@ import crypto from 'crypto';
 import { findNearbyCompatibleDonors } from '../services/matching/donor-match.service';
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
-import { Schema } from 'mongoose';
 import { DonorProfile } from '../models/DonorProfile';
+
+// ==========================================
+// CORE ADMINISTRATIVE CONTROLLERS (FROM MAIN)
+// ==========================================
 
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -27,7 +30,7 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
       };
     });
 
-    res.status(200).json(mapped);
+    res.status(200).json({ success: true, data: mapped });
   } catch (error) {
     next(error);
   }
@@ -35,7 +38,12 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const requestData = req.body;
+    const requestData = {
+      ...req.body,
+      requestedBy: req.body.requestedBy || req.user?.id,
+      registeredDate: req.body.registeredDate || new Date().toISOString(),
+    };
+
     if (!requestData.type || !requestData.urgency || !requestData.status) {
       return next(new ApiError(400, 'Request type, urgency, and status are required.'));
     }
@@ -44,10 +52,7 @@ export const createRequest = async (req: AuthRequest, res: Response, next: NextF
     await newReq.save();
 
     const obj = newReq.toObject();
-    res.status(201).json({
-      id: obj._id.toString(),
-      ...obj,
-    });
+    res.status(201).json({ success: true, data: { id: obj._id.toString(), ...obj } });
   } catch (error) {
     next(error);
   }
@@ -64,10 +69,7 @@ export const updateRequest = async (req: AuthRequest, res: Response, next: NextF
     }
 
     const obj = requestObj.toObject();
-    res.status(200).json({
-      id: obj._id.toString(),
-      ...obj,
-    });
+    res.status(200).json({ success: true, data: { id: obj._id.toString(), ...obj } });
   } catch (error) {
     next(error);
   }
@@ -88,7 +90,7 @@ export const deleteRequest = async (req: AuthRequest, res: Response, next: NextF
 };
 
 // ==========================================
-// PATIENT MODULE SPECIFIC CONTROLLERS
+// PATIENT MODULE SPECIFIC CONTROLLERS (MANUAL FLOW)
 // ==========================================
 
 export const createPatientRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -106,9 +108,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       return next(new ApiError(400, 'Missing required fields: Type, urgency, blood group, and patient name are mandatory.'));
     }
 
-    // Build the request object, strictly controlling the status and metadata
     const newReq = new Request({
-      userId: req.user.id, // Tie the request to the logged-in patient account
+      userId: req.user.id, // Tie the request to the logged-in user's account identifier
       patientName,
       facility,
       age,
@@ -123,13 +124,10 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       type,
       status: 'Pending', // Force all patient-created requests to start as Pending
       registeredDate: new Date(),
-      matchPercentage: 0, // Will be calculated by your matching background engine later
+      matchPercentage: 0,
     });
 
     await newReq.save();
-
-    // Previously this endpoint auto-dispatched to donors; in Manual Selection flow
-    // matching and dispatch are handled by separate endpoints.
 
     const obj = newReq.toObject();
     res.status(201).json({
@@ -189,7 +187,6 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
     await requestObj.save();
 
     // Fetch donor profiles to send emails
-    const { DonorProfile } = require('../models/DonorProfile');
     const donors = await DonorProfile.find({ _id: { $in: selectedDonorIds } }).populate('userId', 'name email phone').lean();
 
     const emailPromises = donors.map((d: any) => {

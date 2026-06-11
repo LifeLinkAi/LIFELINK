@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { 
   getDonors, 
   createDonor, 
@@ -6,9 +7,23 @@ import {
   updateDonor, 
   deleteDonor,
   getMeProfile,
-  completeDonorSetup
+  completeDonorSetup,
+  uploadCertificate,
 } from '../controllers/donor.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+
+// Multer: memory storage, PDF only, 10 MB limit
+const certUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are accepted.'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -22,5 +37,8 @@ router.post('/', authenticate, authorize('Admin'), createDonor);
 router.post('/bulk', authenticate, authorize('Admin'), createDonorBulk);
 router.put('/:id', authenticate, authorize('Admin'), updateDonor);
 router.delete('/:id', authenticate, authorize('Admin'), deleteDonor);
+
+// Donor certificate upload & date extraction
+router.post('/upload-certificate', authenticate, certUpload.single('certificate'), uploadCertificate);
 
 export default router;
