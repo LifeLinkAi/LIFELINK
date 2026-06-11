@@ -5,7 +5,10 @@ import {
   createPatientRequest, 
   getMyRequests, 
   updateRequest, 
-  deleteRequest 
+  deleteRequest,
+  respondToRequest,
+  findMatchesForRequest,
+  dispatchToDonors
 } from '../controllers/request.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -19,6 +22,14 @@ router.get('/', authenticate, getRequests);
 // Routes for creating and tracking patient-specific needs
 router.post('/patient', authenticate, authorize('Patient', 'Hospital'), createPatientRequest);
 router.get('/my-history', authenticate, authorize('Patient', 'Hospital'), getMyRequests);
+
+// --- Manual Selection & Donor Responses ---
+// Donor response endpoint - token-based, no authentication required so donors can respond via email link
+router.post('/:id/respond', respondToRequest);
+
+// Manual selection endpoints
+router.get('/:id/find-matches', authenticate, authorize('Patient', 'Hospital'), findMatchesForRequest);
+router.post('/:id/dispatch', authenticate, authorize('Patient', 'Hospital'), dispatchToDonors);
 
 // --- Admin Management Routes ---
 // High-level system overrides restricted strictly to system administrators
