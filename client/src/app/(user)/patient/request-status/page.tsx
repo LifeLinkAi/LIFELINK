@@ -214,7 +214,7 @@ function RequestCard({ req }: { req: PatientRequest }) {
             {/* Conditional Matching Access Option */}
             {['PENDING', 'MATCHING', 'DONOR_FOUND'].includes(req.status) && (
               <Link 
-                href={`/patient/match-donors?requestId=${req.id}`}
+                href={`/patient/select-donors?requestId=${req.id}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a2e0a] text-white text-[12px] font-medium rounded-lg hover:bg-[#2B4A18] transition-colors"
               >
                 <Search size={13} /> View Matches
