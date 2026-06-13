@@ -1,24 +1,7 @@
-import nodemailer from 'nodemailer';
 import { logger } from '../../utils/logger';
 
-// Create a transporter using SMTP settings from server .env config
-const createTransporter = () => {
-  const port = parseInt(process.env.SMTP_PORT || '2525', 10);
-  const isSecure = port === 465;
-
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: port,
-    secure: isSecure,
-    auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-    },
-  });
-};
-
 /**
- * Core sendMail function for reusability across the entire project
+ * Core sendMail function for reusability across the entire project using SendGrid API
  */
 export const sendMail = async (options: {
   to: string;
@@ -27,21 +10,48 @@ export const sendMail = async (options: {
   html: string;
 }): Promise<void> => {
   try {
-    const transporter = createTransporter();
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@lifelink.org';
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) {
+      throw new Error('SENDGRID_API_KEY environment variable is not defined.');
+    }
 
-    const mailOptions = {
-      from: `"LifeLink Network" <${fromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    };
+    const fromEmail = process.env.EMAIL_FROM || 'lifelinkai4@gmail.com';
 
-    const info = await transporter.sendMail(mailOptions);
-    logger.info(`📧 Email successfully sent to ${options.to}. Message ID: ${info.messageId}`);
+    // Send HTTP POST request to SendGrid API
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [
+          {
+            to: [{ email: options.to }],
+          },
+        ],
+        from: { 
+          email: fromEmail.trim(), 
+          name: 'LifeLink Network' 
+        },
+        subject: options.subject,
+        content: [
+          {
+            type: 'text/html',
+            value: options.html,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`SendGrid API error (${response.status}): ${errorText}`);
+    }
+
+    logger.info(`📧 Email successfully sent to ${options.to} via SendGrid API`);
   } catch (error: any) {
-    logger.error(`❌ Failed to send email to ${options.to}: ${error.message}`);
+    logger.error(`❌ Failed to send email to ${options.to} via SendGrid: ${error.message}`);
     throw error;
   }
 };
