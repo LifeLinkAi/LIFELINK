@@ -14,16 +14,28 @@ export const getCampaigns = async (req: AuthRequest, res: Response, next: NextFu
 
 export const createCampaign = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { title, type, status, hospital, startDate, endDate, bloodGroups, donorsTarget, description, imageUrl } = req.body;
+    const { 
+      title, type, status, hospital, startDate, endDate, 
+      bloodGroups, donorsTarget, description, imageUrl,
+      venueType, venueName, venueAddress 
+    } = req.body;
+
     if (!title || !startDate || !endDate) {
       return next(new ApiError(400, 'Title, start date, and end date are required fields.'));
     }
+
+    const vType = venueType || 'HOSPITAL';
+    const vName = vType === 'HOSPITAL' ? (venueName || hospital || 'Metro General Hospital') : (venueName || '');
+    const vAddress = vType === 'HOSPITAL' ? (venueAddress || 'Main Campus Address') : (venueAddress || '');
 
     const campaign = new Campaign({
       title,
       type,
       status: status || 'DRAFT',
       hospital: hospital || 'Metro General Hospital',
+      venueType: vType,
+      venueName: vName,
+      venueAddress: vAddress,
       startDate,
       endDate,
       bloodGroups: bloodGroups || ['ANY'],

@@ -20,6 +20,9 @@ interface Campaign {
   engagement: number;
   imageUrl: string;
   description?: string;
+  venueType?: 'HOSPITAL' | 'SCHOOL' | 'PUBLIC_PLACE' | 'OFFICE' | 'COMMUNITY_CENTER';
+  venueName?: string;
+  venueAddress?: string;
 }
 
 // Activity interface for timeline
@@ -65,7 +68,10 @@ export default function CampaignsPage() {
     endDate: '',
     description: '',
     targetDonors: 150,
-    bloodGroups: ['ANY']
+    bloodGroups: ['ANY'],
+    venueType: 'HOSPITAL' as 'HOSPITAL' | 'SCHOOL' | 'PUBLIC_PLACE' | 'OFFICE' | 'COMMUNITY_CENTER',
+    venueName: '',
+    venueAddress: ''
   });
 
   const showToast = (message: string) => {
@@ -95,6 +101,9 @@ export default function CampaignsPage() {
         engagement: c.engagement || 0,
         imageUrl: c.imageUrl || 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600',
         description: c.description || '',
+        venueType: c.venueType || 'HOSPITAL',
+        venueName: c.venueName || c.hospital || '',
+        venueAddress: c.venueAddress || '',
       }));
       setCampaigns(mapped);
     } catch (error) {
@@ -162,7 +171,10 @@ export default function CampaignsPage() {
         title: newCampaign.title,
         type: typeMapping[newCampaign.type] || 'ROUTINE DRIVE',
         status: campaignStatus,
-        hospital: newCampaign.hospital,
+        hospital: newCampaign.venueType === 'HOSPITAL' ? newCampaign.hospital : 'Mobile Unit Drive',
+        venueType: newCampaign.venueType,
+        venueName: newCampaign.venueType === 'HOSPITAL' ? newCampaign.hospital : newCampaign.venueName,
+        venueAddress: newCampaign.venueType === 'HOSPITAL' ? 'Hospital Campus Address' : newCampaign.venueAddress,
         startDate: newCampaign.startDate,
         endDate: newCampaign.endDate,
         bloodGroups: newCampaign.bloodGroups,
@@ -180,6 +192,9 @@ export default function CampaignsPage() {
         type: res.data.type,
         status: res.data.status,
         hospital: res.data.hospital,
+        venueType: res.data.venueType || 'HOSPITAL',
+        venueName: res.data.venueName || res.data.hospital || '',
+        venueAddress: res.data.venueAddress || '',
         startDate: res.data.startDate ? res.data.startDate.split('T')[0] : '',
         endDate: res.data.endDate ? res.data.endDate.split('T')[0] : '',
         bloodGroups: res.data.bloodGroups,
@@ -203,7 +218,10 @@ export default function CampaignsPage() {
         endDate: '',
         description: '',
         targetDonors: 150,
-        bloodGroups: ['ANY']
+        bloodGroups: ['ANY'],
+        venueType: 'HOSPITAL' as 'HOSPITAL' | 'SCHOOL' | 'PUBLIC_PLACE' | 'OFFICE' | 'COMMUNITY_CENTER',
+        venueName: '',
+        venueAddress: ''
       });
       showToast('🎉 Campaign successfully created and launched live!');
     } catch (error) {
@@ -582,7 +600,7 @@ export default function CampaignsPage() {
                 <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
                   <div className="text-white">
                     <div className="flex items-center gap-1 font-body-sm text-body-sm mb-1 opacity-90 text-xs">
-                      <span className="material-symbols-outlined text-[16px] text-white/80">location_on</span> {camp.hospital}
+                      <span className="material-symbols-outlined text-[16px] text-white/80">location_on</span> {camp.venueName || camp.hospital}
                     </div>
                   </div>
                 </div>
@@ -682,7 +700,7 @@ export default function CampaignsPage() {
                     <div className="text-xs text-outline mt-0.5">ID: #0{camp.id}</div>
                   </td>
                   <td className="p-4 text-xs font-semibold text-on-surface-variant">
-                    {camp.hospital}
+                    {camp.venueName || camp.hospital}
                   </td>
                   <td className="p-4">
                     <span className="text-[10px] font-bold font-label-caps px-2 py-0.5 bg-surface-container-highest text-primary rounded">
@@ -909,8 +927,18 @@ export default function CampaignsPage() {
                     <div className="bg-[#F4F7F0] p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-2 text-sm text-on-surface">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-primary">local_hospital</span>
-                        <span className="font-semibold">{selectedCampaign.hospital}</span>
+                        <span className="font-semibold">Organized by: {selectedCampaign.hospital}</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-primary">pin_drop</span>
+                        <span className="font-semibold">Venue: {selectedCampaign.venueName || selectedCampaign.hospital}</span>
+                      </div>
+                      {selectedCampaign.venueAddress && (
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[18px] text-primary">map</span>
+                          <span>{selectedCampaign.venueAddress}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px] text-primary">calendar_month</span>
                         <span>
@@ -1150,6 +1178,23 @@ export default function CampaignsPage() {
                       </select>
                     </div>
                     <div>
+                      <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2 text-xs font-bold">Venue Type</label>
+                      <select 
+                        value={newCampaign.venueType}
+                        onChange={(e) => setNewCampaign(prev => ({ ...prev, venueType: e.target.value as any }))}
+                        className="w-full px-4 py-3 rounded-lg border border-outline-variant bg-white focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-body-md text-on-surface shadow-sm"
+                      >
+                        <option value="HOSPITAL">Hospital Facility</option>
+                        <option value="SCHOOL">School / College</option>
+                        <option value="PUBLIC_PLACE">Public Place / Park</option>
+                        <option value="OFFICE">Corporate Office</option>
+                        <option value="COMMUNITY_CENTER">Community Center</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {newCampaign.venueType === 'HOSPITAL' ? (
+                    <div>
                       <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2 text-xs font-bold">Target Hospital / Bank</label>
                       <select 
                         value={newCampaign.hospital}
@@ -1162,7 +1207,32 @@ export default function CampaignsPage() {
                         <option>County Trauma Center</option>
                       </select>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2 text-xs font-bold">Venue Place Name *</label>
+                        <input 
+                          required
+                          type="text"
+                          value={newCampaign.venueName}
+                          onChange={(e) => setNewCampaign(prev => ({ ...prev, venueName: e.target.value }))}
+                          placeholder="e.g. Greenwood High School Gym"
+                          className="w-full px-4 py-3 rounded-lg border border-outline-variant bg-white focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-body-md text-on-surface shadow-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2 text-xs font-bold">Venue Address *</label>
+                        <input 
+                          required
+                          type="text"
+                          value={newCampaign.venueAddress}
+                          onChange={(e) => setNewCampaign(prev => ({ ...prev, venueAddress: e.target.value }))}
+                          placeholder="e.g. 101 High School Rd, Sector 4"
+                          className="w-full px-4 py-3 rounded-lg border border-outline-variant bg-white focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-body-md text-on-surface shadow-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2 text-xs font-bold">Description</label>
