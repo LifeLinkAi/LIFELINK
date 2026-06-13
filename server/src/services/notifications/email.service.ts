@@ -1,5 +1,4 @@
 import { logger } from '../../utils/logger';
-
 /**
  * Core sendMail function for reusability across the entire project using SendGrid API
  */
