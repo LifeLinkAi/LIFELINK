@@ -167,9 +167,6 @@ export const getMyRegistrations = async (req: AuthRequest, res: Response, next: 
 export const getCampaignRegistrationDetail = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { regId } = req.params;
-    if (!req.user || (req.user.role !== 'Admin' && req.user.role !== 'Hospital')) {
-      return next(new ApiError(403, 'Access denied. Staff verification credentials required.'));
-    }
 
     const registration = await CampaignRegistration.findById(regId)
       .populate('campaignId')
@@ -206,10 +203,6 @@ export const verifyDonation = async (req: AuthRequest, res: Response, next: Next
   try {
     const { regId } = req.params;
     const { status, donationUnits, staffNotes } = req.body;
-
-    if (!req.user || (req.user.role !== 'Admin' && req.user.role !== 'Hospital')) {
-      return next(new ApiError(403, 'Access denied. Staff verification credentials required.'));
-    }
 
     if (!status || !['ATTENDED', 'ABSENT', 'DEFERRED'].includes(status)) {
       return next(new ApiError(400, 'Invalid status selection.'));

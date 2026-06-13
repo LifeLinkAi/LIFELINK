@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import { toast } from "react-hot-toast";
-import AuthGuard from "@/components/shared/AuthGuard";
 
 interface Campaign {
   _id: string;
@@ -318,14 +317,12 @@ function VerificationContent() {
 
 export default function QRDonorVerification() {
   return (
-    <AuthGuard allowedRoles={["Admin", "Hospital"]}>
-      <Suspense fallback={
-        <div className="flex h-screen w-screen items-center justify-center bg-neutral-50">
-          <div className="w-10 h-10 border-4 border-[#3b5e2b] border-t-transparent rounded-full animate-spin" />
-        </div>
-      }>
-        <VerificationContent />
-      </Suspense>
-    </AuthGuard>
+    <Suspense fallback={
+      <div className="flex h-screen w-screen items-center justify-center bg-neutral-50">
+        <div className="w-10 h-10 border-4 border-[#3b5e2b] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <VerificationContent />
+    </Suspense>
   );
 }
