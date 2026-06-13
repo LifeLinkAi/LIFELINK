@@ -2,17 +2,27 @@ import nodemailer from 'nodemailer';
 import { logger } from '../../utils/logger';
 
 // Create a transporter using SMTP settings from server .env config
-const createTransporter = () => {
-  const port = parseInt(process.env.SMTP_PORT || '2525', 10);
-  const isSecure = port === 465;
+// const createTransporter = () => {
+//   const port = parseInt(process.env.SMTP_PORT || '2525', 10);
+//   const isSecure = port === 465;
 
+//   return nodemailer.createTransport({
+//     host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
+//     port: port,
+//     secure: isSecure,
+//     auth: {
+//       user: process.env.SMTP_USER || '',
+//       pass: process.env.SMTP_PASS || '',
+//     },
+//   });
+// };
+// Create a transporter using Nodemailer's built-in Gmail configuration
+const createTransporter = () => {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: port,
-    secure: isSecure,
+    service: 'gmail', // This automatically configures the correct host, port, and secure flags for Google
     auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS, 
     },
   });
 };
