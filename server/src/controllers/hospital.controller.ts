@@ -100,9 +100,11 @@ export const createHospital = async (req: AuthRequest, res: Response, next: Next
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
-    sendHospitalInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+    try {
+      await sendHospitalInviteEmail(emailLower, name, inviteUrl);
+    } catch (err) {
       console.error(`Error sending hospital invite email to ${emailLower}:`, err);
-    });
+    }
 
     res.status(201).json({
       id: user._id.toString(),
@@ -551,9 +553,11 @@ export const bulkInviteHospitals = async (req: AuthRequest, res: Response, next:
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
-      sendHospitalInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+      try {
+        await sendHospitalInviteEmail(emailLower, name, inviteUrl);
+      } catch (err: any) {
         console.error(`Error sending bulk hospital invite email to ${emailLower}:`, err);
-      });
+      }
 
       invited.push({ id: user._id.toString(), name, email: emailLower });
     }

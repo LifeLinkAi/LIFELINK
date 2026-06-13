@@ -95,9 +95,11 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
     
-    sendDonorInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+    try {
+      await sendDonorInviteEmail(emailLower, name, inviteUrl);
+    } catch (err) {
       console.error(`Error sending invite email to ${emailLower}:`, err);
-    });
+    }
 
     res.status(201).json({
       id: user._id.toString(),
@@ -393,9 +395,11 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
-      sendDonorInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+      try {
+        await sendDonorInviteEmail(emailLower, name, inviteUrl);
+      } catch (err: any) {
         logger.error(`Error sending bulk invite email to ${emailLower}: ${err.message}`);
-      });
+      }
 
       invited.push({ id: user._id.toString(), name, email: emailLower });
     }
