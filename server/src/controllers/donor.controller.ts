@@ -1,9 +1,7 @@
 import { Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-// pdf-parse v1.1.1 — exports a plain function via CJS require
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
+
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
@@ -573,15 +571,17 @@ export const uploadCertificate = async (
     logger.info(`Processing certificate upload: ${uniqueFilename} for donor ${req.user.id}`);
 
     // Parse PDF from buffer
-    let pdfData: { text: string; numpages: number };
+    let rawText = '';
     try {
-      pdfData = await pdfParse(req.file.buffer);
+      const { getDocumentProxy, extractText } = await import('unpdf');
+      const pdf = await getDocumentProxy(new Uint8Array(req.file.buffer));
+      const result = await extractText(pdf, { mergePages: true });
+      rawText = result.text || '';
     } catch (parseErr: any) {
       logger.error(`PDF parse error for ${uniqueFilename}: ${parseErr.message}`);
       return next(new ApiError(422, 'Unable to read the PDF. The file may be corrupted or password-protected.'));
     }
 
-    const rawText = pdfData.text || '';
     if (!rawText.trim()) {
       logger.warn(`PDF ${uniqueFilename} contained no extractable text.`);
       return next(new ApiError(422, 'The PDF contains no readable text. Please upload a text-based (non-scanned) PDF.'));
