@@ -42,20 +42,29 @@ export default function DonorCampaigns() {
   const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [filter, setFilter] = useState<"ALL" | "MY_REGISTRATIONS">("ALL");
+  const [donorBloodType, setDonorBloodType] = useState<string | null>(null);
 
   const eligibility = useDonorEligibility();
   const hasRecord = !!(eligibility.lastDonation && eligibility.lastDonation !== "N/A");
   const isBlocked = hasRecord && !eligibility.isEligible;
 
+  const getVerificationUrl = (regId: string) => {
+    return `https://lifelink-client-coral.vercel.app/qr-donor-verification?regId=${regId}`;
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [campRes, regRes] = await Promise.all([
+      const [campRes, regRes, donorRes] = await Promise.all([
         api.get("/campaigns"),
         api.get("/campaigns/my-registrations"),
+        api.get("/donors/me").catch(() => null)
       ]);
       setCampaigns(campRes.data || []);
       setRegistrations(regRes.data?.data || []);
+      if (donorRes && donorRes.data) {
+        setDonorBloodType(donorRes.data.bloodType || null);
+      }
     } catch (error) {
       console.error("Error fetching campaigns data:", error);
       toast.error("Failed to load campaigns.");
@@ -148,7 +157,21 @@ export default function DonorCampaigns() {
     }
   };
 
-  const visibleCampaigns = campaigns.filter((c) => c.status === "ACTIVE" || c.status === "UPCOMING");
+  const visibleCampaigns = campaigns.filter((c) => {
+    const isStatusActiveOrUpcoming = c.status === "ACTIVE" || c.status === "UPCOMING";
+    if (!isStatusActiveOrUpcoming) return false;
+
+    // If we don't have donor's blood type yet, don't filter out
+    if (!donorBloodType) return true;
+
+    // If campaign allows any/all, or has no restrictions, show it
+    if (!c.bloodGroups || c.bloodGroups.length === 0) return true;
+    const hasAny = c.bloodGroups.some(g => g.toUpperCase() === "ANY" || g.toUpperCase() === "ALL");
+    if (hasAny) return true;
+
+    // Check case-insensitive match
+    return c.bloodGroups.some(g => g.trim().toUpperCase() === donorBloodType.trim().toUpperCase());
+  });
   const filteredCampaigns = filter === "ALL" 
     ? visibleCampaigns 
     : visibleCampaigns.filter((c) => getRegistrationForCampaign(c._id) !== undefined);
@@ -266,8 +289,12 @@ export default function DonorCampaigns() {
                     </span>
                     
                     {reg && (
-                      <span className="bg-[#3b5e2b] text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm">
-                        Registered
+                      <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm ${
+                        reg.status === "ATTENDED"
+                          ? "bg-[#eef4e2] text-[#3b5e2b] border border-[#d2e4c0]"
+                          : "bg-[#3b5e2b] text-white"
+                      }`}>
+                        {reg.status === "ATTENDED" ? "Donated" : "Registered"}
                       </span>
                     )}
                   </div>
@@ -336,34 +363,43 @@ export default function DonorCampaigns() {
                   {/* Actions */}
                   <div className="mt-6 pt-4 border-t border-gray-50 flex gap-2" onClick={(e) => e.stopPropagation()}>
                     {reg ? (
-                      <>
-                        <button
-                          onClick={() => setSelectedReg(reg)}
-                          className="flex-grow bg-[#3b5e2b] text-white py-3 px-4 rounded-xl font-syne font-bold text-xs uppercase tracking-wider hover:bg-[#2d4721] transition-all shadow-sm flex items-center justify-center gap-1.5"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <path d="M12 7v10" />
-                            <path d="M8 12h8" />
+                      reg.status === "ATTENDED" ? (
+                        <div className="w-full bg-[#eef4e2] text-[#3b5e2b] py-3.5 px-4 rounded-xl font-syne font-bold text-xs uppercase tracking-wider text-center flex items-center justify-center gap-1.5 border border-[#d2e4c0] cursor-default select-none shadow-inner">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12" />
                           </svg>
-                          View QR Ticket
-                        </button>
-                        <button
-                          onClick={() => handleCancel(camp._id)}
-                          disabled={submittingId === camp._id}
-                          className="border border-red-200 text-red-500 hover:bg-red-50 p-3 rounded-xl transition-all flex items-center justify-center"
-                          title="Cancel Registration"
-                        >
-                          {submittingId === camp._id ? (
-                            <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          Donated
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setSelectedReg(reg)}
+                            className="flex-grow bg-[#3b5e2b] text-white py-3 px-4 rounded-xl font-syne font-bold text-xs uppercase tracking-wider hover:bg-[#2d4721] transition-all shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <path d="M12 7v10" />
+                              <path d="M8 12h8" />
                             </svg>
-                          )}
-                        </button>
-                      </>
+                            View QR Ticket
+                          </button>
+                          <button
+                            onClick={() => handleCancel(camp._id)}
+                            disabled={submittingId === camp._id}
+                            className="border border-red-200 text-red-500 hover:bg-red-50 p-3 rounded-xl transition-all flex items-center justify-center"
+                            title="Cancel Registration"
+                          >
+                            {submittingId === camp._id ? (
+                              <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                            )}
+                          </button>
+                        </>
+                      )
                     ) : (
                       <button
                         onClick={() => handleRegister(camp._id)}
@@ -554,39 +590,48 @@ export default function DonorCampaigns() {
             {/* Sticky Actions Footer */}
             <div className="p-6 border-t border-neutral-100 bg-neutral-50/50 flex flex-col gap-2 shrink-0">
               {getRegistrationForCampaign(selectedCampaign._id) ? (
-                <>
-                  <button
-                    onClick={() => {
-                      const reg = getRegistrationForCampaign(selectedCampaign._id);
-                      if (reg) setSelectedReg(reg);
-                    }}
-                    className="w-full bg-[#3b5e2b] text-white py-4 rounded-2xl font-syne font-bold text-xs uppercase tracking-widest hover:bg-[#2d4721] transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M12 7v10" />
-                      <path d="M8 12h8" />
+                getRegistrationForCampaign(selectedCampaign._id)?.status === "ATTENDED" ? (
+                  <div className="w-full bg-[#eef4e2] text-[#3b5e2b] py-4 rounded-2xl font-syne font-bold text-xs uppercase tracking-widest text-center flex items-center justify-center gap-2 border border-[#d2e4c0] cursor-default select-none shadow-inner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
-                    View QR Entry Pass
-                  </button>
-                  <button
-                    onClick={() => handleCancel(selectedCampaign._id)}
-                    disabled={submittingId === selectedCampaign._id}
-                    className="w-full border border-red-200 text-red-500 py-3.5 rounded-2xl font-syne font-bold text-xs uppercase tracking-wider hover:bg-red-50/50 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    {submittingId === selectedCampaign._id ? (
-                      <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                        </svg>
-                        Cancel Drive Registration
-                      </>
-                    )}
-                  </button>
-                </>
+                    Donated
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        const reg = getRegistrationForCampaign(selectedCampaign._id);
+                        if (reg) setSelectedReg(reg);
+                      }}
+                      className="w-full bg-[#3b5e2b] text-white py-4 rounded-2xl font-syne font-bold text-xs uppercase tracking-widest hover:bg-[#2d4721] transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M12 7v10" />
+                        <path d="M8 12h8" />
+                      </svg>
+                      View QR Entry Pass
+                    </button>
+                    <button
+                      onClick={() => handleCancel(selectedCampaign._id)}
+                      disabled={submittingId === selectedCampaign._id}
+                      className="w-full border border-red-200 text-red-500 py-3.5 rounded-2xl font-syne font-bold text-xs uppercase tracking-wider hover:bg-red-50/50 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {submittingId === selectedCampaign._id ? (
+                        <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                          </svg>
+                          Cancel Drive Registration
+                        </>
+                      )}
+                    </button>
+                  </>
+                )
               ) : (
                 <button
                   onClick={() => handleRegister(selectedCampaign._id)}
@@ -673,7 +718,7 @@ export default function DonorCampaigns() {
                 <div className="bg-white p-2.5 rounded-xl border border-neutral-100 mb-2.5 shadow-sm">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      `https://lifelink-client-coral.vercel.app/qr-donor-verification?regId=${selectedReg._id}`
+                      getVerificationUrl(selectedReg._id)
                     )}`}
                     alt="Donor QR Ticket"
                     className="w-36 h-36 object-contain"
@@ -728,7 +773,7 @@ export default function DonorCampaigns() {
               {/* Manual URL link copy button */}
               <button
                 onClick={() => {
-                  const url = `https://lifelink-client-coral.vercel.app/qr-donor-verification?regId=${selectedReg._id}`;
+                  const url = getVerificationUrl(selectedReg._id);
                   navigator.clipboard.writeText(url);
                   toast.success("Verification Link copied to clipboard!");
                 }}

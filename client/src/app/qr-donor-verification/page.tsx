@@ -179,6 +179,175 @@ function VerificationContent() {
             </button>
           </form>
         </div>
+      ) : registration.status !== "REGISTERED" ? (
+        /* Verification success / completion screen */
+        <div className="space-y-6 animate-fade-in">
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes checkmark-circle-draw {
+              100% {
+                stroke-dashoffset: 0;
+              }
+            }
+            @keyframes checkmark-draw {
+              100% {
+                stroke-dashoffset: 0;
+              }
+            }
+            @keyframes scale-up {
+              0%, 100% {
+                transform: none;
+              }
+              50% {
+                transform: scale3d(1.08, 1.08, 1);
+              }
+            }
+            @keyframes fill-success {
+              100% {
+                box-shadow: inset 0px 0px 0px 40px #3b5e2b;
+              }
+            }
+            @keyframes fill-error {
+              100% {
+                box-shadow: inset 0px 0px 0px 40px #ba1a1a;
+              }
+            }
+            @keyframes fill-warning {
+              100% {
+                box-shadow: inset 0px 0px 0px 40px #ea580c;
+              }
+            }
+            .animate-checkmark-circle {
+              stroke-dasharray: 166;
+              stroke-dashoffset: 166;
+              stroke-width: 3;
+              stroke-miterlimit: 10;
+              fill: none;
+              animation: checkmark-circle-draw 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+            }
+            .animate-checkmark-box-success {
+              width: 80px;
+              height: 80px;
+              border-radius: 50%;
+              display: block;
+              stroke-width: 3;
+              stroke: #fff;
+              stroke-miterlimit: 10;
+              box-shadow: inset 0px 0px 0px #3b5e2b;
+              animation: fill-success .4s ease-in-out .4s forwards, scale-up .3s ease-in-out .9s;
+            }
+            .animate-checkmark-box-error {
+              width: 80px;
+              height: 80px;
+              border-radius: 50%;
+              display: block;
+              stroke-width: 3;
+              stroke: #fff;
+              stroke-miterlimit: 10;
+              box-shadow: inset 0px 0px 0px #ba1a1a;
+              animation: fill-error .4s ease-in-out .4s forwards, scale-up .3s ease-in-out .9s;
+            }
+            .animate-checkmark-box-warning {
+              width: 80px;
+              height: 80px;
+              border-radius: 50%;
+              display: block;
+              stroke-width: 3;
+              stroke: #fff;
+              stroke-miterlimit: 10;
+              box-shadow: inset 0px 0px 0px #ea580c;
+              animation: fill-warning .4s ease-in-out .4s forwards, scale-up .3s ease-in-out .9s;
+            }
+            .animate-checkmark-tick {
+              transform-origin: 50% 50%;
+              stroke-dasharray: 48;
+              stroke-dashoffset: 48;
+              animation: checkmark-draw 0.35s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+            }
+          `}} />
+
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-8 text-center shadow-lg flex flex-col items-center justify-center relative overflow-hidden">
+            {/* Status-specific animated icon */}
+            <div className="mb-4">
+              {registration.status === "ATTENDED" ? (
+                <svg className="animate-checkmark-box-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" width="80" height="80">
+                  <circle className="animate-checkmark-circle" style={{ stroke: "#3b5e2b" }} cx="26" cy="26" r="25" />
+                  <path className="animate-checkmark-tick" fill="none" strokeWidth="3" stroke="#fff" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                </svg>
+              ) : registration.status === "ABSENT" ? (
+                <svg className="animate-checkmark-box-error" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" width="80" height="80">
+                  <circle className="animate-checkmark-circle" style={{ stroke: "#ba1a1a" }} cx="26" cy="26" r="25" />
+                  <path className="animate-checkmark-tick" fill="none" strokeWidth="3" stroke="#fff" d="M16 16l20 20M36 16L16 36" />
+                </svg>
+              ) : (
+                <svg className="animate-checkmark-box-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" width="80" height="80">
+                  <circle className="animate-checkmark-circle" style={{ stroke: "#ea580c" }} cx="26" cy="26" r="25" />
+                  <path className="animate-checkmark-tick" fill="none" strokeWidth="4" stroke="#fff" d="M26 13v16M26 37h.01" />
+                </svg>
+              )}
+            </div>
+
+            <h2 className="font-syne font-bold text-2xl text-gray-900 mt-2">
+              {registration.status === "ATTENDED" 
+                ? "Already Donated" 
+                : registration.status === "ABSENT" 
+                ? "Check-In: Absent" 
+                : "Check-In: Deferred"}
+            </h2>
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-black mt-1">
+              Verification Record Stored
+            </p>
+
+            {/* Ticket & Donor Info */}
+            <div className="w-full mt-6 text-left border-t border-neutral-100 pt-5 space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Donor</span>
+                <p className="text-sm font-bold text-gray-800">{registration.donorId.name}</p>
+                <p className="text-xs text-gray-500 font-mono">{registration.donorId.email}</p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Campaign Drive</span>
+                <p className="text-sm font-bold text-gray-800">{registration.campaignId.title}</p>
+                <p className="text-xs text-gray-500">{registration.campaignId.venueName}</p>
+              </div>
+
+              {registration.status === "ATTENDED" && (
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Blood Units Collected</span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#eef4e2] text-[#3b5e2b] border border-[#d2e4c0] rounded-lg font-bold text-xs uppercase tracking-wider mt-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                    {registration.donationUnits || 1} Unit (~{Math.round((registration.donationUnits || 1) * 450)}ml)
+                  </span>
+                </div>
+              )}
+
+              {registration.staffNotes && (
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Staff Notes</span>
+                  <p className="text-xs text-gray-600 bg-neutral-50 p-3 rounded-xl border border-neutral-100 italic mt-1 leading-relaxed">
+                    &ldquo;{registration.staffNotes}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Action */}
+            <div className="w-full mt-6 pt-4 border-t border-neutral-100">
+              <button
+                onClick={() => {
+                  router.push("/qr-donor-verification");
+                  setRegistration(null);
+                  setManualId("");
+                }}
+                className="w-full bg-neutral-900 hover:bg-black text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest shadow-md transition-colors"
+              >
+                Scan Another Ticket
+              </button>
+            </div>
+          </div>
+        </div>
       ) : (
         /* Verification details screen */
         <div className="space-y-6">
@@ -290,7 +459,11 @@ function VerificationContent() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => router.push("/qr-donor-verification")}
+                  onClick={() => {
+                    router.push("/qr-donor-verification");
+                    setRegistration(null);
+                    setManualId("");
+                  }}
                   className="flex-1 border border-neutral-200 text-gray-600 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-50 transition-colors"
                 >
                   Cancel
