@@ -19,8 +19,21 @@ const campaignSchema = new Schema(
     },
     hospital: {
       type: String,
-      required: true,
       trim: true,
+    },
+    venueType: {
+      type: String,
+      enum: ['HOSPITAL', 'SCHOOL', 'PUBLIC_PLACE', 'OFFICE', 'COMMUNITY_CENTER'],
+      default: 'HOSPITAL',
+    },
+    venueName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    venueAddress: {
+      type: String,
+      default: '',
     },
     startDate: {
       type: Date,
