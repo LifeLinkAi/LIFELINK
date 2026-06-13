@@ -59,6 +59,12 @@ export default function CampaignsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [detailsTab, setDetailsTab] = useState<'OVERVIEW' | 'DONORS' | 'PERFORMANCE'>('OVERVIEW');
 
+  // Real registrations states
+  const [actualRegistrations, setActualRegistrations] = useState<any[]>([]);
+  const [loadingRegistrations, setLoadingRegistrations] = useState(false);
+  const [editingRegId, setEditingRegId] = useState<string | null>(null);
+  const [verifyForm, setVerifyForm] = useState({ status: 'ATTENDED', donationUnits: 1, staffNotes: '' });
+
   // Form Fields State
   const [newCampaign, setNewCampaign] = useState({
     title: '',
@@ -114,9 +120,49 @@ export default function CampaignsPage() {
     }
   };
 
+  const fetchRegistrations = async (campaignId: string) => {
+    try {
+      setLoadingRegistrations(true);
+      const res = await api.get(`/campaigns/${campaignId}/registrations`);
+      setActualRegistrations(res.data?.data || []);
+    } catch (error) {
+      console.error('Error fetching campaign registrations:', error);
+      showToast('❌ Failed to fetch campaign registration list.');
+    } finally {
+      setLoadingRegistrations(false);
+    }
+  };
+
   useEffect(() => {
     fetchCampaigns();
   }, []);
+
+  useEffect(() => {
+    if (selectedCampaign) {
+      fetchRegistrations(selectedCampaign.id);
+    } else {
+      setActualRegistrations([]);
+    }
+    setEditingRegId(null);
+  }, [selectedCampaign]);
+
+  const handleVerifyRegistration = async (regId: string, status: string, donationUnits: number, staffNotes: string = '') => {
+    try {
+      await api.put(`/campaigns/registration/${regId}/verify`, {
+        status,
+        donationUnits,
+        staffNotes
+      });
+      showToast('✅ Donor check-in verified successfully!');
+      setEditingRegId(null);
+      if (selectedCampaign) {
+        await fetchRegistrations(selectedCampaign.id);
+        await fetchCampaigns();
+      }
+    } catch (error: any) {
+      showToast(error.response?.data?.message || '❌ Failed to verify donor check-in.');
+    }
+  };
 
   // 2. Computed Stats based on Current Data
   const stats = useMemo(() => {
@@ -986,35 +1032,147 @@ export default function CampaignsPage() {
                 <div className="space-y-4">
                   <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold text-base mb-2">Registered Donors</h4>
                   
-                  {campaignDonors.length === 0 ? (
+                  {loadingRegistrations ? (
+                    <div className="flex justify-center p-8">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : actualRegistrations.length === 0 ? (
                     <div className="text-center p-8 text-on-surface-variant text-sm">No donors registered for this campaign yet.</div>
                   ) : (
-                    <div className="space-y-2">
-                      {campaignDonors.map((donor) => (
-                        <div key={donor.id} className="flex justify-between items-center p-3 border border-outline-variant/30 rounded-xl hover:bg-[#F4F7F0]/20 transition-all">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                              {donor.name.split(' ').map(n => n[0]).join('')}
+                    <div className="space-y-3">
+                      {actualRegistrations.map((reg) => {
+                        const donorName = reg.donorId?.name || 'Unknown Donor';
+                        const donorEmail = reg.donorId?.email || 'N/A';
+                        const isEditing = editingRegId === reg._id;
+
+                        return (
+                          <div 
+                            key={reg._id} 
+                            className="p-4 border border-outline-variant/30 rounded-xl bg-[#F4F7F0]/20 soft-shadow space-y-3 transition-all"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                                  {donorName.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-sm text-on-surface truncate">{donorName}</div>
+                                  <div className="text-xs text-outline font-medium truncate">{donorEmail}</div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  reg.status === 'ATTENDED' ? 'bg-[#DDE5D3] text-primary' :
+                                  reg.status === 'REGISTERED' ? 'bg-blue-100 text-blue-700' :
+                                  reg.status === 'ABSENT' ? 'bg-red-100 text-red-700' :
+                                  'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {reg.status}
+                                </span>
+
+                                {!isEditing && (
+                                  <button
+                                    onClick={() => {
+                                      setEditingRegId(reg._id);
+                                      setVerifyForm({
+                                        status: reg.status === 'REGISTERED' ? 'ATTENDED' : reg.status,
+                                        donationUnits: reg.donationUnits || 1,
+                                        staffNotes: reg.staffNotes || ''
+                                      });
+                                    }}
+                                    className="p-1 text-on-surface-variant hover:text-primary rounded-full hover:bg-surface-variant/50 transition-colors"
+                                    title="Edit check-in verification"
+                                  >
+                                    <span className="material-symbols-outlined text-[18px] block">edit</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-bold text-sm text-on-surface">{donor.name}</div>
-                              <div className="text-xs text-outline font-medium">Registered: {donor.registeredAt}</div>
-                            </div>
+
+                            {/* Attended Units summary & Staff Notes */}
+                            {!isEditing && (
+                              <div className="text-xs text-on-surface-variant space-y-1">
+                                {reg.status === 'ATTENDED' && (
+                                  <div className="flex items-center gap-1 font-semibold text-[#3b5e2b]">
+                                    <span className="material-symbols-outlined text-[16px]">bloodtype</span>
+                                    <span>{reg.donationUnits || 1} Unit(s) Donated</span>
+                                  </div>
+                                )}
+                                {reg.staffNotes && (
+                                  <div className="bg-white p-2 rounded border border-outline-variant/20 italic text-[11px] text-gray-500">
+                                    &ldquo;{reg.staffNotes}&rdquo;
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Editing Form Inline */}
+                            {isEditing && (
+                              <div className="bg-white p-3 rounded-lg border border-outline-variant/40 space-y-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
+                                  <select
+                                    value={verifyForm.status}
+                                    onChange={(e) => setVerifyForm(prev => ({ ...prev, status: e.target.value as any }))}
+                                    className="w-full bg-neutral-50 border border-neutral-200 p-2 rounded-lg text-xs font-bold text-gray-700 focus:outline-none focus:border-primary cursor-pointer"
+                                  >
+                                    <option value="ATTENDED">Attended &amp; Donated</option>
+                                    <option value="ABSENT">Absent (No Show)</option>
+                                    <option value="DEFERRED">Deferred (Medical/Temporary)</option>
+                                  </select>
+                                </div>
+
+                                {verifyForm.status === 'ATTENDED' && (
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Units Collected</label>
+                                    <select
+                                      value={verifyForm.donationUnits}
+                                      onChange={(e) => setVerifyForm(prev => ({ ...prev, donationUnits: Number(e.target.value) }))}
+                                      className="w-full bg-neutral-50 border border-neutral-200 p-2 rounded-lg text-xs font-bold text-gray-700 focus:outline-none focus:border-primary cursor-pointer"
+                                    >
+                                      <option value={1}>1 Unit (~450ml)</option>
+                                      <option value={2}>2 Units (~900ml)</option>
+                                    </select>
+                                  </div>
+                                )}
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Staff Notes</label>
+                                  <textarea
+                                    value={verifyForm.staffNotes}
+                                    onChange={(e) => setVerifyForm(prev => ({ ...prev, staffNotes: e.target.value }))}
+                                    placeholder="Observations or deferred reasons..."
+                                    className="w-full bg-neutral-50 border border-neutral-200 p-2 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-primary min-h-[50px] resize-none"
+                                  />
+                                </div>
+
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingRegId(null)}
+                                    className="px-3 py-1.5 border border-neutral-200 rounded text-[10px] font-bold uppercase hover:bg-neutral-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleVerifyRegistration(
+                                      reg._id,
+                                      verifyForm.status,
+                                      verifyForm.status === 'ATTENDED' ? verifyForm.donationUnits : 0,
+                                      verifyForm.staffNotes
+                                    )}
+                                    className="px-4 py-1.5 bg-primary text-white rounded text-[10px] font-bold uppercase hover:brightness-110 shadow-sm"
+                                  >
+                                    Save check-in
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="px-2 py-0.5 bg-surface-container-highest text-primary rounded font-bold text-[10px]">
-                              {donor.bloodGroup}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              donor.status === 'Donated' ? 'bg-secondary-fixed text-on-secondary-fixed' :
-                              donor.status === 'Confirmed' ? 'bg-tertiary-fixed text-on-tertiary-fixed' :
-                              'bg-surface-variant text-outline'
-                            }`}>
-                              {donor.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
