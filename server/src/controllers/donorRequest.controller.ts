@@ -23,7 +23,8 @@ export const getDonorRequests = async (req: AuthRequest, res: Response, next: Ne
     // Fetch this donor's profile
     const donorProfile = await DonorProfile.findOne({ userId: req.user.id });
     if (!donorProfile) {
-      return next(new ApiError(404, 'Donor profile not found.'));
+      res.status(200).json({ success: true, data: [] });
+      return;
     }
 
     // Filter requests where assignedDonorId === currentDonorId and status is Pending/Active
