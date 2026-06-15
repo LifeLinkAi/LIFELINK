@@ -321,7 +321,7 @@ export default function DonorVerificationPage() {
         if (!mounted) return;
         
         const mapped = data
-          .filter((r: any) => r.status === 'APPROVED' || r.status === 'IN_PROGRESS') // APPROVED means pending verification, IN_PROGRESS means verified
+          .filter((r: any) => r.status === 'PENDING_HOSPITAL' || r.status === 'APPROVED') // PENDING_HOSPITAL means pending verification, APPROVED means verified
           .map((r: any) => {
             const donorName = r.acceptedDonorId?.userId?.name || 'Unknown Donor';
             const initials = donorName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
@@ -334,7 +334,7 @@ export default function DonorVerificationPage() {
               bloodGroup: r.acceptedDonorId?.bloodType || r.bloodGroup || 'Unknown',
               donationType: r.type,
               organType: r.organType,
-              status: (r.status === 'APPROVED' ? 'PENDING' : 'APPROVED') as VerifStatus,
+              status: (r.status === 'PENDING_HOSPITAL' ? 'PENDING' : 'APPROVED') as VerifStatus,
               faceMatchScore: 92,
               submittedAt: new Date(r.updatedAt || r.createdAt || Date.now()).toLocaleTimeString(),
               documents: [
@@ -359,7 +359,7 @@ export default function DonorVerificationPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      await api.patch(`/requests/${id}/status`, { status: 'IN_PROGRESS' });
+      await api.patch(`/requests/${id}/status`, { status: 'APPROVED' });
       setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: 'APPROVED' as VerifStatus, flagged: false } : v));
       toast.success('Donor verified successfully.');
     } catch (err: any) {
