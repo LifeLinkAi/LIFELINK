@@ -92,6 +92,18 @@ const donorProfileSchema = new Schema(
   }
 );
 
+// Pre-save hook to ensure coordinates are always populated (prevents validation failures on legacy data)
+donorProfileSchema.pre('save', function (next) {
+  if (!this.location || !this.location.coordinates || this.location.coordinates.length === 0) {
+    this.location = {
+      type: 'Point',
+      coordinates: [0, 0]
+    };
+  }
+  next();
+});
+
+// CRITICAL: Tells MongoDB to create the geospatial index
 donorProfileSchema.index({ location: '2dsphere' });
 
 export const DONOR_ORGAN_OPTIONS = ORGAN_OPTIONS;
