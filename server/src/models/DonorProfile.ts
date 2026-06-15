@@ -44,6 +44,10 @@ const donorProfileSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    isEmergencyMode: {
+      type: Boolean,
+      default: false,
+    },
     phone: {
       type: String,
       default: '',

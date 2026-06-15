@@ -611,17 +611,13 @@ export const uploadCertificate = async (
     const uniqueFilename = `certificate_${Date.now()}_${uniqueSuffix}.pdf`;
     logger.info(`Processing certificate upload: ${uniqueFilename} for donor ${req.user.id}`);
 
-    // MERGED: Using lazy-required pdf-parse (donor branch, already installed).
-    // pdf-parse is lazy-required to avoid the known startup crash where the
-    // library accesses ./test/data/* at import time in ts-node-dev.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
-
+    // Parse PDF using unpdf — handles malformed XRef tables that crash pdf-parse
     let rawText = '';
-    let pdfData: { text: string; numpages: number };
     try {
-      pdfData = await pdfParse(req.file.buffer);
-      rawText = pdfData.text || '';
+      const { getDocumentProxy, extractText } = await import('unpdf');
+      const pdf = await getDocumentProxy(new Uint8Array(req.file.buffer));
+      const result = await extractText(pdf, { mergePages: true });
+      rawText = result.text || '';
     } catch (parseErr: any) {
       logger.error(`PDF parse error for ${uniqueFilename}: ${parseErr.message}`);
       return next(new ApiError(422, 'Unable to read the PDF. The file may be corrupted or password-protected.'));

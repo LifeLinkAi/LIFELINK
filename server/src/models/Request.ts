@@ -35,10 +35,19 @@ export interface IRequest extends Document {
   type: 'Organ' | 'Blood';
   matchedDonors: IMatchedDonor[];
   notifiedDonors: Schema.Types.ObjectId[];
+  assignedDonorId?: Schema.Types.ObjectId | null;
   acceptedDonorId?: Schema.Types.ObjectId | null;
   targetDonorId?: Schema.Types.ObjectId | null;
   hospitalId?: Schema.Types.ObjectId | null;
   timeline?: Array<{ event: string; timestamp: Date }>;
+  acceptedBy?: string | null;
+  acceptedAt?: Date | null;
+  donorId?: Schema.Types.ObjectId | null;
+  donorName?: string | null;
+  donorEmail?: string | null;
+  donorBloodType?: string | null;
+  rejectedBy: Schema.Types.ObjectId[];
+  rejectedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,12 +174,30 @@ const requestSchema = new Schema<IRequest>(
       ref: 'DonorProfile',
       default: [],
     },
+    assignedDonorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DonorProfile',
+      default: null,
+    },
     acceptedDonorId: {
       type: Schema.Types.ObjectId,
       ref: 'DonorProfile',
       default: null,
     },
     targetDonorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    acceptedBy: {
+      type: String,
+      default: null,
+    },
+    acceptedAt: {
+      type: Date,
+      default: null,
+    },
+    donorId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,
@@ -186,6 +213,27 @@ const requestSchema = new Schema<IRequest>(
         timestamp: { type: Date, default: Date.now }
       }],
       default: []
+    },
+    donorName: {
+      type: String,
+      default: null,
+    },
+    donorEmail: {
+      type: String,
+      default: null,
+    },
+    donorBloodType: {
+      type: String,
+      default: null,
+    },
+    rejectedBy: {
+      type: [Schema.Types.ObjectId],
+      ref: 'DonorProfile',
+      default: [],
+    },
+    rejectedAt: {
+      type: Date,
+      default: null,
     },
     location: {
       type: {

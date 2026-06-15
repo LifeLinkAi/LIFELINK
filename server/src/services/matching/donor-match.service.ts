@@ -148,3 +148,131 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
     throw error; // Re-throw so handler middleware captures it appropriately rather than masking failures
   }
 };
+
+/**
+ * Checks if the donor is eligible to donate (>= 56 days recovery period)
+ */
+export function isDonorEligible(lastDonation: string | undefined | null): boolean {
+  if (!lastDonation || lastDonation === 'N/A') return true;
+  const parseDate = (raw: string): Date | null => {
+    const wordMatch = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if (wordMatch) {
+      const d = new Date(`${wordMatch[2]} ${wordMatch[1]}, ${wordMatch[3]}`);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+    return null;
+  };
+  const donationDate = parseDate(lastDonation);
+  if (!donationDate) return true;
+  const now = new Date();
+  const donation = new Date(donationDate.getFullYear(), donationDate.getMonth(), donationDate.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysSince = Math.floor((today.getTime() - donation.getTime()) / msPerDay);
+  return daysSince >= 56;
+}
+
+/**
+ * Ranks all compatible, active, non-rejected donors using:
+ * - availability (isAvailable)
+ * - emergency mode (isEmergencyMode)
+ * - donation eligibility
+ * - distance
+ * - matching score
+ * Returns the single best DonorProfile document.
+ */
+export const findBestCompatibleDonorForRequest = async (request: any) => {
+  try {
+    const query: any = {
+      status: { $in: ['Available', 'Verified'] },
+      isSetupComplete: true,
+    };
+
+    // Exclude donors who have already rejected this request
+    if (request.rejectedBy && request.rejectedBy.length > 0) {
+      query._id = { $nin: request.rejectedBy };
+    }
+
+    if (request.type === 'Blood') {
+      if (request.bloodGroup) {
+        const compatibleTypes = getCompatibleBloodTypes(request.bloodGroup);
+        query.bloodType = { $in: compatibleTypes };
+      }
+    } else if (request.type === 'Organ') {
+      if (request.organType) {
+        query.organsWillingToDonate = request.organType;
+      }
+    }
+
+    const rawDonors = await DonorProfile.find(query).lean();
+    if (rawDonors.length === 0) return null;
+
+    const evaluatedDonors = rawDonors.map((donor: any) => {
+      // 1. Availability check (isAvailable: true)
+      const availScore = donor.isAvailable ? 1000 : 0;
+
+      // 2. Emergency mode check (isEmergencyMode: true)
+      const emergencyScore = donor.isEmergencyMode ? 500 : 0;
+
+      // 3. Eligibility check (>= 56 days)
+      const eligible = isDonorEligible(donor.lastDonation);
+      const eligibilityScore = eligible ? 10000 : 0;
+
+      // 4. Distance Calculation (Haversine, max 50km)
+      let proximityScore = 0;
+      let trueDistanceMeters = 999999;
+      if (
+        request.location &&
+        Array.isArray(request.location.coordinates) &&
+        request.location.coordinates.length === 2 &&
+        donor.coordinates &&
+        Array.isArray(donor.coordinates) &&
+        donor.coordinates.length === 2
+      ) {
+        const [reqLng, reqLat] = request.location.coordinates;
+        const [donorLng, donorLat] = donor.coordinates;
+        trueDistanceMeters = calculateHaversineDistance(reqLat, reqLng, donorLat, donorLng);
+        if (trueDistanceMeters <= 50000) {
+          proximityScore = 40 * (1 - trueDistanceMeters / 50000);
+        }
+      }
+
+      // 5. Urgency Score (urgency priority)
+      let urgencyScore = 5;
+      if (request.urgency === 'critical') urgencyScore = 35;
+      else if (request.urgency === 'high') urgencyScore = 25;
+      else if (request.urgency === 'medium') urgencyScore = 15;
+
+      // 6. Biological Matching / Compatibility Score
+      let compatibilityScore = 15;
+      if (request.type === 'Blood' && request.bloodGroup && donor.bloodType) {
+        if (donor.bloodType.toUpperCase() === request.bloodGroup.toUpperCase()) {
+          compatibilityScore = 25;
+        }
+      } else if (request.type === 'Organ') {
+        compatibilityScore = 25;
+      }
+
+      const matchPercentage = Math.min(Math.max(Math.round(proximityScore + urgencyScore + compatibilityScore), 0), 100);
+
+      // Compute total ranking score. We subtract distance to prioritize closer matches as tie-breaker
+      const score = availScore + emergencyScore + eligibilityScore + matchPercentage - (trueDistanceMeters / 1000);
+
+      return {
+        donor,
+        score,
+      };
+    });
+
+    // Sort descending by computed ranking score
+    evaluatedDonors.sort((a, b) => b.score - a.score);
+
+    // Return the top donor
+    return evaluatedDonors[0].donor;
+  } catch (error) {
+    logger.error('Error finding best compatible donor:', error);
+    return null;
+  }
+};
