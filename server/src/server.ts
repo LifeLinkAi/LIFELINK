@@ -49,7 +49,7 @@ const startServer = async (): Promise<void> => {
     const indexes = await rawCollection.listIndexes().toArray();
     for (const idx of indexes) {
       const has2dsphere = idx.key && Object.values(idx.key).includes('2dsphere');
-      if (has2dsphere && !idx.key.location) {
+      if (has2dsphere) {
         try {
           await rawCollection.dropIndex(idx.name as string);
           logger.info(`Startup: Dropped 2dsphere index "${idx.name}" from donorprofiles`);

@@ -12,15 +12,18 @@ const donorProfileSchema = new Schema(
     },
 
     // ── Location fields (donor branch) ───────────────────────────────────────
-    // `location` is a proper GeoJSON Point for geospatial query matching.
+    // `location` is a plain string (city/address) shown in the UI.
+    // `coordinates` is [longitude, latitude] stored only when the donor provides
+    // GPS or manual map coords. default:undefined prevents Mongoose from
+    // inserting [] which would fail any 2dsphere index.
     location: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], required: true } // [longitude, latitude]
-    },
-    address: {
       type: String,
       default: '',
       trim: true,
+    },
+    coordinates: {
+      type: [Number],
+      default: undefined, // keeps field absent on new documents — avoids geo-index errors
     },
 
     // ── Profile fields (both branches) ──────────────────────────────────────
@@ -88,7 +91,12 @@ const donorProfileSchema = new Schema(
   }
 );
 
-donorProfileSchema.index({ location: '2dsphere' });
+// NOTE: No 2dsphere index is registered here.
+// The startup migration in server.ts explicitly drops any stale 2dsphere indexes
+// (coordinates_2dsphere, location_2dsphere) from Atlas on every boot, so
+// adding one here would immediately re-create the problem.
+// Re-enable only after full GeoJSON migration is complete.
+// donorProfileSchema.index({ coordinates: '2dsphere' }, { sparse: true });
 
 export const DONOR_ORGAN_OPTIONS = ORGAN_OPTIONS;
 export const DonorProfile = model('DonorProfile', donorProfileSchema);

@@ -56,7 +56,7 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
 
     if (phone !== undefined)                 updateFields.phone = phone;
     if (bloodType !== undefined)             updateFields.bloodType = bloodType;
-    if (location !== undefined)              updateFields.address = location;
+    if (location !== undefined)              updateFields.location = location;
     if (details !== undefined)               updateFields.details = details;
     if (organsWillingToDonate !== undefined) updateFields.organsWillingToDonate = organsWillingToDonate;
     if (isAvailable !== undefined)           updateFields.isAvailable = Boolean(isAvailable);
@@ -65,12 +65,9 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
     // so the sparse 2dsphere index is not violated by null/empty values
     if (coordinates !== undefined) {
       if (hasValidCoords) {
-        updateFields.location = {
-          type: 'Point',
-          coordinates: coordinates
-        };
+        updateFields.coordinates = coordinates;
       } else {
-        unsetFields.location = '';
+        unsetFields.coordinates = '';
       }
     }
 
@@ -96,8 +93,8 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: (profile as any).address || '',
-      coordinates: (profile as any).location?.coordinates || [],
+      location: profile.location,
+      coordinates: profile.coordinates ?? [],
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
