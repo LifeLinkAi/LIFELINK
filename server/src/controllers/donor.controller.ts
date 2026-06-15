@@ -86,7 +86,6 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       { userId: user._id },
       {
         $set: {
-          location: '',
           bloodType: 'O-',
           tier: 'Bronze',
           status: 'Pending',
