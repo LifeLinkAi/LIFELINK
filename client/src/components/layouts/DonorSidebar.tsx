@@ -1,10 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { clearUser } from "@/features/auth/authSlice";
+import Cookies from "js-cookie";
+import api from "@/lib/axios";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const IcoDash  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>;
@@ -46,10 +48,20 @@ export function DonorSidebar({ isOpen, onClose }: DonorSidebarProps) {
   const pathname = usePathname();
   const router   = useRouter();
   const dispatch = useDispatch();
+  const [donorName, setDonorName]   = useState("Donor");
+  const [donorAvatar, setDonorAvatar] = useState("");
+
+  useEffect(() => {
+    api.get("/donors/me").then((res) => {
+      if (res.data?.name)   setDonorName(res.data.name);
+      if (res.data?.avatar) setDonorAvatar(res.data.avatar);
+    }).catch(() => {});
+  }, []);
 
   const handleSignOut = () => {
     dispatch(clearUser());
-    // Clear any persisted session tokens
+    // Clear all session tokens
+    Cookies.remove("ll_access_token");
     if (typeof window !== "undefined") {
       localStorage.removeItem("token");
       sessionStorage.clear();
@@ -82,14 +94,16 @@ export function DonorSidebar({ isOpen, onClose }: DonorSidebarProps) {
         <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 shrink-0 border border-gray-100">
-              <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100"
-                alt="Donor"
-                className="w-full h-full object-cover"
-              />
+              {donorAvatar ? (
+                <img src={donorAvatar} alt={donorName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#dcf594] flex items-center justify-center text-[#3b5e2b] text-sm font-bold">
+                  {donorName.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
             <div className="min-w-0">
-              <h2 className="font-bold text-sm text-[#2d3a24] truncate leading-tight">LifeLink Portal</h2>
+              <h2 className="font-bold text-sm text-[#2d3a24] truncate leading-tight">{donorName}</h2>
               <p className="text-[11px] text-gray-500 truncate">Verified Donor</p>
             </div>
           </div>

@@ -38,7 +38,42 @@ const startServer = async (): Promise<void> => {
   // Connect to Database
   await connectDB();
 
-  
+  // ── Startup migration: drop ALL 2dsphere indexes + fix corrupt documents ──
+  // MongoDB Atlas has stale 2dsphere indexes on donorprofiles (both on the
+  // `coordinates` and `location` string field). These block every upsert.
+  // Fix: enumerate all indexes, drop any with a 2dsphere key, then clean docs.
+  try {
+    const rawCollection = mongoose.connection.db!.collection('donorprofiles');
+
+    // Step 1: List all indexes and drop every 2dsphere one
+    const indexes = await rawCollection.listIndexes().toArray();
+    for (const idx of indexes) {
+      const has2dsphere = idx.key && Object.values(idx.key).includes('2dsphere');
+      if (has2dsphere) {
+        try {
+          await rawCollection.dropIndex(idx.name as string);
+          logger.info(`Startup: Dropped 2dsphere index "${idx.name}" from donorprofiles`);
+        } catch (dropErr: any) {
+          logger.warn(`Startup: Could not drop index "${idx.name}": ${dropErr.message}`);
+        }
+      }
+    }
+
+    // Step 2: Clean documents with coordinates: [] (invalid for 2dsphere)
+    const fixResult = await rawCollection.updateMany(
+      { coordinates: { $exists: true, $size: 0 } },
+      { $unset: { coordinates: '' } }
+    );
+    if (fixResult.modifiedCount > 0) {
+      logger.info(`Startup: Removed empty coordinates from ${fixResult.modifiedCount} DonorProfile documents`);
+    }
+
+    logger.info('Startup migration complete — all 2dsphere indexes removed.');
+  } catch (migErr: any) {
+    logger.warn(`Startup migration warning: ${migErr.message}`);
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
 
   // Start HTTP Server listener
   const port = process.env.PORT || 5000;

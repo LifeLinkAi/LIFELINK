@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import api from "@/lib/axios";
 
 const IcoMenu   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
 const IcoSearch = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
@@ -11,6 +12,16 @@ interface DonorTopBarProps {
 }
 
 export function DonorTopBar({ onMenuClick, searchPlaceholder = "Search..." }: DonorTopBarProps) {
+  const [avatar, setAvatar] = useState("");
+  const [name, setName]     = useState("Donor");
+
+  useEffect(() => {
+    api.get("/donors/me").then((res) => {
+      if (res.data?.avatar) setAvatar(res.data.avatar);
+      if (res.data?.name)   setName(res.data.name);
+    }).catch(() => {});
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 bg-[#f8f9fa]/95 backdrop-blur border-b border-gray-100 px-4 sm:px-6 lg:px-8 py-3.5 shrink-0">
       <div className="flex items-center justify-between gap-4">
@@ -44,12 +55,14 @@ export function DonorTopBar({ onMenuClick, searchPlaceholder = "Search..." }: Do
             ✱ SOS
           </button>
 
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shrink-0">
-            <img
-              src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100"
-              alt="User"
-              className="w-full h-full object-cover"
-            />
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shrink-0" title={name}>
+            {avatar ? (
+              <img src={avatar} alt={name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-[#dcf594] flex items-center justify-center text-[#3b5e2b] text-xs font-bold">
+                {name.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </div>
 

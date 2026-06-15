@@ -32,7 +32,11 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  // Fall back to a placeholder so GoogleOAuthProvider never receives an empty
+  // string (which causes it to throw). Google login will gracefully fail until
+  // NEXT_PUBLIC_GOOGLE_CLIENT_ID is configured in .env.
+  const googleClientId =
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'not-configured.apps.googleusercontent.com';
 
   return (
     <Provider store={store}>

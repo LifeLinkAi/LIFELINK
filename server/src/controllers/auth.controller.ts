@@ -313,16 +313,24 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       });
 
       // Create corresponding profiles
+      // MERGED: use findOneAndUpdate+upsert with setDefaultsOnInsert:false to prevent
+      // Mongoose from inserting coordinates:[] which breaks any geo index.
       if (role === 'Donor') {
-        await DonorProfile.create({
-          userId: user._id,
-          bloodType: 'O-',
-          tier: 'Bronze',
-          status: 'Pending',
-          phone: '',
-          avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
-          isSetupComplete: false,
-        });
+        await DonorProfile.findOneAndUpdate(
+          { userId: user._id },
+          {
+            $set: {
+              location: '',
+              bloodType: 'O-',
+              tier: 'Bronze',
+              status: 'Pending',
+              phone: '',
+              avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+              isSetupComplete: false,
+            },
+          },
+          { upsert: true, setDefaultsOnInsert: false }
+        );
       } else if (role === 'Hospital') {
         await HospitalProfile.create({
           userId: user._id,
