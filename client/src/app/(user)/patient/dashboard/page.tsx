@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { Siren, Droplets, Heart, Clock, MapPin, FileHeart, ArrowRight, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -124,9 +124,9 @@ export default function PatientDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">
+          <h1 className="text-xl font-bold tracking-tight text-[#1a2e0a] sm:text-2xl md:text-[28px]">
             Good morning, Patient 👋
           </h1>
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">
@@ -134,16 +134,16 @@ export default function PatientDashboard() {
           </p>
         </div>
         <a href="/patient/sos"
-          className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[13.5px] font-bold rounded-xl transition-colors animate-pulse hover:animate-none">
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[13.5px] font-bold rounded-xl transition-colors animate-pulse hover:animate-none">
           <Siren size={16} /> SOS Emergency
         </a>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {stats.map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-[#E8E4D8] p-5">
             <p className="text-[12px] font-medium text-[#6B7A5A] uppercase tracking-wide">{s.label}</p>
-            <p className={cn('text-[30px] font-bold leading-none mt-2', s.color)}>{loading ? '—' : s.value}</p>
+            <p className={cn('text-2xl md:text-[30px] font-bold leading-none mt-2', s.color)}>{loading ? '—' : s.value}</p>
             <p className="text-[11.5px] text-[#8A9A7A] mt-1">{s.note}</p>
           </div>
         ))}
@@ -151,7 +151,7 @@ export default function PatientDashboard() {
 
       <div>
         <p className="text-[13px] font-semibold text-[#1a2e0a] mb-3">Quick Actions</p>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {QUICK_ACTIONS.map(a => (
             <a key={a.label} href={a.href}
               className={cn(
@@ -175,7 +175,7 @@ export default function PatientDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_1.4fr] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="bg-white rounded-xl border border-[#E8E4D8] p-5">
           <div className="flex items-center justify-between mb-4">
             <p className="text-[14px] font-semibold text-[#1a2e0a]">Recent Activity</p>

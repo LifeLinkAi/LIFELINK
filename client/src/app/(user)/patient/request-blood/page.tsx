@@ -483,17 +483,17 @@ export default function RequestBloodPage() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 md:flex-row">
               <button
                 onClick={handleUseCurrentLocation}
                 disabled={isLocLoading}
-                className="flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-red-300 transition-colors"
+                className="w-full md:flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-red-300 transition-colors"
               >
                 {isLocLoading ? 'Detecting…' : '📍 Use My Current Location'}
               </button>
               <button
                 onClick={() => { setCoordinates(null); toast('Location cleared'); }}
-                className="py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg"
+                className="w-full py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg md:w-auto"
               >Clear</button>
             </div>
           </div>

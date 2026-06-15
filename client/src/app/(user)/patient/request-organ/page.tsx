@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Heart, CheckCircle, AlertTriangle, FileText, MapPin } from 'lucide-react';
@@ -423,7 +423,7 @@ export default function RequestOrganPage() {
         </div>
 
         {/* Age & Gender */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">Age</label>
             <input
@@ -466,15 +466,15 @@ export default function RequestOrganPage() {
               <p className="text-[11.5px] text-[#6B7A5A] mt-0.5">{coordinates ? `Lat: ${coordinates[1].toFixed(4)}, Lng: ${coordinates[0].toFixed(4)}` : 'Not set'}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 md:flex-row">
             <button
               onClick={handleUseCurrentLocation}
               disabled={isLocLoading}
-              className="flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-[#7AB648] transition-colors"
+              className="w-full md:flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-[#7AB648] transition-colors"
             >
               {isLocLoading ? 'Detecting…' : '📍 Use My Current Location'}
             </button>
-            <button onClick={() => { setCoordinates(null); toast('Location cleared'); }} className="py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg">Clear</button>
+            <button onClick={() => { setCoordinates(null); toast('Location cleared'); }} className="w-full py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg md:w-auto">Clear</button>
           </div>
         </div>
 

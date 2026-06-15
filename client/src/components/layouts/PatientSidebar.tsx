@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, Siren, Droplets, Heart,
-  Clock, MapPin, FileHeart,
+  LayoutDashboard, Droplets, Heart,
+  Clock, FileHeart,
   Settings, HelpCircle, LogOut,
 } from 'lucide-react';
 import Cookies from 'js-cookie';
@@ -13,15 +13,18 @@ import { cn } from '@/lib/utils';
 
 const NAV = [
   { label: 'Dashboard',         href: '/patient/dashboard',          icon: LayoutDashboard },
-  { label: 'SOS Emergency',     href: '/patient/sos',                icon: Siren           },
   { label: 'Request Blood',     href: '/patient/request-blood',      icon: Droplets        },
   { label: 'Request Organ',     href: '/patient/request-organ',      icon: Heart           },
   { label: 'My Requests',       href: '/patient/request-status',     icon: Clock           },
-  { label: 'Nearby Hospitals',  href: '/patient/nearby-hospitals',   icon: MapPin          },
   { label: 'Medical History',   href: '/patient/medical-history',    icon: FileHeart       },
 ];
 
-export function PatientSidebar() {
+interface PatientSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function PatientSidebar({ isOpen, onClose }: PatientSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -51,8 +54,22 @@ export function PatientSidebar() {
   };
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-[240px] bg-[#1a0a0a] flex flex-col z-50 overflow-hidden">
+    <>
+      {isOpen && (
+        <button
+          type="button"
+          aria-label="Close patient navigation"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={onClose}
+        />
+      )}
 
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-50 flex h-screen w-[240px] flex-col overflow-hidden bg-[#1a0a0a] transition-transform duration-300 ease-in-out md:translate-x-0',
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-[18px] border-b border-white/10 flex-shrink-0">
         <div className="w-8 h-8 bg-red-800 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -64,17 +81,6 @@ export function PatientSidebar() {
         </div>
       </div>
 
-      {/* SOS button - prominent */}
-      <div className="px-3 pt-4 pb-2 flex-shrink-0">
-        <Link
-          href="/patient/sos"
-          className="w-full bg-red-700 hover:bg-red-600 text-white text-[13px] font-bold px-3 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors duration-150 animate-pulse hover:animate-none"
-        >
-          <Siren size={15} />
-          SOS EMERGENCY
-        </Link>
-      </div>
-
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto scrollbar-hide space-y-0.5">
         {NAV.map(({ label, href, icon: Icon }) => {
@@ -83,6 +89,7 @@ export function PatientSidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] transition-all duration-150',
                 active
@@ -106,13 +113,14 @@ export function PatientSidebar() {
         >
           <LogOut size={16} /> Logout
         </button>
-        <Link href="/patient/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+        <Link href="/patient/settings" onClick={onClose} className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <Settings size={16} /> Settings
         </Link>
-        <Link href="/support" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+        <Link href="/support" onClick={onClose} className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <HelpCircle size={16} /> Support
         </Link>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
