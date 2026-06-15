@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { isValidObjectId } from 'mongoose';
+import { Types, isValidObjectId } from 'mongoose';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -204,7 +204,14 @@ export const findMatchesForRequest = async (req: AuthRequest, res: Response, nex
     if (!requestObj) return next(new ApiError(404, 'Request not found.'));
 
     const matches = await findNearbyCompatibleDonors(requestObj as any);
-    res.status(200).json({ success: true, data: matches });
+    const notifiedDonors = Array.from(new Set([
+      ...(requestObj.notifiedDonors || []).map((donorId: any) => donorId.toString()),
+      ...(requestObj.matchedDonors || [])
+        .filter((matched: any) => ['NOTIFIED', 'ACCEPTED'].includes(matched.status))
+        .map((matched: any) => matched.donorId?.toString())
+        .filter(Boolean),
+    ]));
+    res.status(200).json({ success: true, data: matches, notifiedDonors });
   } catch (error) {
     next(error);
   }
@@ -222,29 +229,41 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
     const requestObj = await Request.findById(id);
     if (!requestObj) return next(new ApiError(404, 'Request not found.'));
 
-    const matchedEntries = selectedDonorIds.map(did => {
+    const alreadyNotified = new Set([
+      ...(requestObj.notifiedDonors || []).map((donorId: any) => donorId.toString()),
+      ...(requestObj.matchedDonors || [])
+        .filter((matched: any) => ['NOTIFIED', 'ACCEPTED'].includes(matched.status))
+        .map((matched: any) => matched.donorId?.toString())
+        .filter(Boolean),
+    ]);
+    const uniqueDonorIds = Array.from(new Set(selectedDonorIds.map(did => did?.toString()).filter(Boolean)));
+    const donorIdsToNotify = uniqueDonorIds.filter(did => !alreadyNotified.has(did));
+
+    if (donorIdsToNotify.length === 0) {
+      return next(new ApiError(400, 'All selected donors have already been notified for this request.'));
+    }
+
+    const matchedEntries = donorIdsToNotify.map(did => {
       const inviteToken = crypto.randomBytes(20).toString('hex');
       const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
       return {
-        donorId: did as any,
+        donorId: new Types.ObjectId(did) as any,
         inviteToken,
         tokenExpiresAt,
         status: 'NOTIFIED',
       };
     });
 
-    requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(matchedEntries as any)];
-    requestObj.status = 'DONOR_NOTIFIED';
-    await requestObj.save();
+    const donors = await DonorProfile.find({ _id: { $in: donorIdsToNotify } }).populate('userId', 'name email phone').lean();
+    const successfulDonorIds: string[] = [];
+    const successfulEntries: typeof matchedEntries = [];
 
-    const donors = await DonorProfile.find({ _id: { $in: selectedDonorIds } }).populate('userId', 'name email phone').lean();
-
-    const emailPromises = donors.map((d: any) => {
+    await Promise.all(donors.map(async (d: any) => {
       const toEmail = d.userId?.email;
       const donorName = d.userId?.name || 'Donor';
-      if (!toEmail) return Promise.resolve();
+      if (!toEmail) return;
       const entry = matchedEntries.find((e: any) => e.donorId?.toString() === d._id.toString());
-      if (!entry) return Promise.resolve();
+      if (!entry) return;
       const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/respond?requestId=${requestObj._id}&token=${entry.inviteToken}`;
       const requestDetails = {
         urgency: requestObj.urgency,
@@ -254,12 +273,28 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
         facility: requestObj.facility,
         patientName: requestObj.patientName,
       };
-      return sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
-    });
+      try {
+        await sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
+        successfulDonorIds.push(d._id.toString());
+        successfulEntries.push(entry);
+      } catch (err) {
+        logger.error(`Error sending dispatch notification to donor ${d._id}`, err);
+      }
+    }));
 
-    Promise.all(emailPromises).catch(err => logger.error('Error sending dispatch notifications', err));
+    if (successfulDonorIds.length === 0) {
+      return next(new ApiError(502, 'No donor notifications were sent successfully.'));
+    }
 
-    res.status(200).json({ success: true, message: 'Donors notified', data: { matchedCount: matchedEntries.length } });
+    requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(successfulEntries as any)];
+    requestObj.notifiedDonors = [
+      ...(requestObj.notifiedDonors || []),
+      ...(successfulDonorIds.map(did => new Types.ObjectId(did)) as any),
+    ];
+    requestObj.status = 'DONOR_NOTIFIED';
+    await requestObj.save();
+
+    res.status(200).json({ success: true, message: 'Donors notified', data: { matchedCount: successfulDonorIds.length, notifiedDonors: successfulDonorIds } });
   } catch (error) {
     next(error);
   }
@@ -299,7 +334,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(400, 'Missing token or response.'));
     }
 
-    const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1 });
+    const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1, status: 1, notifiedDonors: 1 });
     if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
 
     const matched = (requestObj.matchedDonors && requestObj.matchedDonors[0]) as any;
@@ -313,7 +348,12 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     if (donorResponse === 'ACCEPTED') {
       const donorId = matched.donorId;
-      const filter = { _id: id, 'matchedDonors.inviteToken': token, 'matchedDonors.status': 'NOTIFIED', acceptedDonorId: { $exists: false } };
+      const filter = {
+        _id: id,
+        'matchedDonors.inviteToken': token,
+        'matchedDonors.status': 'NOTIFIED',
+        acceptedDonorId: null,
+      };
       const update = {
         $set: {
           'matchedDonors.$.status': 'ACCEPTED',
@@ -325,10 +365,19 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
       const updated = await Request.findOneAndUpdate(filter, update, { new: true });
       if (!updated) {
+        const latestRequest = await Request.findById(id, { status: 1, notifiedDonors: 1, matchedDonors: 1, acceptedDonorId: 1 }).lean();
+        console.log('[respondToRequest] acceptance validation failed', {
+          requestId: id,
+          requestStatus: latestRequest?.status,
+          requestNotifiedDonors: (latestRequest?.notifiedDonors || []).map((notifiedDonor: any) => notifiedDonor.toString()),
+          incomingDonorId: donorId?.toString(),
+          matchedDonorStatus: matched.status,
+          acceptedDonorId: latestRequest?.acceptedDonorId?.toString?.() || latestRequest?.acceptedDonorId,
+        });
         return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
       }
 
-      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
+      res.status(200).json({ success: true, message: 'Thank you â€” you have accepted the request.' });
       return;
     }
 

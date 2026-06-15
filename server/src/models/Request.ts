@@ -34,6 +34,7 @@ export interface IRequest extends Document {
   contactPhone?: string; // Added to interface
   type: 'Organ' | 'Blood';
   matchedDonors: IMatchedDonor[];
+  notifiedDonors: Schema.Types.ObjectId[];
   acceptedDonorId?: Schema.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -47,7 +48,7 @@ const matchedDonorSchema = new Schema<IMatchedDonor>(
   {
     donorId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'DonorProfile',
       required: true,
     },
     status: {
@@ -156,9 +157,14 @@ const requestSchema = new Schema<IRequest>(
       type: [matchedDonorSchema],
       default: [],
     },
+    notifiedDonors: {
+      type: [Schema.Types.ObjectId],
+      ref: 'DonorProfile',
+      default: [],
+    },
     acceptedDonorId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'DonorProfile',
       default: null,
     },
     location: {
@@ -180,6 +186,7 @@ const requestSchema = new Schema<IRequest>(
 
 requestSchema.index({ userId: 1, createdAt: -1 });
 requestSchema.index({ status: 1 });
+requestSchema.index({ notifiedDonors: 1 });
 requestSchema.index({ 'matchedDonors.inviteToken': 1 });
 requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
 requestSchema.index({ location: '2dsphere' });

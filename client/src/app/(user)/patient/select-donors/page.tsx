@@ -43,6 +43,12 @@ type MatchResponse = {
   phone?: string;
 };
 
+type MatchesApiResponse = {
+  success: boolean;
+  data: MatchResponse[];
+  notifiedDonors?: string[];
+};
+
 type DonorMatch = {
   donorId: string;
   name: string;
@@ -149,6 +155,7 @@ export default function SelectDonorsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notifiedDonorIds, setNotifiedDonorIds] = useState<Set<string>>(new Set());
 
   const selectedMatches = useMemo(
     () => matches.filter((match) => selectedIds.has(match.donorId)),
@@ -173,7 +180,7 @@ export default function SelectDonorsPage() {
     setError(null);
 
     try {
-      const response = await api.get<{ success: boolean; data: MatchResponse[] }>(
+      const response = await api.get<MatchesApiResponse>(
         `/requests/${requestId}/find-matches`,
         { headers }
       );
@@ -183,6 +190,7 @@ export default function SelectDonorsPage() {
         .filter((match): match is DonorMatch => Boolean(match));
 
       setMatches(normalized);
+      setNotifiedDonorIds(new Set((response.data.notifiedDonors || []).map(String)));
       setSelectedIds(new Set());
     } catch (err: any) {
       const message =
@@ -202,6 +210,8 @@ export default function SelectDonorsPage() {
   }, [fetchMatches]);
 
   const toggleDonor = (donorId: string) => {
+    if (notifiedDonorIds.has(donorId)) return;
+
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(donorId)) {
@@ -229,6 +239,11 @@ export default function SelectDonorsPage() {
 
       if (response.data?.success) {
         toast.success(`Dispatched ${selectedDonorIds.length} donor invitation${selectedDonorIds.length === 1 ? '' : 's'}.`);
+        setNotifiedDonorIds((current) => {
+          const next = new Set(current);
+          selectedDonorIds.forEach((donorId) => next.add(donorId));
+          return next;
+        });
         router.push('/patient/request-status');
         return;
       }
@@ -352,14 +367,17 @@ export default function SelectDonorsPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {matches.map((match) => {
               const selected = selectedIds.has(match.donorId);
+              const alreadyNotified = notifiedDonorIds.has(match.donorId);
               return (
                 <button
                   key={match.donorId}
                   type="button"
+                  disabled={alreadyNotified}
                   onClick={() => toggleDonor(match.donorId)}
                   className={cn(
-                    'group relative rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#B6D088]/40',
-                    selected ? 'border-[#3d6b1e] ring-2 ring-[#7AB648]/30' : 'border-[#E8E4D8]'
+                    'group relative rounded-2xl border bg-white p-5 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-[#B6D088]/40',
+                    selected ? 'border-[#3d6b1e] ring-2 ring-[#7AB648]/30' : 'border-[#E8E4D8]',
+                    alreadyNotified ? 'cursor-not-allowed opacity-60' : 'hover:-translate-y-0.5 hover:shadow-md'
                   )}
                 >
                   <div
@@ -414,7 +432,13 @@ export default function SelectDonorsPage() {
                       <p className="text-[11px] font-semibold uppercase text-[#8A9A7A]">Donor record</p>
                       <p className="mt-0.5 text-[13px] font-semibold text-[#3A4A2A]">{match.totalDonated}</p>
                     </div>
-                    <ChevronRight className="text-[#8A9A7A] transition group-hover:translate-x-0.5" size={18} />
+                    {alreadyNotified ? (
+                      <span className="rounded-full bg-[#F0EDE3] px-3 py-1 text-[11px] font-bold text-[#6B7A5A]">
+                        Request Sent
+                      </span>
+                    ) : (
+                      <ChevronRight className="text-[#8A9A7A] transition group-hover:translate-x-0.5" size={18} />
+                    )}
                   </div>
                 </button>
               );
@@ -430,7 +454,7 @@ export default function SelectDonorsPage() {
                 <p className="mt-1 text-[12.5px] text-[#6B7A5A]">
                   {selectedMatches.length > 0
                     ? selectedMatches.map((match) => match.name).join(', ')
-                    : 'Select at least one matching donor to continue.'}
+                    : 'Select at least one available matching donor to continue.'}
                 </p>
               </div>
               <button
