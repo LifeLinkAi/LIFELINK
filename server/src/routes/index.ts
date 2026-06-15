@@ -7,6 +7,7 @@ import hospitalRouter from './hospital.routes';
 import patientRouter from './patient.routes';
 import requestRouter from './request.routes';
 import uploadRouter from './upload.routes';
+import donationRouter from './donation.routes';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/hospitals', hospitalRouter);
 router.use('/patients', patientRouter);
 router.use('/requests', requestRouter);
 router.use('/upload', uploadRouter);
+router.use('/donations', donationRouter);
 
 export default router;

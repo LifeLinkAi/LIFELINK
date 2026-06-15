@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
-import { Heart, Droplets, Star, CheckCircle2, Clock, Loader2, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Heart, Droplets, Star, CheckCircle2, Clock, Loader2, Phone, MapPin, ShieldCheck, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 type DonationType = 'blood' | 'organ' | 'plasma';
 type DonorStatus = 'arriving' | 'screening' | 'donating' | 'completed' | 'deferred';
@@ -62,17 +64,68 @@ const FILTER_TABS: { key: DonorStatus | 'all'; label: string }[] = [
 export default function DonationMonitorPage() {
   const [filter, setFilter]       = useState<DonorStatus | 'all'>('all');
   const [expandedId, setExpanded] = useState<string | null>(null);
+  const [donors, setDonors]       = useState<Donor[]>([]);
+  const [loading, setLoading]     = useState(true);
 
-  const visible = filter === 'all' ? DONORS : DONORS.filter(d => d.status === filter);
+  useEffect(() => {
+    let mounted = true;
+    const fetchDonations = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/donations/hospital');
+        const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+        if (!mounted) return;
+        
+        const mapped = data.map((d: any) => {
+          const name = d.donorId?.name || 'Unknown Donor';
+          const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+          return {
+            id: d._id,
+            name,
+            initials,
+            bloodType: d.bloodType || 'Unknown',
+            donationType: d.donationType?.toLowerCase() || 'blood',
+            status: d.pipelineStatus || 'arriving',
+            scheduledAt: new Date(d.donationDate || Date.now()).toLocaleTimeString(),
+            phone: d.donorId?.email || 'N/A', // fallback
+            location: d.facility || 'Hospital',
+            units: d.volumeMl > 0 ? Math.round(d.volumeMl / 450) : 1,
+            firstTime: false,
+            verified: d.pipelineStatus === 'donating' || d.pipelineStatus === 'completed',
+          };
+        });
+        setDonors(mapped);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchDonations();
+    return () => { mounted = false; };
+  }, []);
+
+  const updateStatus = async (id: string, newStatus: DonorStatus) => {
+    try {
+      await api.patch(`/donations/${id}/pipeline-status`, { pipelineStatus: newStatus });
+      setDonors(prev => prev.map(d => d.id === id ? { ...d, status: newStatus, verified: newStatus === 'donating' || newStatus === 'completed' || d.verified } : d));
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.error?.message || 'Failed to update status');
+    }
+  };
+
+  const visible = filter === 'all' ? donors : donors.filter(d => d.status === filter);
 
   const counts = FILTER_TABS.reduce((acc, f) => {
-    acc[f.key] = f.key === 'all' ? DONORS.length : DONORS.filter(d => d.status === f.key).length;
+    acc[f.key] = f.key === 'all' ? donors.length : donors.filter(d => d.status === f.key).length;
     return acc;
   }, {} as Record<string, number>);
 
-  const completedToday = DONORS.filter(d => d.status === 'completed').length;
-  const activeNow      = DONORS.filter(d => ['arriving','screening','donating'].includes(d.status)).length;
-  const bloodUnits     = DONORS.filter(d => d.donationType === 'blood' && d.status === 'completed').length;
+  const completedToday = donors.filter(d => d.status === 'completed').length;
+  const activeNow      = donors.filter(d => ['arriving','screening','donating'].includes(d.status)).length;
+  const bloodUnits     = donors.filter(d => d.donationType === 'blood' && d.status === 'completed').length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -96,7 +149,7 @@ export default function DonationMonitorPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label:'Total Today',     value: DONORS.length,  note:'Donors registered',  color:'text-[#1a2e0a]' },
+          { label:'Total Today',     value: donors.length,  note:'Donors registered',  color:'text-[#1a2e0a]' },
           { label:'Active Now',      value: activeNow,      note:'In pipeline',         color:'text-amber-600' },
           { label:'Completed',       value: completedToday, note:'Donations done',      color:'text-green-600' },
           { label:'Blood Units',     value: bloodUnits,     note:'Collected today',     color:'text-red-600'   },
@@ -115,7 +168,7 @@ export default function DonationMonitorPage() {
         <div className="grid grid-cols-5 gap-2">
           {(['arriving','screening','donating','completed','deferred'] as DonorStatus[]).map((stage, i, arr) => {
             const cfg = STATUS_CONFIG[stage];
-            const stageCount = DONORS.filter(d => d.status === stage).length;
+            const stageCount = donors.filter(d => d.status === stage).length;
             return (
               <div key={stage} className="flex flex-col items-center gap-2 relative">
                 {i < arr.length - 1 && (
@@ -157,10 +210,11 @@ export default function DonationMonitorPage() {
 
       {/* Donor list */}
       <div className="flex flex-col gap-2">
-        {visible.length === 0 && (
+        {loading ? (
+          <div className="text-center py-12 text-[#8A9A7A] text-[14px]">Loading donations...</div>
+        ) : visible.length === 0 ? (
           <div className="text-center py-12 text-[#8A9A7A] text-[14px]">No donors in this stage.</div>
-        )}
-        {visible.map(donor => {
+        ) : visible.map(donor => {
           const sc  = STATUS_CONFIG[donor.status];
           const tc  = TYPE_CONFIG[donor.donationType];
           const isExpanded = expandedId === donor.id;
@@ -224,13 +278,18 @@ export default function DonationMonitorPage() {
 
               <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
                 {donor.status === 'screening' && (
-                  <button className="px-3 py-1.5 text-[12px] font-medium bg-[#1a2e0a] text-white rounded-lg hover:bg-[#2B4A18] transition-colors flex items-center gap-1.5">
-                    <ShieldCheck size={12} /> Verify
+                  <button onClick={() => updateStatus(donor.id, 'donating')} className="px-3 py-1.5 text-[12px] font-medium bg-[#1a2e0a] text-white rounded-lg hover:bg-[#2B4A18] transition-colors flex items-center gap-1.5">
+                    <ShieldCheck size={12} /> Verify & Start
                   </button>
                 )}
                 {donor.status === 'arriving' && (
-                  <button className="px-3 py-1.5 text-[12px] font-medium border border-[#E8E4D8] rounded-lg text-[#4a5940] hover:border-[#7AB648] transition-colors">
+                  <button onClick={() => updateStatus(donor.id, 'screening')} className="px-3 py-1.5 text-[12px] font-medium border border-[#E8E4D8] rounded-lg text-[#4a5940] hover:border-[#7AB648] transition-colors">
                     Check In
+                  </button>
+                )}
+                {donor.status === 'donating' && (
+                  <button onClick={() => updateStatus(donor.id, 'completed')} className="px-3 py-1.5 text-[12px] font-medium bg-[#3d6b1e] text-white rounded-lg hover:bg-[#2B4A18] transition-colors flex items-center gap-1.5">
+                    <CheckCircle2 size={12} /> Complete
                   </button>
                 )}
                 {donor.status === 'completed' && (
