@@ -4,7 +4,7 @@ import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import crypto from 'crypto';
-import { findNearbyCompatibleDonors } from '../services/matching/donor-match.service';
+import { findNearbyCompatibleDonors, findBestCompatibleDonorForRequest } from '../services/matching/donor-match.service';
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
@@ -15,7 +15,7 @@ import { User } from '../models/User';
 const parseGeoLocation = (body: any) => {
   const location = body.location;
   // Default fallback coordinates to safeguard the 2dsphere index from missing types
-  let coords = [0, 0]; 
+  let coords = [0, 0];
 
   if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
     const lng = parseFloat(location.coordinates[0]);
@@ -154,8 +154,8 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       return next(new ApiError(403, 'Access denied. Patient or Hospital role required to make requests.'));
     }
 
-    const { 
-      patientName, facility, contactPhone, age, gender, organType, 
+    const {
+      patientName, facility, contactPhone, age, gender, organType,
       bloodGroup, units, urgency, facilityType, notes, type
     } = req.body;
 
@@ -164,7 +164,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
     }
 
     const newReq = new Request({
-      userId: req.user.id, 
+      userId: req.user.id,
       requestedBy: req.user.id, // Support structural identity metrics across dashboards
       patientName,
       facility,
@@ -179,12 +179,38 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facilityType,
       notes,
       type,
-      status: 'Pending', 
+      status: 'Pending',
       registeredDate: new Date(),
       matchPercentage: 0,
     });
 
+    // Find the single best compatible donor
+    const bestDonor = await findBestCompatibleDonorForRequest(newReq);
+    if (bestDonor) {
+      newReq.assignedDonorId = bestDonor._id;
+    }
+
     await newReq.save();
+
+    // If a donor was selected, send an email notification using SendGrid
+    if (bestDonor) {
+      try {
+        const donorUser = await User.findById(bestDonor.userId).select('name email');
+        if (donorUser && donorUser.email) {
+          const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/incoming-requests`;
+          await sendDonorRequestNotification(donorUser.email, donorUser.name, {
+            urgency: newReq.urgency,
+            type: newReq.type,
+            bloodGroup: newReq.bloodGroup,
+            organType: newReq.organType,
+            facility: newReq.facility,
+            patientName: newReq.patientName,
+          }, inviteUrl);
+        }
+      } catch (err: any) {
+        logger.error(`Error sending email to assigned donor ${bestDonor._id}: ${err.message}`);
+      }
+    }
 
     const obj = newReq.toObject();
     res.status(201).json({
@@ -247,7 +273,7 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
 
     const matchedEntries = donorIdsToNotify.map(did => {
       const inviteToken = crypto.randomBytes(20).toString('hex');
-      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+      const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       return {
         donorId: new Types.ObjectId(did) as any,
         inviteToken,

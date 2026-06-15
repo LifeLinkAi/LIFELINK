@@ -16,6 +16,8 @@ export interface IncomingRequest {
   registeredDate: string;
   createdAt: string;
   donorResponse: DonorResponseStatus;
+  units?: number;
+  contactPhone?: string;
 }
 
 /**

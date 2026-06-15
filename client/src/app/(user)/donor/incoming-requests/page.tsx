@@ -42,6 +42,7 @@ function SkeletonCard() {
 export default function IncomingRequests() {
   const [activeTab, setActiveTab] = useState<Tab>("All");
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<IncomingRequest | null>(null);
 
   const eligibility = useDonorEligibility();
   const typeFilter = activeTab === "All" ? undefined : activeTab;
@@ -90,7 +91,7 @@ export default function IncomingRequests() {
           {isBlocked && (
             <div className="mb-6 bg-orange-50 border border-orange-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
               </div>
               <div>
                 <p className="text-sm font-bold text-orange-800">You cannot accept requests — 56-day recovery period active</p>
@@ -109,7 +110,7 @@ export default function IncomingRequests() {
               <span className={`text-xs font-bold uppercase tracking-wide ${isBlocked ? "text-orange-700" : "text-[#3b5e2b]"}`}>
                 {isBlocked ? `Not eligible · ${eligibility.daysRemaining} days remaining`
                   : hasRecord ? `Eligible · ${eligibility.daysSince} days since last donation (≥ 56 days)`
-                  : "Eligible · No donation record on file"}
+                    : "Eligible · No donation record on file"}
               </span>
             </div>
             {hasRecord && <span className="text-[10px] text-gray-500 font-medium">Last: {eligibility.lastDonation}</span>}
@@ -162,7 +163,7 @@ export default function IncomingRequests() {
                       isBlocked={isBlocked}
                       daysRemaining={eligibility.daysRemaining}
                       isLoading={respondingId === req.id}
-                      onAccept={(id) => handleRespond(id, "ACCEPTED")}
+                      onAccept={() => setSelectedRequest(req)}
                       onDecline={(id) => handleRespond(id, "DECLINED")}
                     />
                   </div>
@@ -218,7 +219,7 @@ export default function IncomingRequests() {
               {isBlocked ? (
                 <>
                   <div className="w-full bg-gray-200 text-gray-400 text-sm font-bold py-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed select-none">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                     Accept Donation Request
                   </div>
                   <p className="text-[11px] text-center text-orange-500 font-semibold mt-3">Available in {eligibility.daysRemaining} day{eligibility.daysRemaining !== 1 ? "s" : ""} on {eligibility.eligibleDate}</p>
@@ -230,6 +231,121 @@ export default function IncomingRequests() {
           </div>
         </div>
       </div>
+
+      {/* DETAILED REQUEST ACCEPATION MODAL */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="bg-[#3b5e2b] text-white p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] bg-white/20 text-white font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {selectedRequest.type} Request Details
+                  </span>
+                  <h3 className="text-2xl font-bold font-serif mt-2">
+                    {selectedRequest.type === "Blood" ? `${selectedRequest.bloodGroup} Blood` : selectedRequest.organType ?? "Organ"}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedRequest(null)}
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Details Body */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Patient Name</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.patientName || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Emergency Priority</label>
+                  <p className="text-sm font-black text-red-600 mt-0.5">{selectedRequest.urgency || "Standard"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Blood Type</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.bloodGroup || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Requested Organ</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.organType || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Hospital Name</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.facility || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Hospital Location</label>
+                  <p className="text-sm font-semibold text-gray-950 mt-0.5">{selectedRequest.distance || "Nearby"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Required Quantity</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">
+                    {selectedRequest.units ? `${selectedRequest.units} units` : "1 unit"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Required Date & Time</label>
+                  <p className="text-sm font-medium text-gray-950 mt-0.5">
+                    {selectedRequest.registeredDate ? new Date(selectedRequest.registeredDate).toLocaleString() : "As soon as possible"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Contact Information</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.contactPhone || "Available upon acceptance"}</p>
+                </div>
+              </div>
+
+              {selectedRequest.notes && (
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Additional Notes</label>
+                  <p className="text-xs text-gray-600 mt-1 bg-gray-50 rounded-xl p-3 border border-gray-100 leading-relaxed">
+                    {selectedRequest.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row gap-2 border-t border-gray-100">
+              <button
+                onClick={async () => {
+                  const reqId = selectedRequest.id;
+                  setSelectedRequest(null);
+                  await handleRespond(reqId, "ACCEPTED");
+                }}
+                className="flex-1 bg-[#3b5e2b] text-white text-xs font-bold py-3 px-4 rounded-xl hover:bg-[#2d4721] transition-colors shadow-sm text-center"
+              >
+                Confirm Accept
+              </button>
+              <button
+                onClick={async () => {
+                  const reqId = selectedRequest.id;
+                  setSelectedRequest(null);
+                  await handleRespond(reqId, "DECLINED");
+                }}
+                className="flex-1 border border-red-200 bg-red-50 text-red-700 text-xs font-bold py-3 px-4 rounded-xl hover:bg-red-100 hover:border-red-300 transition-colors text-center"
+              >
+                Reject
+              </button>
+              <button
+                onClick={() => setSelectedRequest(null)}
+                className="border border-gray-200 bg-white text-gray-600 text-xs font-bold py-3 px-4 rounded-xl hover:bg-gray-50 transition-colors text-center"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

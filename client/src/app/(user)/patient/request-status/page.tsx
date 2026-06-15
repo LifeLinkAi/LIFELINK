@@ -35,6 +35,9 @@ interface BackendRequest {
   notes?: string;
   type: RequestType;
   timeline?: TimelineEvent[];
+  donorName?: string;
+  donorBloodType?: string;
+  acceptedAt?: string;
 }
 
 interface PatientRequest {
@@ -48,6 +51,9 @@ interface PatientRequest {
   hospital: string;
   timeline: { time: string; event: string; done: boolean }[];
   canCancel: boolean;
+  donorName?: string;
+  donorBloodType?: string;
+  acceptedAt?: string;
 }
 
 const TIMELINE_STEPS: Array<{ event: string; statuses: RequestStatus[] }> = [
@@ -120,6 +126,9 @@ function mapBackendRequest(req: BackendRequest): PatientRequest {
     hospital: req.facility,
     timeline: buildTimeline({ ...req, status }),
     canCancel: ['PENDING', 'DONOR_NOTIFIED'].includes(status),
+    donorName: req.donorName,
+    donorBloodType: req.donorBloodType,
+    acceptedAt: req.acceptedAt,
   };
 }
 
@@ -197,6 +206,31 @@ function RequestCard({ req }: { req: PatientRequest }) {
       {/* Timeline */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-[#F0EDE3] bg-[#FAFAF7]">
+          {req.status === 'APPROVED' && req.donorName && (
+            <div className="mb-4 mt-4 rounded-xl bg-sky-50 border border-sky-100 p-4">
+              <p className="text-[11px] font-bold text-sky-850 uppercase tracking-wide mb-2">Donor Details</p>
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div>
+                  <span className="text-[#8A9A7A] font-semibold">Name:</span>{' '}
+                  <span className="text-[#1a2e0a] font-bold">{req.donorName}</span>
+                </div>
+                <div>
+                  <span className="text-[#8A9A7A] font-semibold">Blood Type:</span>{' '}
+                  <span className="text-[#1a2e0a] font-bold">{req.donorBloodType || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[#8A9A7A] font-semibold">Acceptance Time:</span>{' '}
+                  <span className="text-[#1a2e0a] font-medium">
+                    {req.acceptedAt ? formatRegisteredDate(req.acceptedAt) : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8A9A7A] font-semibold">Hospital:</span>{' '}
+                  <span className="text-[#1a2e0a] font-semibold">{req.hospital}</span>
+                </div>
+              </div>
+            </div>
+          )}
           <p className="text-[11px] font-semibold text-[#8A9A7A] uppercase tracking-wide mt-4 mb-3">
             Timeline
           </p>
