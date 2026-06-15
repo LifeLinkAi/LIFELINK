@@ -133,12 +133,12 @@ function RequestCard({ req }: { req: PatientRequest }) {
   const borderColor = URGENCY_COLORS[req.urgency] ?? URGENCY_COLORS.low;
 
   return (
-    <div className="bg-white rounded-xl border border-[#E8E4D8] overflow-hidden"
+    <div className="overflow-hidden rounded-xl border border-[#E8E4D8] bg-white"
       style={{ borderLeft: `3px solid ${borderColor}` }}>
 
       {/* Header row */}
       <div
-        className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-[#FAFAF7] transition-colors"
+        className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-[#FAFAF7] sm:flex-nowrap sm:gap-4 sm:px-5"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -160,7 +160,7 @@ function RequestCard({ req }: { req: PatientRequest }) {
           </p>
         </div>
 
-        <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0"
+        <span className="order-4 ml-[52px] text-[11.5px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 sm:order-none sm:ml-0"
           style={{ color: sc.color, background: sc.bg, borderColor: sc.border }}>
           {sc.label}
         </span>
@@ -210,7 +210,7 @@ function RequestCard({ req }: { req: PatientRequest }) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2.5 mt-2 w-full">
+          <div className="mt-2 flex w-full flex-col items-stretch gap-2.5 sm:flex-row sm:items-center">
             {req.status === 'COMPLETED' && (
               <div className="flex items-center gap-1.5 text-[12.5px] text-green-700 font-medium">
                 <CheckCircle size={14} /> Fulfilled successfully
@@ -221,14 +221,14 @@ function RequestCard({ req }: { req: PatientRequest }) {
             {['PENDING', 'DONOR_NOTIFIED'].includes(req.status) && (
               <Link 
                 href={`/patient/select-donors?requestId=${req.id}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a2e0a] text-white text-[12px] font-medium rounded-lg hover:bg-[#2B4A18] transition-colors"
+                className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#1a2e0a] px-3 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#2B4A18] sm:w-auto"
               >
                 <Search size={13} /> View Matches
               </Link>
             )}
 
             {req.canCancel && (
-              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-[12px] font-medium rounded-lg hover:bg-red-50 transition-colors ml-auto">
+              <button className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-50 sm:ml-auto sm:w-auto">
                 <XCircle size={13} /> Cancel Request
               </button>
             )}
@@ -291,11 +291,11 @@ export default function RequestStatusPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 sm:gap-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">My Requests</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">My Requests</h1>
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">
             Track all your blood and organ requests.
           </p>
@@ -305,7 +305,7 @@ export default function RequestStatusPage() {
           onClick={fetchHistory}
           disabled={loading}
           className={cn(
-            'flex items-center gap-1.5 px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors',
+            'flex min-h-10 w-full items-center justify-center gap-1.5 px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors sm:w-auto',
             loading
               ? 'border-[#E8E4D8] bg-[#F5F5F3] text-[#8A9A7A] cursor-not-allowed'
               : 'border-[#D0CCBC] bg-white text-[#3A4A2A] hover:border-[#7AB648]'
@@ -316,7 +316,7 @@ export default function RequestStatusPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-[#E8E4D8] p-4 text-center">
             <p className={cn('text-[26px] font-bold leading-none', s.color || 'text-[#1a2e0a]')}>{s.value}</p>
@@ -362,7 +362,7 @@ export default function RequestStatusPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[
           { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
           { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart      size={16} />, color: '#5B21B6' },

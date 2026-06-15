@@ -118,7 +118,7 @@ function formatDistance(distanceKm: number | null) {
 
 function DonorSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
@@ -266,9 +266,9 @@ export default function SelectDonorsPage() {
   const isEmpty = !loading && !error && matches.length === 0;
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 sm:gap-6">
       <section className="overflow-hidden rounded-3xl border border-[#DDE6D0] bg-[#123e20] text-white shadow-sm">
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
+        <div className="grid gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <div className="min-w-0">
             <button
               type="button"
@@ -287,7 +287,7 @@ export default function SelectDonorsPage() {
                 Request {requestId || 'not provided'}
               </span>
             </div>
-            <h1 className="mt-4 max-w-3xl text-[32px] font-bold leading-tight tracking-tight">
+            <h1 className="mt-4 max-w-3xl text-2xl font-bold leading-tight tracking-tight sm:text-[32px]">
               Select verified donors and dispatch invitations
             </h1>
             <p className="mt-3 max-w-2xl text-[14px] leading-6 text-white/75">
@@ -295,7 +295,7 @@ export default function SelectDonorsPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 rounded-2xl border border-white/15 bg-white/10 p-4">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 sm:grid-cols-3">
             <div>
               <p className="text-[11px] font-semibold uppercase text-white/55">Matches</p>
               <p className="mt-1 text-2xl font-bold">{loading ? '-' : matches.length}</p>
@@ -364,7 +364,7 @@ export default function SelectDonorsPage() {
 
       {hasMatches && (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {matches.map((match) => {
               const selected = selectedIds.has(match.donorId);
               const alreadyNotified = notifiedDonorIds.has(match.donorId);
@@ -410,7 +410,7 @@ export default function SelectDonorsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="rounded-xl border border-[#E8E4D8] bg-[#FAF9F4] p-3">
                       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6B7A5A]">
                         <HeartPulse size={14} />
@@ -445,7 +445,7 @@ export default function SelectDonorsPage() {
             })}
           </div>
 
-          <div className="sticky bottom-4 z-10 rounded-2xl border border-[#D8D2C4] bg-white/95 p-4 shadow-lg backdrop-blur">
+          <div className="sticky bottom-2 z-10 rounded-2xl border border-[#D8D2C4] bg-white/95 p-4 shadow-lg backdrop-blur sm:bottom-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[14px] font-bold text-[#1a2e0a]">
@@ -461,7 +461,7 @@ export default function SelectDonorsPage() {
                 type="button"
                 disabled={selectedIds.size === 0 || submitting}
                 onClick={dispatchSelected}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#CC0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#B00000] disabled:cursor-not-allowed disabled:bg-[#D8D2C4] disabled:text-[#6B7A5A]"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#CC0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#B00000] disabled:cursor-not-allowed disabled:bg-[#D8D2C4] disabled:text-[#6B7A5A] md:w-auto"
               >
                 {submitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                 {submitting ? 'Dispatching donors' : 'Dispatch selected donors'}

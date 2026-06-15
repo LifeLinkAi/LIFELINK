@@ -86,7 +86,7 @@ function MedicalRecordCard({ record: r }: { record: MedicalRecord }) {
       r.critical && 'border-l-[3px] border-l-red-500'
     )}>
       <div
-        className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-[#FAFAF7] transition-colors"
+        className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-[#FAFAF7] sm:flex-nowrap sm:gap-4 sm:px-5"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
@@ -110,7 +110,7 @@ function MedicalRecordCard({ record: r }: { record: MedicalRecord }) {
             <span className="text-[11.5px] text-[#8A9A7A]">{r.date} · {r.doctor}</span>
           </div>
         </div>
-        <span className="text-[11.5px] text-[#8A9A7A] flex-shrink-0">{r.hospital}</span>
+        <span className="order-4 ml-[52px] max-w-full text-[11.5px] text-[#8A9A7A] sm:order-none sm:ml-0 sm:max-w-[160px] sm:truncate">{r.hospital}</span>
         {expanded
           ? <ChevronUp size={16} className="text-[#8A9A7A] flex-shrink-0" />
           : <ChevronDown size={16} className="text-[#8A9A7A] flex-shrink-0" />
@@ -128,13 +128,13 @@ function MedicalRecordCard({ record: r }: { record: MedicalRecord }) {
               <div className="flex flex-col gap-1.5">
                 {r.documents.map(doc => (
                   <div key={doc.name}
-                    className="flex items-center justify-between bg-white rounded-lg border border-[#E8E4D8] px-3 py-2">
-                    <div className="flex items-center gap-2">
+                    className="flex flex-col gap-2 rounded-lg border border-[#E8E4D8] bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-2">
                       <FileText size={13} className="text-[#6B7A5A]" />
-                      <span className="text-[12.5px] text-[#3A4A2A]">{doc.name}</span>
+                      <span className="min-w-0 break-all text-[12.5px] text-[#3A4A2A]">{doc.name}</span>
                       <span className="text-[11px] text-[#8A9A7A]">{doc.size}</span>
                     </div>
-                    <button className="flex items-center gap-1 text-[11.5px] text-[#3d6b1e] font-medium hover:underline">
+                    <button className="flex min-h-9 w-full items-center justify-center gap-1 text-[11.5px] font-medium text-[#3d6b1e] hover:underline sm:w-auto">
                       <Download size={12} /> Download
                     </button>
                   </div>
@@ -207,23 +207,23 @@ export default function MedicalHistoryPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 sm:gap-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">Medical History</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">Medical History</h1>
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">
             Your complete medical records, allergies, and vaccinations.
           </p>
         </div>
-        <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1a2e0a] text-white text-[13px] font-medium hover:bg-[#2B4A18] transition-colors">
+        <button className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#1a2e0a] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#2B4A18] sm:w-auto">
           <Plus size={14} /> Add Record
         </button>
       </div>
 
       {/* Patient summary card */}
       <div className="bg-white rounded-xl border border-[#E8E4D8] p-5">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-[20px] font-bold text-red-700 flex-shrink-0">
             PT
           </div>
@@ -231,7 +231,7 @@ export default function MedicalHistoryPage() {
             <p className="text-[15px] font-bold text-[#1a2e0a]">Patient Name</p>
             <p className="text-[12.5px] text-[#6B7A5A] mt-0.5">MRN: 8829-XJ-4 · 45 yrs · Male</p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0 sm:items-center sm:gap-3">
             <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
               <Droplets size={14} className="text-red-600" />
               <div>
@@ -251,12 +251,12 @@ export default function MedicalHistoryPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-[#F5F2E8] p-1 rounded-xl">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-[#F5F2E8] p-1">
         {TABS.map(t => (
           <button key={t.key}
             onClick={() => setActiveTab(t.key as typeof activeTab)}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-medium transition-all',
+              'min-w-max flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all',
               activeTab === t.key
                 ? 'bg-white text-[#1a2e0a] shadow-sm'
                 : 'text-[#6B7A5A] hover:text-[#1a2e0a]'
@@ -307,7 +307,7 @@ export default function MedicalHistoryPage() {
           {ALLERGIES.map(a => {
             const sc = SEVERITY_CONFIG[a.severity];
             return (
-              <div key={a.name} className="bg-white rounded-xl border border-[#E8E4D8] px-5 py-4 flex items-center gap-4">
+              <div key={a.name} className="flex flex-col items-start gap-3 rounded-xl border border-[#E8E4D8] bg-white px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg flex-shrink-0">
                   ⚠️
                 </div>
@@ -315,7 +315,7 @@ export default function MedicalHistoryPage() {
                   <p className="text-[14px] font-semibold text-[#1a2e0a]">{a.name}</p>
                   <p className="text-[12.5px] text-[#6B7A5A] mt-0.5">{a.reaction}</p>
                 </div>
-                <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+                <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 sm:ml-auto"
                   style={{ color: sc.color, background: sc.bg }}>
                   {sc.label}
                 </span>
@@ -329,13 +329,13 @@ export default function MedicalHistoryPage() {
       {activeTab === 'vaccinations' && (
         <div className="flex flex-col gap-3">
           {VACCINATIONS.map(v => (
-            <div key={v.name} className="bg-white rounded-xl border border-[#E8E4D8] px-5 py-4 flex items-center gap-4">
+            <div key={v.name} className="flex flex-col items-start gap-3 rounded-xl border border-[#E8E4D8] bg-white px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
               <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg flex-shrink-0">
                 💉
               </div>
               <div className="flex-1">
                 <p className="text-[14px] font-semibold text-[#1a2e0a]">{v.name}</p>
-                <div className="flex items-center gap-3 mt-0.5">
+                <div className="mt-0.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                   <span className="flex items-center gap-1 text-[12px] text-[#6B7A5A]">
                     <Calendar size={11} /> Given: {v.date}
                   </span>
@@ -346,7 +346,7 @@ export default function MedicalHistoryPage() {
                   )}
                 </div>
               </div>
-              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 sm:ml-auto">
                 ✓ Done
               </span>
             </div>

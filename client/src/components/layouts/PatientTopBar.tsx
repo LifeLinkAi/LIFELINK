@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, ChevronDown, LogOut, Search, Settings, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { useAppDispatch } from '@/store/hooks';
 import { clearUser } from '@/features/auth/authSlice';
@@ -15,7 +15,7 @@ const NOTIFICATIONS = [
   'Hospital verification completed',
 ];
 
-export function PatientTopBar() {
+export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -47,8 +47,17 @@ export function PatientTopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 h-16 bg-[#F5F2E8]/95 backdrop-blur border-b border-[#E8E4D8] px-6 flex items-center justify-between">
-      <div className="relative w-full max-w-md">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-[#E8E4D8] bg-[#F5F2E8]/95 px-3 backdrop-blur sm:px-4 lg:px-6">
+      <button
+        type="button"
+        onClick={onMenuClick}
+        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#D0CCBC] bg-white text-[#3A4A2A] transition-all hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 md:hidden"
+        aria-label="Open patient navigation"
+      >
+        <Menu size={19} />
+      </button>
+
+      <div className="relative hidden w-full max-w-md sm:block">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9A7A]" />
         <input
           value={query}
@@ -58,7 +67,7 @@ export function PatientTopBar() {
         />
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
         <div className="relative">
           <button
             type="button"
@@ -73,7 +82,7 @@ export function PatientTopBar() {
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-600" />
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 mt-2 w-72 rounded-xl border border-[#E8E4D8] bg-white shadow-lg overflow-hidden">
+            <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-[#E8E4D8] bg-white shadow-lg overflow-hidden">
               <div className="px-4 py-3 border-b border-[#F0EDE3]">
                 <p className="text-[13px] font-bold text-[#1a2e0a]">Notifications</p>
               </div>
@@ -93,7 +102,7 @@ export function PatientTopBar() {
 
         <Link
           href="/patient/settings"
-          className="h-10 w-10 rounded-lg border border-[#D0CCBC] bg-white text-[#3A4A2A] flex items-center justify-center hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 transition-all"
+          className="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#D0CCBC] bg-white text-[#3A4A2A] transition-all hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 sm:flex"
           aria-label="Settings"
         >
           <Settings size={17} />

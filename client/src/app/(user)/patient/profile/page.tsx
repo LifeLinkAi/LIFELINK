@@ -118,7 +118,7 @@ export default function PatientProfilePage() {
                 <ShieldCheck size={14} />
                 Patient Profile
               </p>
-              <h1 className="mt-3 truncate text-[30px] font-bold tracking-tight">{profile.name}</h1>
+              <h1 className="mt-3 truncate text-2xl md:text-[30px] font-bold tracking-tight">{profile.name}</h1>
               <p className="mt-2 max-w-2xl text-[14px] leading-6 text-white/70">
                 Manage identity, request activity, and clinical contact details for the patient portal.
               </p>
