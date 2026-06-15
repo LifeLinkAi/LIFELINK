@@ -92,13 +92,17 @@ const donorProfileSchema = new Schema(
   }
 );
 
-// Pre-save hook to ensure coordinates are always populated (prevents validation failures on legacy data)
-donorProfileSchema.pre('save', function (next) {
-  if (!this.location || !this.location.coordinates || this.location.coordinates.length === 0) {
-    this.location = {
-      type: 'Point',
-      coordinates: [0, 0]
-    };
+// Pre-validate hook to ensure coordinates are always populated (prevents validation failures on legacy data)
+donorProfileSchema.pre('validate', function (next) {
+  if (this.location !== undefined) {
+    if (!this.location || typeof this.location !== 'object') {
+      this.location = {
+        type: 'Point',
+        coordinates: [0, 0]
+      };
+    } else if (!this.location.coordinates || !Array.isArray(this.location.coordinates) || this.location.coordinates.length === 0) {
+      this.location.coordinates = [0, 0];
+    }
   }
   next();
 });

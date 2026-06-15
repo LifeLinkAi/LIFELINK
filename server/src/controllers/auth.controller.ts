@@ -320,7 +320,6 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
           { userId: user._id },
           {
             $set: {
-              location: '',
               bloodType: 'O-',
               tier: 'Bronze',
               status: 'Pending',
