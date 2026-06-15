@@ -1,8 +1,6 @@
 import { Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-// pdf-parse is lazy-required inside uploadCertificate to avoid the known startup
-// crash where the library accesses ./test/data/* at import time in ts-node-dev.
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
@@ -17,12 +15,10 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
     for (const user of donors) {
       let profile = await DonorProfile.findOne({ userId: user._id });
       if (!profile) {
-        // Use findOneAndUpdate with setDefaultsOnInsert:false to prevent
-        // Mongoose from inserting coordinates:[] which breaks the 2dsphere index
         profile = await DonorProfile.findOneAndUpdate(
           { userId: user._id },
           { $set: { avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}` } },
-          { new: true, upsert: true, setDefaultsOnInsert: false }
+          { new: true, upsert: true }
         ) as NonNullable<typeof profile>;
       }
       result.push({
@@ -49,10 +45,7 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
 
 export const createDonor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const {
-      name,
-      email,
-    } = req.body;
+    const { name, email } = req.body;
 
     if (!name || !email) {
       return next(new ApiError(400, 'Name and email are required.'));
@@ -65,7 +58,6 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     const salt = await bcrypt.genSalt(10);
-    // Generate secure random password initially so standard logins are blocked
     const tempPass = crypto.randomBytes(16).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPass, salt);
 
@@ -76,12 +68,9 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       role: 'Donor',
     });
 
-    // Generate invitation token and 7 days expiration
     const inviteToken = crypto.randomBytes(32).toString('hex');
-    const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // MERGED: use findOneAndUpdate+upsert with setDefaultsOnInsert:false to prevent
-    // Mongoose from inserting coordinates:[] which breaks any geo index.
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
       {
@@ -100,11 +89,10 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
           isSetupComplete: false,
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: false }
+      { new: true, upsert: true }
     );
     if (!profile) throw new Error('Failed to create donor profile');
 
-    // Send donor invite email asynchronously
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
@@ -147,17 +135,7 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
 
     for (const donorData of donors) {
       const {
-        name,
-        email,
-        location,
-        bloodType,
-        tier,
-        status,
-        phone,
-        lastDonation,
-        totalDonated,
-        details,
-        avatar,
+        name, email, location, bloodType, tier, status, phone, lastDonation, totalDonated, details, avatar,
       } = donorData;
 
       if (!name || !email) continue;
@@ -173,8 +151,6 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
         role: 'Donor',
       });
 
-      // MERGED: use findOneAndUpdate+upsert with setDefaultsOnInsert:false to prevent
-      // Mongoose from inserting coordinates:[] which breaks any geo index.
       const profile = await DonorProfile.findOneAndUpdate(
         { userId: user._id },
         {
@@ -190,7 +166,7 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
             avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
           },
         },
-        { new: true, upsert: true, setDefaultsOnInsert: false }
+        { new: true, upsert: true }
       );
       if (!profile) continue;
 
@@ -233,7 +209,7 @@ export const updateDonor = async (req: AuthRequest, res: Response, next: NextFun
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
       { $set: profileFields },
-      { new: true, upsert: true, setDefaultsOnInsert: false }
+      { new: true, upsert: true }
     );
 
     res.status(200).json({
@@ -287,12 +263,10 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
 
     let profile = await DonorProfile.findOne({ userId: user._id });
     if (!profile) {
-      // Use findOneAndUpdate with setDefaultsOnInsert:false to prevent
-      // Mongoose from inserting coordinates:[] which breaks the 2dsphere index
       profile = await DonorProfile.findOneAndUpdate(
         { userId: user._id },
         { $set: { avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}` } },
-        { new: true, upsert: true, setDefaultsOnInsert: false }
+        { new: true, upsert: true }
       ) as NonNullable<typeof profile>;
     }
 
@@ -300,10 +274,7 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      // MERGED: donor branch provides location string + coordinates array;
-      // origin branch had location:''. Both preserved here.
       location: profile!.location ?? '',
-      coordinates: profile!.coordinates ?? [],
       bloodType: profile!.bloodType,
       tier: profile!.tier,
       status: profile!.status,
@@ -348,7 +319,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
       { $set: updateFields },
-      { new: true, upsert: true, setDefaultsOnInsert: false }
+      { new: true, upsert: true }
     );
 
     res.status(200).json({
@@ -394,7 +365,6 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
         continue;
       }
 
-      // Generate random secure password
       const tempPass = crypto.randomBytes(16).toString('hex');
       const hashedPassword = await bcrypt.hash(tempPass, salt);
 
@@ -406,13 +376,13 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
       });
 
       const inviteToken = crypto.randomBytes(32).toString('hex');
-      const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      // MERGED: use findOneAndUpdate+upsert with setDefaultsOnInsert:false
       await DonorProfile.findOneAndUpdate(
         { userId: user._id },
         {
           $set: {
+            location: '',
             bloodType: 'O-',
             tier: 'Bronze',
             status: 'Pending',
@@ -426,7 +396,7 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
             isSetupComplete: false,
           },
         },
-        { upsert: true, setDefaultsOnInsert: false }
+        { upsert: true }
       );
 
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -477,18 +447,11 @@ function normalizeDate(day: number, month: number, year: number): string {
   return `${day} ${MONTH_DISPLAY[month]} ${year}`;
 }
 
-/**
- * Extract the most likely donation date from raw PDF text.
- * Priority:
- *   1. Date appearing near a donation keyword
- *   2. Latest valid date found anywhere in the document
- */
 function extractDonationDate(text: string): string | null {
-  // Collapse whitespace variants so multi-space PDFs don't break patterns
   const normalized = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/[ \t]+/g, ' ');  // collapse multiple spaces → single space
+    .replace(/[ \t]+/g, ' ');
 
   interface DateCandidate {
     day: number; month: number; year: number;
@@ -497,48 +460,39 @@ function extractDonationDate(text: string): string | null {
 
   const candidates: DateCandidate[] = [];
 
-  // ─── Broad donation-keyword patterns ─────────────────────────────────────
   const DONATION_KEYWORDS =
     /(?:last\s+donation|donation\s+date|date\s+of\s+donation|donated\s+on|donated\s+date|certificate\s+date|blood\s+donation\s+date|donation:|date:|on\s*:)/i;
 
-  // ─── Date format patterns ──────────────────────────────────────────────────
-  // Each entry: [regex, parser fn returning {day,month,year} or null]
   type ParseResult = { day: number; month: number; year: number } | null;
 
   const FORMATS: Array<{ re: RegExp; parse: (m: RegExpExecArray) => ParseResult }> = [
-    // 1. DD/MM/YYYY  DD-MM-YYYY  DD.MM.YYYY
     {
       re: /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\b/g,
       parse: (m) => ({ day: +m[1], month: +m[2], year: +m[3] }),
     },
-    // 2. MM/DD/YYYY  (try both interpretations, valid one wins)
     {
       re: /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\b/g,
-      parse: (m) => ({ day: +m[2], month: +m[1], year: +m[3] }),  // swap day/month
+      parse: (m) => ({ day: +m[2], month: +m[1], year: +m[3] }),
     },
-    // 3. YYYY-MM-DD  YYYY/MM/DD
     {
       re: /\b(\d{4})[\/\-](\d{2})[\/\-](\d{2})\b/g,
       parse: (m) => ({ day: +m[3], month: +m[2], year: +m[1] }),
     },
-    // 4. DD Month YYYY  e.g. "14 March 2024" or "14 Mar 2024"
     {
       re: /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{4})\b/gi,
       parse: (m) => ({ day: +m[1], month: MONTH_NAMES[m[2].toLowerCase()] ?? 0, year: +m[3] }),
     },
-    // 5. Month DD, YYYY  e.g. "March 14, 2024" or "Mar 14 2024"
     {
       re: /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi,
       parse: (m) => ({ day: +m[2], month: MONTH_NAMES[m[1].toLowerCase()] ?? 0, year: +m[3] }),
     },
-    // 6. DD Month YY  e.g. "14 Mar 24" (two-digit year)
     {
       re: /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{2})\b/gi,
       parse: (m) => ({ day: +m[1], month: MONTH_NAMES[m[2].toLowerCase()] ?? 0, year: 2000 + +m[3] }),
     },
   ];
 
-  const seen = new Set<string>();  // deduplicate identical dates
+  const seen = new Set<string>();
 
   for (const { re, parse } of FORMATS) {
     re.lastIndex = 0;
@@ -553,7 +507,6 @@ function extractDonationDate(text: string): string | null {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      // Expanded context window: 300 chars before + 50 chars after
       const ctxBefore = normalized.slice(Math.max(0, match.index - 300), match.index);
       const ctxAfter  = normalized.slice(match.index, match.index + 50);
       const hasDonationKeyword = DONATION_KEYWORDS.test(ctxBefore) || DONATION_KEYWORDS.test(ctxAfter);
@@ -568,7 +521,6 @@ function extractDonationDate(text: string): string | null {
 
   if (candidates.length === 0) return null;
 
-  // Sort: donation-keyword matches first (priority 2), then by date descending (latest first)
   candidates.sort((a, b) => {
     if (b.priority !== a.priority) return b.priority - a.priority;
     const aTs = new Date(a.year, a.month - 1, a.day).getTime();
@@ -580,12 +532,8 @@ function extractDonationDate(text: string): string | null {
   return normalizeDate(best.day, best.month, best.year);
 }
 
-// ── uploadCertificate controller ─────────────────────────────────────────────
-
 export const uploadCertificate = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
+  req: AuthRequest, res: Response, next: NextFunction
 ): Promise<void> => {
   try {
     if (!req.user) {
@@ -596,24 +544,18 @@ export const uploadCertificate = async (
       return next(new ApiError(400, 'No file uploaded.'));
     }
 
-    // Validate MIME type
     if (req.file.mimetype !== 'application/pdf') {
       return next(new ApiError(400, 'Only PDF files are accepted.'));
     }
 
-    // Validate size (10 MB)
     if (req.file.size > 10 * 1024 * 1024) {
       return next(new ApiError(400, 'File size must not exceed 10 MB.'));
     }
 
-    // Generate unique filename: certificate_<timestamp>_<6-char-uuid-fragment>.pdf
-    const uniqueSuffix = crypto.randomBytes(3).toString('hex'); // 6 hex chars
+    const uniqueSuffix = crypto.randomBytes(3).toString('hex');
     const uniqueFilename = `certificate_${Date.now()}_${uniqueSuffix}.pdf`;
     logger.info(`Processing certificate upload: ${uniqueFilename} for donor ${req.user.id}`);
 
-    // MERGED: Using lazy-required pdf-parse (donor branch, already installed).
-    // pdf-parse is lazy-required to avoid the known startup crash where the
-    // library accesses ./test/data/* at import time in ts-node-dev.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
 
@@ -632,10 +574,8 @@ export const uploadCertificate = async (
       return next(new ApiError(422, 'The PDF contains no readable text. Please upload a text-based (non-scanned) PDF.'));
     }
 
-    // Log a preview of the extracted text for debugging
     logger.info(`PDF text preview (first 400 chars): ${rawText.replace(/\s+/g, ' ').substring(0, 400)}`);
 
-    // Extract donation date
     const lastDonationDate = extractDonationDate(rawText);
     if (!lastDonationDate) {
       logger.warn(`No donation date found in ${uniqueFilename}. Text sample: ${rawText.replace(/\s+/g, ' ').substring(0, 200)}`);
@@ -644,7 +584,6 @@ export const uploadCertificate = async (
 
     logger.info(`Extracted donation date "${lastDonationDate}" from ${uniqueFilename}`);
 
-    // ── Persist the extracted date to the donor's profile in MongoDB ──────────
     await DonorProfile.findOneAndUpdate(
       { userId: req.user.id },
       { $set: { lastDonation: lastDonationDate } },

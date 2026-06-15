@@ -385,7 +385,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         },
         $push: {
           timeline: {
-            event: 'donor_accepted',
+            event: 'Donor Accepted - Awaiting Hospital',
             timestamp: now
           }
         }
@@ -409,7 +409,24 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return;
     }
 
-    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
+    await Request.updateOne(
+      { _id: new Types.ObjectId(id), 'matchedDonors.inviteToken': token },
+      { 
+        $set: { 
+          'matchedDonors.$.status': 'DECLINED', 
+          'matchedDonors.$.respondedAt': now,
+          status: 'PENDING_DONOR',
+          targetDonorId: null,
+          acceptedDonorId: null
+        },
+        $push: {
+          timeline: {
+            event: 'Donor Unavailable - Please select another match',
+            timestamp: now
+          }
+        }
+      }
+    );
     res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
   } catch (error) {
     next(error);
