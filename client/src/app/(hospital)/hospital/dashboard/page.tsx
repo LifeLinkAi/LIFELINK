@@ -58,6 +58,8 @@ interface DashboardMetrics {
   erWaitTime: number;
   onCallStaff: number;
   organRequests: number;
+  bloodRequests: number;
+  activeDonations: number;
   icuTrend?: string;
   staffTrend?: string;
 }
@@ -115,7 +117,7 @@ const STATUS_COLORS = {
 };
 
 const DEFAULT_DASHBOARD_DATA: DashboardData = {
-  metrics: { icuCapacity: 92, erWaitTime: 45, onCallStaff: 142, organRequests: 0 },
+  metrics: { icuCapacity: 92, erWaitTime: 45, onCallStaff: 142, organRequests: 0, bloodRequests: 0, activeDonations: 0 },
   bloodLevels: BLOOD_LEVELS,
   activity: ACTIVITY,
 };
@@ -175,7 +177,7 @@ export default function HospitalDashboard() {
       setIncomingError(null);
 
       // Fire requests concurrently using Promise.all
-      const [profileRes, dashboardRes, incomingRes] = await Promise.all([
+      const [profileRes, dashboardRes, incomingRes, donationsRes] = await Promise.all([
         api.get('/hospitals/me'),
         api.get('/hospitals/dashboard').catch(err => {
           console.warn("Dashboard metrics endpoint not fully deployed yet. Using fallbacks.", err);
@@ -184,6 +186,10 @@ export default function HospitalDashboard() {
         api.get<ApiEnvelope<IncomingRequest[]>>('/requests/hospital/incoming').catch(err => {
           console.error('Failed to fetch hospital incoming requests:', err);
           setIncomingError('Unable to load pending requests right now.');
+          return null;
+        }),
+        api.get('/donations/hospital').catch(err => {
+          console.error('Failed to fetch hospital donations:', err);
           return null;
         }),
       ]);
@@ -210,17 +216,39 @@ export default function HospitalDashboard() {
         }
       }
 
-      // Set Dashboard live metrics if the backend returned data successfully
-      if (dashboardRes && dashboardRes.data?.success) {
-        setDashboardData(normalizeDashboardData(dashboardRes.data.data));
-      } else if (dashboardRes && dashboardRes.data) {
-        setDashboardData(normalizeDashboardData(dashboardRes.data)); // fallback to raw response object if not nested
-      }
+      // Calculate aggregations dynamically
+      let organCount = 0;
+      let bloodCount = 0;
+      let activeDonations = 0;
 
       if (incomingRes?.data?.success && Array.isArray(incomingRes.data.data)) {
-        setIncomingRequests(incomingRes.data.data);
+        const reqs = incomingRes.data.data;
+        setIncomingRequests(reqs);
+        organCount = reqs.filter((r: any) => r.type === 'Organ' && r.status === 'PENDING').length;
+        bloodCount = reqs.filter((r: any) => r.type === 'Blood' && r.status === 'PENDING').length;
       } else if (incomingRes) {
         setIncomingRequests([]);
+      }
+
+      if (donationsRes?.data?.success && Array.isArray(donationsRes.data.data)) {
+        const dons = donationsRes.data.data;
+        activeDonations = dons.filter((d: any) => ['arriving', 'screening', 'donating'].includes(d.pipelineStatus)).length;
+      }
+
+      // Set Dashboard live metrics if the backend returned data successfully
+      let dData = dashboardRes?.data?.success ? dashboardRes.data.data : (dashboardRes?.data || null);
+      if (dData) {
+        const normalized = normalizeDashboardData(dData);
+        normalized.metrics.organRequests = organCount;
+        normalized.metrics.bloodRequests = bloodCount;
+        normalized.metrics.activeDonations = activeDonations;
+        setDashboardData(normalized);
+      } else {
+        const fallback = normalizeDashboardData(null);
+        fallback.metrics.organRequests = organCount;
+        fallback.metrics.bloodRequests = bloodCount;
+        fallback.metrics.activeDonations = activeDonations;
+        setDashboardData(fallback);
       }
 
     } catch (error) {

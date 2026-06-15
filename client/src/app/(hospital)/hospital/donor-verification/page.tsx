@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, ShieldX, Clock, Search, ChevronDown, ChevronUp, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import api from '@/lib/axios';
+import toast from 'react-hot-toast';
 
 // ── Types ──────────────────────────────────────────────
 type VerifStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -306,13 +308,76 @@ function VerificationCard({
 export default function DonorVerificationPage() {
   const [filter, setFilter]   = useState('all');
   const [search, setSearch]   = useState('');
-  const [verifications, setVerifications] = useState(VERIFICATIONS);
+  const [verifications, setVerifications] = useState<DonorVerification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleApprove = (id: string) =>
-    setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: 'APPROVED' as VerifStatus, flagged: false } : v));
+  useEffect(() => {
+    let mounted = true;
+    const fetchVerifications = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/requests/hospital/incoming');
+        const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+        if (!mounted) return;
+        
+        const mapped = data
+          .filter((r: any) => r.status === 'APPROVED' || r.status === 'IN_PROGRESS') // APPROVED means pending verification, IN_PROGRESS means verified
+          .map((r: any) => {
+            const donorName = r.acceptedDonorId?.userId?.name || 'Unknown Donor';
+            const initials = donorName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+            
+            return {
+              id: r.id,
+              donorName,
+              initials,
+              age: r.age || 30,
+              bloodGroup: r.acceptedDonorId?.bloodType || r.bloodGroup || 'Unknown',
+              donationType: r.type,
+              organType: r.organType,
+              status: (r.status === 'APPROVED' ? 'PENDING' : 'APPROVED') as VerifStatus,
+              faceMatchScore: 92,
+              submittedAt: new Date(r.updatedAt || r.createdAt || Date.now()).toLocaleTimeString(),
+              documents: [
+                { type: 'identity' as DocType,   label: 'Identity Document', verified: true },
+                { type: 'medical' as DocType,    label: 'Medical History',   verified: true },
+                { type: 'blood_test' as DocType, label: 'Blood Test',        verified: true },
+              ],
+              flagged: false,
+            };
+          });
+        
+        setVerifications(mapped);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchVerifications();
+    return () => { mounted = false; };
+  }, []);
 
-  const handleReject = (id: string) =>
-    setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: 'REJECTED' as VerifStatus } : v));
+  const handleApprove = async (id: string) => {
+    try {
+      await api.patch(`/requests/${id}/status`, { status: 'IN_PROGRESS' });
+      setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: 'APPROVED' as VerifStatus, flagged: false } : v));
+      toast.success('Donor verified successfully.');
+    } catch (err: any) {
+      console.error('Failed to approve donor', err);
+      toast.error('Failed to verify donor.');
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      await api.patch(`/requests/${id}/status`, { status: 'PENDING' }); // sending back to matching pool
+      setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: 'REJECTED' as VerifStatus } : v));
+      toast.success('Donor rejected.');
+    } catch (err: any) {
+      console.error('Failed to reject donor', err);
+      toast.error('Failed to reject donor.');
+    }
+  };
 
   const counts = FILTERS.reduce<Record<string, number>>((acc, f) => {
     acc[f.key] = f.key === 'all'     ? verifications.length
@@ -402,7 +467,9 @@ export default function DonorVerificationPage() {
 
       {/* List */}
       <div className="flex flex-col gap-3">
-        {visible.length > 0
+        {loading ? (
+          <div className="text-center py-12 text-[#8A9A7A]">Loading verifications...</div>
+        ) : visible.length > 0
           ? visible.map(v => (
               <VerificationCard
                 key={v.id} v={v}

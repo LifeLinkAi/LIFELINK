@@ -44,6 +44,11 @@ const donationRecordSchema = new Schema(
       default: 'Pending',
       required: true,
     },
+    pipelineStatus: {
+      type: String,
+      enum: ['arriving', 'screening', 'donating', 'completed', 'deferred'],
+      default: 'arriving',
+    },
     // Volume in millilitres (450 = standard whole blood unit)
     volumeMl: {
       type: Number,

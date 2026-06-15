@@ -430,11 +430,27 @@ export const getHospitalDashboardData = async (req: AuthRequest, res: Response, 
       return next(new ApiError(404, 'Hospital profile not found.'));
     }
 
+    // Map backend bloodInventory to frontend BloodLevel format
+    const bloodLevels = profile.bloodInventory.map(inv => ({
+      type: inv.bloodGroup + (inv.bloodGroup.endsWith('+') || inv.bloodGroup.endsWith('-') ? '' : ''), // keep it as is, or map to 'O Positive'
+      units: inv.units,
+      max: inv.maxCapacity,
+      status: inv.status
+    }));
+
     res.status(200).json({
       success: true,
       data: {
-        bloodInventory: profile.bloodInventory,
-        liveStats: profile.liveStats,
+        metrics: {
+          icuCapacity: profile.liveStats?.icuCapacityPct || 85,
+          erWaitTime: profile.liveStats?.erWaitTimeMins || 42,
+          onCallStaff: profile.liveStats?.onCallStaff || 24,
+          organRequests: 0, // will be counted on frontend or we could count here
+          bloodRequests: 0,
+          activeDonations: 0,
+        },
+        bloodLevels,
+        activity: [], // could populate real activity
         bloodHealthStatus: profile.bloodHealthStatus,
         patientCount: profile.patientCount,
       }

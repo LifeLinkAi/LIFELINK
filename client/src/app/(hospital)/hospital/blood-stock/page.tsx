@@ -64,7 +64,7 @@ export default function BloodStockPage() {
     const loadInventory = async () => {
       setIsLoading(true);
       try {
-        const res = await api.get('/hospital/dashboard');
+        const res = await api.get('/hospitals/dashboard');
         const payload = res.data?.data ?? res.data;
         const inventory = Array.isArray(payload?.bloodInventory) ? payload.bloodInventory.map((item: any) => ({
           group: item.bloodGroup,
@@ -105,7 +105,7 @@ export default function BloodStockPage() {
 
     setSavingGroup(selected.group);
     try {
-      const res = await api.put('/hospital/inventory', requestBody);
+      const res = await api.put('/hospitals/inventory', requestBody);
       const payload = res.data?.data ?? res.data;
       const updatedInventory = Array.isArray(payload) ? payload.map((item: any) => ({
         group: item.bloodGroup,

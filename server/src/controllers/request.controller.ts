@@ -8,6 +8,7 @@ import { findNearbyCompatibleDonors } from '../services/matching/donor-match.ser
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
+import { HospitalProfile } from '../models/HospitalProfile';
 
 // Helper function to safely parse and structure valid GeoJSON locations
 const parseGeoLocation = (body: any) => {
@@ -400,9 +401,14 @@ export const getHospitalIncomingRequests = async (req: AuthRequest, res: Respons
 
     const requests = await Request.find({
       type: { $in: ['Blood', 'Organ'] },
-      status: { $in: PENDING_REQUEST_STATUSES },
+      status: { $in: ['Pending', 'PENDING', 'APPROVED', 'IN_PROGRESS', 'FULFILLED'] },
     })
       .sort({ createdAt: -1 })
+      .populate({
+        path: 'acceptedDonorId',
+        select: 'bloodType userId',
+        populate: { path: 'userId', select: 'name email' }
+      })
       .lean() as RequestRecord[];
 
     res.status(200).json({
@@ -431,19 +437,42 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
       return next(new ApiError(400, 'Status must be one of: APPROVED, IN_PROGRESS, FULFILLED.'));
     }
 
-    const requestObj = await Request.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true, runValidators: true }
-    ).lean() as RequestRecord | null;
+    const requestObj = await Request.findById(id);
 
     if (!requestObj) {
       return next(new ApiError(404, 'Request not found.'));
     }
 
+    const previousStatus = requestObj.status;
+    requestObj.status = status as string;
+
+    if (status === 'FULFILLED' && previousStatus !== 'FULFILLED' && requestObj.type === 'Blood') {
+      const hospitalProfile = await HospitalProfile.findOne({ userId: req.user.id });
+      if (hospitalProfile) {
+        const invIndex = hospitalProfile.bloodInventory.findIndex(inv => inv.bloodGroup === requestObj.bloodGroup);
+        if (invIndex !== -1) {
+          const unitsToDeduct = requestObj.units || 1;
+          hospitalProfile.bloodInventory[invIndex].units = Math.max(0, hospitalProfile.bloodInventory[invIndex].units - unitsToDeduct);
+          
+          const currentUnits = hospitalProfile.bloodInventory[invIndex].units;
+          const currentMax = hospitalProfile.bloodInventory[invIndex].maxCapacity;
+          const percentage = currentMax > 0 ? (currentUnits / currentMax) * 100 : 0;
+          
+          if (percentage <= 15) hospitalProfile.bloodInventory[invIndex].status = 'critical';
+          else if (percentage <= 30) hospitalProfile.bloodInventory[invIndex].status = 'low';
+          else if (percentage >= 80) hospitalProfile.bloodInventory[invIndex].status = 'optimal';
+          else hospitalProfile.bloodInventory[invIndex].status = 'adequate';
+
+          await hospitalProfile.save();
+        }
+      }
+    }
+
+    await requestObj.save();
+
     res.status(200).json({
       success: true,
-      data: toRequestDto(requestObj),
+      data: toRequestDto(requestObj.toObject() as any),
     });
   } catch (error) {
     next(error);
