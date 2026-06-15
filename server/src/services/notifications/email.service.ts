@@ -1,24 +1,6 @@
-import nodemailer from 'nodemailer';
 import { logger } from '../../utils/logger';
-
-// Create a transporter using SMTP settings from server .env config
-const createTransporter = () => {
-  const port = parseInt(process.env.SMTP_PORT || '2525', 10);
-  const isSecure = port === 465;
-
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: port,
-    secure: isSecure,
-    auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-    },
-  });
-};
-
 /**
- * Core sendMail function for reusability across the entire project
+ * Core sendMail function for reusability across the entire project using SendGrid API
  */
 export const sendMail = async (options: {
   to: string;
@@ -27,21 +9,48 @@ export const sendMail = async (options: {
   html: string;
 }): Promise<void> => {
   try {
-    const transporter = createTransporter();
-    const fromEmail = process.env.EMAIL_FROM || 'no-reply@lifelink.org';
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) {
+      throw new Error('SENDGRID_API_KEY environment variable is not defined.');
+    }
 
-    const mailOptions = {
-      from: `"LifeLink Network" <${fromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    };
+    const fromEmail = process.env.EMAIL_FROM || 'lifelinkai4@gmail.com';
 
-    const info = await transporter.sendMail(mailOptions);
-    logger.info(`📧 Email successfully sent to ${options.to}. Message ID: ${info.messageId}`);
+    // Send HTTP POST request to SendGrid API
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [
+          {
+            to: [{ email: options.to }],
+          },
+        ],
+        from: { 
+          email: fromEmail.trim(), 
+          name: 'LifeLink Network' 
+        },
+        subject: options.subject,
+        content: [
+          {
+            type: 'text/html',
+            value: options.html,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`SendGrid API error (${response.status}): ${errorText}`);
+    }
+
+    logger.info(`📧 Email successfully sent to ${options.to} via SendGrid API`);
   } catch (error: any) {
-    logger.error(`❌ Failed to send email to ${options.to}: ${error.message}`);
+    logger.error(`❌ Failed to send email to ${options.to} via SendGrid: ${error.message}`);
     throw error;
   }
 };
@@ -124,4 +133,41 @@ export const sendHospitalInviteEmail = async (
     subject: 'Activate Your LIFELINK Hospital Node',
     html: htmlContent,
   });
+};
+
+/**
+ * Sends an urgent donor notification when a new patient request matches a donor.
+ */
+export const sendDonorRequestNotification = async (
+  toEmail: string,
+  donorName: string,
+  requestDetails: { urgency?: string; type?: string; bloodGroup?: string; organType?: string; facility?: string; patientName?: string },
+  inviteUrl: string
+): Promise<void> => {
+  const subject = `URGENT: New ${requestDetails.type || 'Donation'} Request`;
+  const htmlContent = `
+    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #fee2e2; border-radius: 12px; background-color: #fff8f8;">
+      <h2 style="color: #7f1d1d; font-family: 'Syne', sans-serif; margin-top: 0;">URGENT: New ${requestDetails.type || 'Donation'} Request</h2>
+      <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hello <strong>${donorName}</strong>,</p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+        A new ${requestDetails.type || 'donation'} request requires immediate attention. Below are the details:
+      </p>
+      <ul style="color: #334155; font-size: 14px; line-height: 1.6;">
+        ${requestDetails.patientName ? `<li><strong>Patient:</strong> ${requestDetails.patientName}</li>` : ''}
+        ${requestDetails.facility ? `<li><strong>Facility:</strong> ${requestDetails.facility}</li>` : ''}
+        ${requestDetails.urgency ? `<li><strong>Urgency:</strong> ${requestDetails.urgency}</li>` : ''}
+        ${requestDetails.bloodGroup ? `<li><strong>Blood Group:</strong> ${requestDetails.bloodGroup}</li>` : ''}
+        ${requestDetails.organType ? `<li><strong>Organ:</strong> ${requestDetails.organType}</li>` : ''}
+      </ul>
+      <div style="text-align: center; margin: 18px 0;">
+        <a href="${inviteUrl}" style="background-color: #7f1d1d; color: #ffffff; padding: 12px 22px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
+          View Request & Respond
+        </a>
+      </div>
+      <p style="color: #64748b; font-size: 12px;">If the button above does not work, copy and paste the link below into your browser:<br/><a href="${inviteUrl}" style="color: #2563eb;">${inviteUrl}</a></p>
+      <p style="color: #64748b; font-size: 12px; margin-top: 12px; border-top: 1px solid #fee2e2; padding-top: 12px;">This invitation link will expire in 24 hours.</p>
+    </div>
+  `;
+
+  await sendMail({ to: toEmail, subject, html: htmlContent });
 };

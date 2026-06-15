@@ -100,9 +100,11 @@ export const createHospital = async (req: AuthRequest, res: Response, next: Next
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
-    sendHospitalInviteEmail(emailLower, name, inviteUrl).catch((err) => {
+    try {
+      await sendHospitalInviteEmail(emailLower, name, inviteUrl);
+    } catch (err) {
       console.error(`Error sending hospital invite email to ${emailLower}:`, err);
-    });
+    }
 
     res.status(201).json({
       id: user._id.toString(),
@@ -496,3 +498,78 @@ export const updateBloodInventory = async (req: AuthRequest, res: Response, next
     next(error);
   }
 };
+
+export const bulkInviteHospitals = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { users } = req.body;
+    if (!users || !Array.isArray(users)) {
+      return next(new ApiError(400, 'users array is required for bulk invite operations.'));
+    }
+
+    const invited = [];
+    const skipped = [];
+
+    const salt = await bcrypt.genSalt(10);
+
+    for (const u of users) {
+      const { name, email } = u;
+      if (!name || !email) continue;
+      const emailLower = email.toLowerCase().trim();
+
+      const existingUser = await User.findOne({ email: emailLower });
+      if (existingUser) {
+        skipped.push({ name, email: emailLower, reason: 'Already registered.' });
+        continue;
+      }
+
+      // Generate random secure password
+      const tempPass = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPass, salt);
+
+      const user = await User.create({
+        name,
+        email: emailLower,
+        password: hashedPassword,
+        role: 'Hospital',
+      });
+
+      const inviteToken = crypto.randomBytes(32).toString('hex');
+      const inviteTokenExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+
+      await HospitalProfile.create({
+        userId: user._id,
+        licenseId: '',
+        governmentLicenseId: '',
+        city: '',
+        location: '',
+        logo: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+        specialties: ['General'],
+        status: 'Pending',
+        isSetupComplete: false,
+        inviteToken,
+        inviteTokenExpires,
+      });
+
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
+
+      try {
+        await sendHospitalInviteEmail(emailLower, name, inviteUrl);
+      } catch (err: any) {
+        console.error(`Error sending bulk hospital invite email to ${emailLower}:`, err);
+      }
+
+      invited.push({ id: user._id.toString(), name, email: emailLower });
+    }
+
+    res.status(200).json({
+      success: true,
+      invitedCount: invited.length,
+      skippedCount: skipped.length,
+      invited,
+      skipped,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

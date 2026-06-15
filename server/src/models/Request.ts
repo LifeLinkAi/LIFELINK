@@ -1,12 +1,84 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 
-const requestSchema = new Schema(
+// ==========================================
+// TYPE DEFINITIONS
+// ==========================================
+
+export interface IMatchedDonor {
+  donorId: Schema.Types.ObjectId;
+  status: 'NOTIFIED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+  inviteToken: string;
+  tokenExpiresAt: Date;
+  respondedAt?: Date;
+}
+
+export interface IRequest extends Document {
+  userId: Schema.Types.ObjectId | null;
+  requestedBy: Schema.Types.ObjectId;
+  patientName?: string;
+  facility?: string;
+  age?: number;
+  gender?: string;
+  location?: { type: 'Point'; coordinates: number[] } | null;
+  organType?: string;
+  bloodGroup: string;
+  units?: number;
+  urgency: string;
+  status: string;
+  matchPercentage?: number;
+  registeredDate: Date;
+  distance?: string;
+  facilityType?: string;
+  time?: string;
+  notes?: string;
+  contactPhone?: string; // Added to interface
+  type: 'Organ' | 'Blood';
+  matchedDonors: IMatchedDonor[];
+  notifiedDonors: Schema.Types.ObjectId[];
+  acceptedDonorId?: Schema.Types.ObjectId | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ==========================================
+// SCHEMA DEFINITION
+// ==========================================
+
+const matchedDonorSchema = new Schema<IMatchedDonor>(
+  {
+    donorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DonorProfile',
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['NOTIFIED', 'ACCEPTED', 'DECLINED', 'EXPIRED'],
+      default: 'NOTIFIED',
+    },
+    inviteToken: {
+      type: String,
+      required: true,
+    },
+    tokenExpiresAt: {
+      type: Date,
+      required: true,
+    },
+    respondedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: true }
+);
+
+const requestSchema = new Schema<IRequest>(
   {
     // --- CONNECTS THE REQUEST TO A SPECIFIC USER ACCOUNT ---
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      default: null, // Left optional so legacy Admin-created requests don't break
+      default: null,
     },
     // -----------------------------------------------------
     patientName: {
@@ -14,6 +86,10 @@ const requestSchema = new Schema(
       trim: true,
     },
     facility: {
+      type: String,
+      trim: true,
+    },
+    contactPhone: { // Added to schema
       type: String,
       trim: true,
     },
@@ -53,7 +129,7 @@ const requestSchema = new Schema(
       required: true,
     },
     registeredDate: {
-      type: Date, // Changed from String to Date to match standard JS Date instances smoothly
+      type: Date,
       required: true,
     },
     distance: {
@@ -77,10 +153,42 @@ const requestSchema = new Schema(
       enum: ['Organ', 'Blood'],
       required: true,
     },
+    matchedDonors: {
+      type: [matchedDonorSchema],
+      default: [],
+    },
+    notifiedDonors: {
+      type: [Schema.Types.ObjectId],
+      ref: 'DonorProfile',
+      default: [],
+    },
+    acceptedDonorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DonorProfile',
+      default: null,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point',
+      },
+      coordinates: {
+        type: [Number],
+        required: false,
+      },
+    },
   },
   {
     timestamps: true,
   }
 );
 
-export const Request = model('Request', requestSchema);
+requestSchema.index({ userId: 1, createdAt: -1 });
+requestSchema.index({ status: 1 });
+requestSchema.index({ notifiedDonors: 1 });
+requestSchema.index({ 'matchedDonors.inviteToken': 1 });
+requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
+requestSchema.index({ location: '2dsphere' });
+
+export const Request = model<IRequest>('Request', requestSchema);

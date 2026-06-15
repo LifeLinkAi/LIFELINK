@@ -5,7 +5,7 @@ import api from '@/lib/axios';
 import toast from 'react-hot-toast';
 import { 
   AlertTriangle, Droplets, Users, Heart,
-  TrendingUp, TrendingDown, Activity, CheckCircle, Award, ShieldAlert, FileText, UploadCloud, Trash2
+  TrendingUp, TrendingDown, Activity, CheckCircle, Award, ShieldAlert, FileText, UploadCloud, Trash2, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +68,30 @@ interface DashboardData {
   activity: ActivityItem[];
 }
 
+interface IncomingRequest {
+  id: string;
+  _id?: string;
+  patientName?: string;
+  facility?: string;
+  age?: number;
+  gender?: string;
+  organType?: string;
+  bloodGroup?: string;
+  units?: number;
+  urgency?: string;
+  facilityType?: string;
+  notes?: string;
+  type: 'Blood' | 'Organ';
+  status: string;
+  registeredDate?: string;
+  createdAt?: string;
+}
+
+interface ApiEnvelope<T> {
+  success: boolean;
+  data: T;
+}
+
 // Keep fallback arrays intact so the UI never crashes if data is loading
 const BLOOD_LEVELS: BloodLevel[] = [
   { type: 'O Negative', units: 12, max: 80, status: 'critical' },
@@ -90,16 +114,30 @@ const STATUS_COLORS = {
   optimal: { bar: '#16a34a', text: 'text-green-700' },
 };
 
+const DEFAULT_DASHBOARD_DATA: DashboardData = {
+  metrics: { icuCapacity: 92, erWaitTime: 45, onCallStaff: 142, organRequests: 0 },
+  bloodLevels: BLOOD_LEVELS,
+  activity: ACTIVITY,
+};
+
+const normalizeDashboardData = (value: Partial<DashboardData> | null | undefined): DashboardData => ({
+  metrics: {
+    ...DEFAULT_DASHBOARD_DATA.metrics,
+    ...(value?.metrics ?? {}),
+  },
+  bloodLevels: Array.isArray(value?.bloodLevels) ? value.bloodLevels : DEFAULT_DASHBOARD_DATA.bloodLevels,
+  activity: Array.isArray(value?.activity) ? value.activity : DEFAULT_DASHBOARD_DATA.activity,
+});
+
 export default function HospitalDashboard() {
   const [profile, setProfile] = useState<HospitalProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
+  const [isIncomingLoading, setIsIncomingLoading] = useState(true);
+  const [incomingError, setIncomingError] = useState<string | null>(null);
 
   // Dynamic state for your live metrics
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    metrics: { icuCapacity: 92, erWaitTime: 45, onCallStaff: 142, organRequests: 4 },
-    bloodLevels: BLOOD_LEVELS,
-    activity: ACTIVITY
-  });
+  const [dashboardData, setDashboardData] = useState<DashboardData>(DEFAULT_DASHBOARD_DATA);
 
   // Multi-step Wizard States
   const [currentStep, setCurrentStep] = useState(1);
@@ -133,14 +171,21 @@ export default function HospitalDashboard() {
   const fetchProfile = async () => {
     try {
       setIsLoading(true);
+      setIsIncomingLoading(true);
+      setIncomingError(null);
 
       // Fire requests concurrently using Promise.all
-      const [profileRes, dashboardRes] = await Promise.all([
+      const [profileRes, dashboardRes, incomingRes] = await Promise.all([
         api.get('/hospitals/me'),
         api.get('/hospitals/dashboard').catch(err => {
           console.warn("Dashboard metrics endpoint not fully deployed yet. Using fallbacks.", err);
           return null; // Safe degradation if endpoint is still being pushed
-        })
+        }),
+        api.get<ApiEnvelope<IncomingRequest[]>>('/requests/hospital/incoming').catch(err => {
+          console.error('Failed to fetch hospital incoming requests:', err);
+          setIncomingError('Unable to load pending requests right now.');
+          return null;
+        }),
       ]);
 
       // Set Profile Data
@@ -167,9 +212,15 @@ export default function HospitalDashboard() {
 
       // Set Dashboard live metrics if the backend returned data successfully
       if (dashboardRes && dashboardRes.data?.success) {
-        setDashboardData(dashboardRes.data.data);
+        setDashboardData(normalizeDashboardData(dashboardRes.data.data));
       } else if (dashboardRes && dashboardRes.data) {
-        setDashboardData(dashboardRes.data); // fallback to raw response object if not nested
+        setDashboardData(normalizeDashboardData(dashboardRes.data)); // fallback to raw response object if not nested
+      }
+
+      if (incomingRes?.data?.success && Array.isArray(incomingRes.data.data)) {
+        setIncomingRequests(incomingRes.data.data);
+      } else if (incomingRes) {
+        setIncomingRequests([]);
       }
 
     } catch (error) {
@@ -177,6 +228,7 @@ export default function HospitalDashboard() {
       toast.error('Failed to load facility configuration.');
     } finally {
       setIsLoading(false);
+      setIsIncomingLoading(false);
     }
   };
 
@@ -332,6 +384,13 @@ export default function HospitalDashboard() {
 
   const isPendingAudit = profile && profile.isSetupComplete && (profile.status === 'Pending' || profile.status === 'Verified'); // wait until status shifts to Active
   const isSetupIncomplete = profile && !profile.isSetupComplete;
+  const pendingIncomingCount = incomingRequests.length;
+  const pendingOrganCount = incomingRequests.filter(request => request.type === 'Organ').length;
+  const pendingBloodCount = incomingRequests.filter(request => request.type === 'Blood').length;
+  const criticalIncomingCount = incomingRequests.filter(request => {
+    const urgency = request.urgency?.toLowerCase() ?? '';
+    return urgency.includes('critical') || urgency.includes('urgent') || urgency.includes('high');
+  }).length;
 
   return (
     <div className="relative min-h-[calc(100vh-100px)]">
@@ -769,12 +828,12 @@ export default function HospitalDashboard() {
             trendUp={true} 
           />
           <StatCard 
-            title="Organ Requests" 
-            subtitle="Pending reviews" 
-            value={String(dashboardData.metrics.organRequests)} 
+            title="Incoming Requests" 
+            subtitle="Pending hospital review" 
+            value={String(pendingIncomingCount)} 
             suffix="active" 
-            tag={`${dashboardData.metrics.organRequests} to verify`} 
-            tagVariant="warn" 
+            tag={criticalIncomingCount > 0 ? `${criticalIncomingCount} urgent` : `${pendingOrganCount} organ / ${pendingBloodCount} blood`} 
+            tagVariant={criticalIncomingCount > 0 ? "critical" : "warn"} 
             icon={<Heart size={18} />} 
           />
         </div>
@@ -793,27 +852,22 @@ export default function HospitalDashboard() {
           </div>
         </div>
 
-        {/* Live Activity */}
+        {/* Incoming Requests */}
         <div className="bg-white rounded-xl border border-[#E8E4D8] p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={15} className="text-[#6B7A5A]" />
-            <span className="text-[14px] font-semibold text-[#1a2e0a]">Live Activity</span>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Activity size={15} className="text-[#6B7A5A]" />
+              <span className="text-[14px] font-semibold text-[#1a2e0a]">Incoming Emergencies</span>
+            </div>
+            <span className="rounded-full bg-[#F5F2E8] px-2.5 py-1 text-[11px] font-semibold text-[#3A4A2A]">
+              {pendingIncomingCount} pending
+            </span>
           </div>
-          <div className="flex flex-col">
-            {dashboardData.activity.map((item, i) => (
-              <div key={i} className="flex gap-3">
-                <div className="flex flex-col items-center flex-shrink-0 w-3">
-                  <div className={cn('w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0', item.urgent ? 'bg-red-500' : 'bg-[#3d6b1e]')} />
-                  {i < dashboardData.activity.length - 1 && <div className="w-px flex-1 bg-[#E8E4D8] my-1" />}
-                </div>
-                <div className="pb-4">
-                  <p className="text-[10.5px] font-semibold text-[#8A9A7A] tracking-wide mb-0.5">{item.time}</p>
-                  <p className="text-[13px] font-semibold text-[#1a2e0a]">{item.title}</p>
-                  <p className="text-[12px] text-[#6B7A5A] leading-relaxed mt-0.5">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <IncomingRequestsPanel
+            requests={incomingRequests}
+            isLoading={isIncomingLoading}
+            error={incomingError}
+          />
         </div>
       </div>
     </div>
@@ -821,6 +875,124 @@ export default function HospitalDashboard() {
 }
 
 type TagVariant = 'critical' | 'warn' | 'ok';
+
+function IncomingRequestsPanel({ requests, isLoading, error }: {
+  requests: IncomingRequest[];
+  isLoading: boolean;
+  error: string | null;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[180px] items-center justify-center rounded-lg border border-dashed border-[#E8E4D8] bg-[#FBFAF6]">
+        <div className="flex items-center gap-2 text-[12.5px] font-semibold text-[#3d6b1e]">
+          <Loader2 size={16} className="animate-spin" />
+          Loading pending requests...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-5 text-[13px] font-medium text-red-700">
+        {error}
+      </div>
+    );
+  }
+
+  if (requests.length === 0) {
+    return (
+      <div className="flex min-h-[180px] flex-col items-center justify-center rounded-lg border border-dashed border-[#E8E4D8] bg-[#FBFAF6] text-center">
+        <CheckCircle size={26} className="mb-2 text-[#3d6b1e]" />
+        <p className="text-[13px] font-semibold text-[#1a2e0a]">No pending requests at this time</p>
+        <p className="mt-1 text-[12px] text-[#6B7A5A]">New blood and organ requests will appear here automatically.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {requests.map(request => (
+        <article key={request.id} className="rounded-lg border border-[#E8E4D8] bg-[#FCFBF7] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className={cn(
+                'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
+                request.type === 'Blood' ? 'bg-red-50 text-red-700' : 'bg-purple-50 text-purple-700'
+              )}>
+                {request.type === 'Blood' ? <Droplets size={17} /> : <Heart size={17} />}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[13.5px] font-bold text-[#1a2e0a]">
+                  {request.patientName || 'Unnamed patient'}
+                </p>
+                <p className="text-[11.5px] font-medium text-[#8A9A7A]">
+                  {request.type} request . {formatRequestDate(request.registeredDate || request.createdAt)}
+                </p>
+              </div>
+            </div>
+            <span className={cn(
+              'rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wide',
+              getUrgencyClass(request.urgency)
+            )}>
+              {request.urgency || 'Pending'}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-[#4a5940]">
+            <RequestMeta label="Blood" value={request.bloodGroup || 'Not specified'} />
+            <RequestMeta label={request.type === 'Organ' ? 'Organ' : 'Units'} value={request.type === 'Organ' ? request.organType || 'Not specified' : String(request.units ?? 'Not specified')} />
+            <RequestMeta label="Facility" value={request.facility || request.facilityType || 'Not specified'} />
+            <RequestMeta label="Status" value={request.status} />
+          </div>
+
+          {request.notes && (
+            <p className="mt-3 line-clamp-2 rounded-md bg-white px-3 py-2 text-[12px] leading-relaxed text-[#6B7A5A]">
+              {request.notes}
+            </p>
+          )}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function RequestMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md bg-white px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#8A9A7A]">{label}</p>
+      <p className="mt-0.5 truncate font-semibold text-[#1a2e0a]">{value}</p>
+    </div>
+  );
+}
+
+function formatRequestDate(value?: string) {
+  if (!value) return 'Time pending';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Time pending';
+
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function getUrgencyClass(urgency?: string) {
+  const normalized = urgency?.toLowerCase() ?? '';
+
+  if (normalized.includes('critical') || normalized.includes('urgent')) {
+    return 'bg-red-50 text-red-700 border border-red-200';
+  }
+
+  if (normalized.includes('high')) {
+    return 'bg-amber-50 text-amber-700 border border-amber-200';
+  }
+
+  return 'bg-[#F5F2E8] text-[#3A4A2A] border border-[#E8E4D8]';
+}
 
 function StatCard({ title, subtitle, value, suffix, tag, tagVariant, icon, trend, trendUp }: {
   title: string;

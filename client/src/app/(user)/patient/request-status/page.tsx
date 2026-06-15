@@ -1,13 +1,14 @@
 ﻿'use client';
 import { useEffect, useState } from 'react';
-import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 type RequestType   = 'Blood' | 'Organ';
-type RequestStatus = 'PENDING' | 'MATCHING' | 'DONOR_FOUND' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+type RequestStatus = 'PENDING' | 'DONOR_NOTIFIED' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 interface BackendRequest {
   id: string;
@@ -43,7 +44,12 @@ interface PatientRequest {
   canCancel: boolean;
 }
 
-const STATUS_ORDER: RequestStatus[] = ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'];
+const TIMELINE_STEPS: Array<{ event: string; statuses: RequestStatus[] }> = [
+  { event: 'Request Submitted', statuses: ['PENDING', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donors Notified', statuses: ['DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Request Accepted', statuses: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donation Completed', statuses: ['COMPLETED'] },
+];
 
 function formatRegisteredDate(value: string): string {
   try {
@@ -56,19 +62,21 @@ function formatRegisteredDate(value: string): string {
 }
 
 function buildTimeline(req: BackendRequest): PatientRequest['timeline'] {
-  const baseEvents = [
-    { event: 'Request submitted', done: true },
-    { event: 'AI matching started', done: ['MATCHING', 'DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'].includes(req.status) },
-    { event: req.type === 'Blood' ? 'Compatible donor found' : 'Compatible donor found', done: ['DONOR_FOUND', 'IN_PROGRESS', 'COMPLETED'].includes(req.status) },
-    { event: req.status === 'COMPLETED' ? (req.type === 'Blood' ? 'Donation completed' : 'Organ donation completed') : 'Request processing', done: req.status === 'COMPLETED' },
-    { event: req.status === 'COMPLETED' ? 'Request fulfilled' : '—', done: req.status === 'COMPLETED' },
-  ];
-
-  return baseEvents.map((event, index) => ({
+  return TIMELINE_STEPS.map((step, index) => ({
     time: index === 0 ? formatRegisteredDate(req.registeredDate) : req.time || '—',
-    event: event.event,
-    done: event.done,
+    event: step.event,
+    done: step.statuses.includes(req.status),
   }));
+}
+
+function normalizeStatus(status: string): RequestStatus {
+  const rawStatus = status.toUpperCase();
+  if (['COMPLETED', 'FULFILLED'].includes(rawStatus)) return 'COMPLETED';
+  if (['APPROVED', 'ACCEPTED'].includes(rawStatus)) return 'APPROVED';
+  if (['IN_PROGRESS'].includes(rawStatus)) return 'IN_PROGRESS';
+  if (['DONOR_NOTIFIED', 'DONOR_FOUND', 'MATCHING'].includes(rawStatus)) return 'DONOR_NOTIFIED';
+  if (rawStatus === 'CANCELLED') return 'CANCELLED';
+  return 'PENDING';
 }
 
 function mapBackendRequest(req: BackendRequest): PatientRequest {
@@ -76,32 +84,34 @@ function mapBackendRequest(req: BackendRequest): PatientRequest {
     ? `${req.bloodGroup || 'Unknown'} · ${req.units} unit${req.units === 1 ? '' : 's'} · ${req.facility}`
     : `${req.organType || 'Organ'} · ${req.bloodGroup || 'Unknown'} · ${req.facility}`;
 
+  const status = normalizeStatus(typeof req.status === 'string' ? req.status : 'PENDING');
+
   return {
     id: req.id,
     type: req.type,
-    status: req.status,
+    status,
     createdAt: formatRegisteredDate(req.registeredDate),
     updatedAt: req.time || formatRegisteredDate(req.registeredDate),
-    urgency: req.urgency,
+    urgency: req.urgency || 'low',
     detail,
     hospital: req.facility,
-    timeline: buildTimeline(req),
-    canCancel: ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'].includes(req.status),
+    timeline: buildTimeline({ ...req, status }),
+    canCancel: ['PENDING', 'DONOR_NOTIFIED'].includes(status),
   };
 }
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
-  PENDING:     { label: '● Pending',     color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
-  MATCHING:    { label: '⟳ Matching',   color: '#5B21B6', bg: '#EDE8FF', border: '#C4B5FD' },
-  DONOR_FOUND: { label: '✦ Donor Found', color: '#1A5FAA', bg: '#E3F0FF', border: '#93C5FD' },
-  IN_PROGRESS: { label: '↑ In Progress', color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
-  COMPLETED:   { label: '✓ Completed',   color: '#2B6B0A', bg: '#E8F5E0', border: '#86EFAC' },
-  CANCELLED:   { label: '✕ Cancelled',   color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
+  PENDING:        { label: 'Pending',          color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
+  DONOR_NOTIFIED: { label: 'Donors Notified',  color: '#1A5FAA', bg: '#E3F0FF', border: '#93C5FD' },
+  APPROVED:       { label: 'Accepted',         color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
+  IN_PROGRESS:    { label: 'In Progress',      color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
+  COMPLETED:      { label: 'Completed',        color: '#2B6B0A', bg: '#E8F5E0', border: '#86EFAC' },
+  CANCELLED:      { label: 'Cancelled',        color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
 };
 
 const TYPE_CONFIG: Record<RequestType, { icon: React.ReactNode; color: string; bg: string }> = {
   Blood:     { icon: <Droplets size={15} />, color: '#CC0000', bg: '#FFE5E5' },
-  Organ:     { icon: <Heart    size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
+  Organ:     { icon: <Heart     size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
 };
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -117,9 +127,10 @@ const FILTERS = [
 
 function RequestCard({ req }: { req: PatientRequest }) {
   const [expanded, setExpanded] = useState(req.status !== 'COMPLETED' && req.status !== 'CANCELLED');
-  const sc = STATUS_CONFIG[req.status];
+  const statusKey = (req.status in STATUS_CONFIG ? req.status : 'PENDING') as RequestStatus;
+  const sc = STATUS_CONFIG[statusKey];
   const tc = TYPE_CONFIG[req.type];
-  const borderColor = URGENCY_COLORS[req.urgency];
+  const borderColor = URGENCY_COLORS[req.urgency] ?? URGENCY_COLORS.low;
 
   return (
     <div className="bg-white rounded-xl border border-[#E8E4D8] overflow-hidden"
@@ -199,12 +210,23 @@ function RequestCard({ req }: { req: PatientRequest }) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2.5 mt-2">
+          <div className="flex items-center gap-2.5 mt-2 w-full">
             {req.status === 'COMPLETED' && (
               <div className="flex items-center gap-1.5 text-[12.5px] text-green-700 font-medium">
                 <CheckCircle size={14} /> Fulfilled successfully
               </div>
             )}
+            
+            {/* Conditional Matching Access Option */}
+            {['PENDING', 'DONOR_NOTIFIED'].includes(req.status) && (
+              <Link 
+                href={`/patient/select-donors?requestId=${req.id}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a2e0a] text-white text-[12px] font-medium rounded-lg hover:bg-[#2B4A18] transition-colors"
+              >
+                <Search size={13} /> View Matches
+              </Link>
+            )}
+
             {req.canCancel && (
               <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 text-[12px] font-medium rounded-lg hover:bg-red-50 transition-colors ml-auto">
                 <XCircle size={13} /> Cancel Request
@@ -223,7 +245,7 @@ export default function RequestStatusPage() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const ACTIVE_STATUSES = ['PENDING', 'MATCHING', 'DONOR_FOUND', 'IN_PROGRESS'];
+  const ACTIVE_STATUSES = ['PENDING', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS'];
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -343,7 +365,7 @@ export default function RequestStatusPage() {
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
-          { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart     size={16} />, color: '#5B21B6' },
+          { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart      size={16} />, color: '#5B21B6' },
         ].map(l => (
           <a key={l.label} href={l.href}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E8E4D8] hover:border-[#7AB648] transition-colors text-center">
@@ -358,4 +380,3 @@ export default function RequestStatusPage() {
     </div>
   );
 }
-

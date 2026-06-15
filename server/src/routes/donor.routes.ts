@@ -9,6 +9,7 @@ import {
   getMeProfile,
   completeDonorSetup,
   uploadCertificate,
+  bulkInviteDonors,
 } from '../controllers/donor.controller';
 import { updateProfile, toggleAvailability } from '../controllers/donorProfile.controller';
 import { getDonorRequests, respondToRequest } from '../controllers/donorRequest.controller';
@@ -48,6 +49,7 @@ router.get('/history/stats', authenticate, getDonorHistoryStats);
 router.get('/', authenticate, getDonors);
 router.post('/', authenticate, authorize('Admin'), createDonor);
 router.post('/bulk', authenticate, authorize('Admin'), createDonorBulk);
+router.post('/bulk-invite', authenticate, authorize('Admin'), bulkInviteDonors);
 router.put('/:id', authenticate, authorize('Admin'), updateDonor);
 router.delete('/:id', authenticate, authorize('Admin'), deleteDonor);
 

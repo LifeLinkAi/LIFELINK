@@ -313,6 +313,8 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       });
 
       // Create corresponding profiles
+      // MERGED: use findOneAndUpdate+upsert with setDefaultsOnInsert:false to prevent
+      // Mongoose from inserting coordinates:[] which breaks any geo index.
       if (role === 'Donor') {
         await DonorProfile.findOneAndUpdate(
           { userId: user._id },
