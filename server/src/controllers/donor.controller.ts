@@ -1,9 +1,8 @@
 import { Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-// pdf-parse v1.1.1 — exports a plain function via CJS require
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
+// pdf-parse is lazy-required inside uploadCertificate to avoid the known startup
+// crash where the library accesses ./test/data/* at import time in ts-node-dev.
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
@@ -18,10 +17,13 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
     for (const user of donors) {
       let profile = await DonorProfile.findOne({ userId: user._id });
       if (!profile) {
-        profile = await DonorProfile.create({
-          userId: user._id,
-          avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
-        });
+        // Use findOneAndUpdate with setDefaultsOnInsert:false to prevent
+        // Mongoose from inserting coordinates:[] which breaks the 2dsphere index
+        profile = await DonorProfile.findOneAndUpdate(
+          { userId: user._id },
+          { $set: { avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}` } },
+          { new: true, upsert: true, setDefaultsOnInsert: false }
+        );
       }
       result.push({
         id: user._id.toString(),
@@ -78,21 +80,27 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     const inviteToken = crypto.randomBytes(32).toString('hex');
     const inviteTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const profile = await DonorProfile.create({
-      userId: user._id,
-      location: '',
-      bloodType: 'O-',
-      tier: 'Bronze',
-      status: 'Pending', // Defaults to Pending until activated
-      phone: '',
-      lastDonation: 'N/A',
-      totalDonated: '0 Liters',
-      details: 'Registered donor. Setup pending.',
-      avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
-      inviteToken,
-      inviteTokenExpires,
-      isSetupComplete: false,
-    });
+    const profile = await DonorProfile.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $set: {
+          location: '',
+          bloodType: 'O-',
+          tier: 'Bronze',
+          status: 'Pending',
+          phone: '',
+          lastDonation: 'N/A',
+          totalDonated: '0 Liters',
+          details: 'Registered donor. Setup pending.',
+          avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+          inviteToken,
+          inviteTokenExpires,
+          isSetupComplete: false,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: false }
+    );
+    if (!profile) throw new Error('Failed to create donor profile');
 
     // Send donor invite email asynchronously
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -161,18 +169,24 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
         role: 'Donor',
       });
 
-      const profile = await DonorProfile.create({
-        userId: user._id,
-        location: location || '',
-        bloodType: bloodType || 'O-',
-        tier: tier || 'Bronze',
-        status: status || 'Pending',
-        phone: phone || '',
-        lastDonation: lastDonation || 'N/A',
-        totalDonated: totalDonated || '0 Liters',
-        details: details || '',
-        avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
-      });
+      const profile = await DonorProfile.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $set: {
+            location: location || '',
+            bloodType: bloodType || 'O-',
+            tier: tier || 'Bronze',
+            status: status || 'Pending',
+            phone: phone || '',
+            lastDonation: lastDonation || 'N/A',
+            totalDonated: totalDonated || '0 Liters',
+            details: details || '',
+            avatar: avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: false }
+      );
+      if (!profile) continue;
 
       results.push({
         id: user._id.toString(),
@@ -213,7 +227,7 @@ export const updateDonor = async (req: AuthRequest, res: Response, next: NextFun
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
       { $set: profileFields },
-      { new: true, upsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: false }
     );
 
     res.status(200).json({
@@ -267,10 +281,13 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
 
     let profile = await DonorProfile.findOne({ userId: user._id });
     if (!profile) {
-      profile = await DonorProfile.create({
-        userId: user._id,
-        avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
-      });
+      // Use findOneAndUpdate with setDefaultsOnInsert:false to prevent
+      // Mongoose from inserting coordinates:[] which breaks the 2dsphere index
+      profile = await DonorProfile.findOneAndUpdate(
+        { userId: user._id },
+        { $set: { avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}` } },
+        { new: true, upsert: true, setDefaultsOnInsert: false }
+      );
     }
 
     res.status(200).json({
@@ -278,14 +295,17 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
       name: user.name,
       email: user.email,
       location: profile.location,
+      coordinates: profile.coordinates ?? [],
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
+      isAvailable: profile.isAvailable ?? true,
       avatar: profile.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}`,
       phone: profile.phone,
       lastDonation: profile.lastDonation,
       totalDonated: profile.totalDonated,
       details: profile.details,
+      organsWillingToDonate: profile.organsWillingToDonate ?? [],
       isSetupComplete: profile.isSetupComplete,
     });
   } catch (error) {
@@ -320,7 +340,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
           status: 'Available',
         },
       },
-      { new: true, upsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: false }
     );
 
     res.status(200).json({
@@ -501,7 +521,10 @@ export const uploadCertificate = async (
     const uniqueFilename = `certificate_${Date.now()}_${uniqueSuffix}.pdf`;
     logger.info(`Processing certificate upload: ${uniqueFilename} for donor ${req.user.id}`);
 
-    // Parse PDF from buffer
+    // Parse PDF from buffer — lazy-require to avoid startup crash
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse: (buffer: Buffer) => Promise<{ text: string; numpages: number }> = require('pdf-parse');
+
     let pdfData: { text: string; numpages: number };
     try {
       pdfData = await pdfParse(req.file.buffer);

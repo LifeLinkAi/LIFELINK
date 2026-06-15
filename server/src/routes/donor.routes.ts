@@ -1,15 +1,18 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { 
-  getDonors, 
-  createDonor, 
-  createDonorBulk, 
-  updateDonor, 
+import {
+  getDonors,
+  createDonor,
+  createDonorBulk,
+  updateDonor,
   deleteDonor,
   getMeProfile,
   completeDonorSetup,
   uploadCertificate,
 } from '../controllers/donor.controller';
+import { updateProfile, toggleAvailability } from '../controllers/donorProfile.controller';
+import { getDonorRequests, respondToRequest } from '../controllers/donorRequest.controller';
+import { getDonorHistory, getDonorHistoryStats } from '../controllers/donorHistory.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 // Multer: memory storage, PDF only, 10 MB limit
@@ -27,18 +30,28 @@ const certUpload = multer({
 
 const router = Router();
 
-// Routes require authentication
+// ── Donor self-service profile ──────────────────────────────────────────────
 router.get('/me', authenticate, getMeProfile);
 router.put('/setup-complete', authenticate, completeDonorSetup);
+router.patch('/me', authenticate, updateProfile);
+router.patch('/me/availability', authenticate, toggleAvailability);
 
-// mutate actions require Admin role
+// ── Donor request feed & responses ─────────────────────────────────────────
+router.get('/requests', authenticate, getDonorRequests);
+router.post('/requests/:id/respond', authenticate, respondToRequest);
+
+// ── Donation history ────────────────────────────────────────────────────────
+router.get('/history', authenticate, getDonorHistory);
+router.get('/history/stats', authenticate, getDonorHistoryStats);
+
+// ── Admin-only donor management ─────────────────────────────────────────────
 router.get('/', authenticate, getDonors);
 router.post('/', authenticate, authorize('Admin'), createDonor);
 router.post('/bulk', authenticate, authorize('Admin'), createDonorBulk);
 router.put('/:id', authenticate, authorize('Admin'), updateDonor);
 router.delete('/:id', authenticate, authorize('Admin'), deleteDonor);
 
-// Donor certificate upload & date extraction
+// ── Certificate upload & date extraction ────────────────────────────────────
 router.post('/upload-certificate', authenticate, certUpload.single('certificate'), uploadCertificate);
 
 export default router;
