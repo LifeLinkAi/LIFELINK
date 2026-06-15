@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, ChevronDown, LogOut, Plus, Search, Settings, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import Cookies from 'js-cookie';
+import { clearUser } from '@/features/auth/authSlice';
 
 const HOSPITAL_ALERTS = [
   'Critical: O- Negative request escalated',
@@ -15,15 +17,33 @@ const HOSPITAL_ALERTS = [
 
 export function HospitalTopBar() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
   const [query, setQuery] = useState('');
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
+    // 1. Clear client-side auth state
+    dispatch(clearUser());
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('lifelink-auth');
+    Cookies.remove('ll_access_token');
     sessionStorage.clear();
-    router.push('/login');
+
+    // 2. Fire backend logout to clear httpOnly refresh cookie (best-effort)
+    (async () => {
+      try {
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        if (!apiUrl.endsWith('/api')) apiUrl = `${apiUrl}/api`;
+        await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // ignore network errors
+      } finally {
+        router.push('/login');
+      }
+    })();
   };
 
   return (

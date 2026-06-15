@@ -6,6 +6,9 @@ import {
   AlertTriangle, FlaskConical, Settings, HelpCircle, Plus, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Cookies from 'js-cookie';
+import { useAppDispatch } from '@/store/hooks';
+import { clearUser } from '@/features/auth/authSlice';
 
 const NAV = [
   { label: 'Dashboard',          href: '/hospital/dashboard',              icon: LayoutDashboard },
@@ -20,11 +23,29 @@ const NAV = [
 export function HospitalSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const dispatch = useAppDispatch();
 
   const handleLogout = () => {
+    // 1. Clear client-side auth state
+    dispatch(clearUser());
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('lifelink-auth');
+    Cookies.remove('ll_access_token');
     sessionStorage.clear();
-    router.push('/login');
+
+    // 2. Fire backend logout to clear httpOnly refresh cookie (best-effort)
+    (async () => {
+      try {
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        if (!apiUrl.endsWith('/api')) apiUrl = `${apiUrl}/api`;
+        await fetch(`${apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // ignore network errors
+      } finally {
+        router.push('/login');
+      }
+    })();
   };
 
   return (
