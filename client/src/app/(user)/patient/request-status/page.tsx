@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils';
 type RequestType   = 'Blood' | 'Organ';
 type RequestStatus = 'PENDING' | 'DONOR_NOTIFIED' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
+interface TimelineEvent {
+  event: string;
+  timestamp: string | Date;
+}
+
 interface BackendRequest {
   id: string;
   userId: string;
@@ -29,6 +34,7 @@ interface BackendRequest {
   time?: string;
   notes?: string;
   type: RequestType;
+  timeline?: TimelineEvent[];
   donorName?: string;
   donorBloodType?: string;
   acceptedAt?: string;
@@ -57,30 +63,47 @@ const TIMELINE_STEPS: Array<{ event: string; statuses: RequestStatus[] }> = [
   { event: 'Donation Completed', statuses: ['COMPLETED'] },
 ];
 
-function formatRegisteredDate(value: string): string {
+function formatRegisteredDate(value: string | Date): string {
   try {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
+    if (Number.isNaN(date.getTime())) return String(value);
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' }).format(date);
   } catch {
-    return value;
+    return String(value);
   }
 }
 
 function buildTimeline(req: BackendRequest): PatientRequest['timeline'] {
-  return TIMELINE_STEPS.map((step, index) => ({
+  const steps = TIMELINE_STEPS.map((step, index) => ({
     time: index === 0 ? formatRegisteredDate(req.registeredDate) : req.time || '—',
     event: step.event,
     done: step.statuses.includes(req.status),
   }));
+
+  // Append any real-time custom timeline events from the database
+  if (req.timeline && req.timeline.length > 0) {
+    req.timeline.forEach(evt => {
+      // Avoid duplicate standard events if we already mapped them
+      const alreadyListed = steps.some(s => s.event.toLowerCase() === evt.event.toLowerCase());
+      if (!alreadyListed) {
+        steps.push({
+          time: formatRegisteredDate(evt.timestamp),
+          event: evt.event,
+          done: true
+        });
+      }
+    });
+  }
+
+  return steps;
 }
 
 function normalizeStatus(status: string): RequestStatus {
   const rawStatus = status.toUpperCase();
   if (['COMPLETED', 'FULFILLED'].includes(rawStatus)) return 'COMPLETED';
-  if (['APPROVED', 'ACCEPTED'].includes(rawStatus)) return 'APPROVED';
+  if (['APPROVED', 'ACCEPTED', 'PENDING_HOSPITAL'].includes(rawStatus)) return 'APPROVED';
   if (['IN_PROGRESS'].includes(rawStatus)) return 'IN_PROGRESS';
-  if (['DONOR_NOTIFIED', 'DONOR_FOUND', 'MATCHING'].includes(rawStatus)) return 'DONOR_NOTIFIED';
+  if (['DONOR_NOTIFIED', 'DONOR_FOUND', 'MATCHING', 'PENDING_DONOR'].includes(rawStatus)) return 'DONOR_NOTIFIED';
   if (rawStatus === 'CANCELLED') return 'CANCELLED';
   return 'PENDING';
 }
@@ -277,29 +300,48 @@ export default function RequestStatusPage() {
   const [filter, setFilter] = useState('all');
   const [requests, setRequests] = useState<BackendRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const { user } = useAuth();
 
   const ACTIVE_STATUSES = ['PENDING', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS'];
 
-  const fetchHistory = async () => {
-    setLoading(true);
+  const fetchHistory = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setIsRefetching(true);
+    }
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
       const response = await api.get<{ success: true; data: BackendRequest[] }>('/requests/my-history', { headers });
       setRequests(response.data.data || []);
     } catch (error: any) {
-      const message = error?.response?.data?.error?.message || error?.message || 'Unable to load request history.';
-      toast.error(message);
+      if (!silent) {
+        const message = error?.response?.data?.error?.message || error?.message || 'Unable to load request history.';
+        toast.error(message);
+      }
       setRequests([]);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      } else {
+        setIsRefetching(false);
+      }
     }
   };
 
   useEffect(() => {
     if (!user) return;
-    fetchHistory();
+    fetchHistory(false);
+
+    const interval = setInterval(() => {
+      fetchHistory(true);
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [user]);
 
   const displayRequests = requests.map(mapBackendRequest);
@@ -329,14 +371,22 @@ export default function RequestStatusPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">My Requests</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">My Requests</h1>
+            {isRefetching && (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                Syncing
+              </span>
+            )}
+          </div>
           <p className="text-[13.5px] text-[#6B7A5A] mt-1">
             Track all your blood and organ requests.
           </p>
         </div>
         <button
           type="button"
-          onClick={fetchHistory}
+          onClick={() => fetchHistory(false)}
           disabled={loading}
           className={cn(
             'flex min-h-10 w-full items-center justify-center gap-1.5 px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors sm:w-auto',
@@ -345,7 +395,7 @@ export default function RequestStatusPage() {
               : 'border-[#D0CCBC] bg-white text-[#3A4A2A] hover:border-[#7AB648]'
           )}
         >
-          <RefreshCw size={13} /> {loading ? 'Refreshing…' : 'Refresh'}
+          <RefreshCw size={13} className={cn(isRefetching && 'animate-spin')} /> {loading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
