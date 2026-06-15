@@ -65,7 +65,7 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
             type: 'Point',
             coordinates: [reqLng, reqLat],
           },
-          $maxDistance: 50000, // Strict 50km boundary metric
+          $maxDistance: 500000, // Strict 500km boundary metric
         },
       },
     };
@@ -100,7 +100,7 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
       const trueDistanceMeters = calculateHaversineDistance(reqLat, reqLng, donorLat, donorLng);
       
       // Secondary absolute protection barrier for manual geo calculations
-      if (trueDistanceMeters > 50000) return null;
+      if (trueDistanceMeters > 500000) return null;
 
       // Component A: Proximity Linear Decay Score (Max 40)
       const proximityScore = 40 * (1 - trueDistanceMeters / 50000);

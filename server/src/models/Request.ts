@@ -36,6 +36,9 @@ export interface IRequest extends Document {
   matchedDonors: IMatchedDonor[];
   notifiedDonors: Schema.Types.ObjectId[];
   acceptedDonorId?: Schema.Types.ObjectId | null;
+  targetDonorId?: Schema.Types.ObjectId | null;
+  hospitalId?: Schema.Types.ObjectId | null;
+  timeline?: Array<{ event: string; timestamp: Date }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -166,6 +169,23 @@ const requestSchema = new Schema<IRequest>(
       type: Schema.Types.ObjectId,
       ref: 'DonorProfile',
       default: null,
+    },
+    targetDonorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    hospitalId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    timeline: {
+      type: [{
+        event: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now }
+      }],
+      default: []
     },
     location: {
       type: {

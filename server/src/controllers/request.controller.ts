@@ -9,6 +9,7 @@ import { sendDonorRequestNotification } from '../services/notifications/email.se
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
 import { HospitalProfile } from '../models/HospitalProfile';
+import { User } from '../models/User';
 
 // Helper function to safely parse and structure valid GeoJSON locations
 const parseGeoLocation = (body: any) => {
@@ -335,7 +336,10 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(400, 'Missing token or response.'));
     }
 
-    const requestObj = await Request.findOne({ _id: id, 'matchedDonors.inviteToken': token }, { 'matchedDonors.$': 1, acceptedDonorId: 1, status: 1, notifiedDonors: 1 });
+    const requestObj = await Request.findOne(
+      { _id: new Types.ObjectId(id), 'matchedDonors.inviteToken': token },
+      { 'matchedDonors.$': 1, acceptedDonorId: 1, status: 1, notifiedDonors: 1, requestedBy: 1, facility: 1 }
+    );
     if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
 
     const matched = (requestObj.matchedDonors && requestObj.matchedDonors[0]) as any;
@@ -343,14 +347,29 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     const now = new Date();
     if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
-      await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
+      await Request.updateOne({ _id: new Types.ObjectId(id), 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
       return next(new ApiError(400, 'Token has expired.'));
     }
 
     if (donorResponse === 'ACCEPTED') {
       const donorId = matched.donorId;
+      const donorProfile = await DonorProfile.findById(new Types.ObjectId(donorId));
+      if (!donorProfile) return next(new ApiError(404, 'Donor profile not found.'));
+      const targetDonorId = donorProfile.userId;
+
+      let hospitalId = null;
+      const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
+      if (creator && creator.role === 'Hospital') {
+        hospitalId = creator._id;
+      } else if (requestObj.facility) {
+        const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
+        if (matchingHospital) {
+          hospitalId = matchingHospital._id;
+        }
+      }
+
       const filter = {
-        _id: id,
+        _id: new Types.ObjectId(id),
         'matchedDonors.inviteToken': token,
         'matchedDonors.status': 'NOTIFIED',
         acceptedDonorId: null,
@@ -359,9 +378,17 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         $set: {
           'matchedDonors.$.status': 'ACCEPTED',
           'matchedDonors.$.respondedAt': now,
-          status: 'APPROVED',
-          acceptedDonorId: donorId,
+          status: 'PENDING_HOSPITAL',
+          acceptedDonorId: new Types.ObjectId(donorId),
+          targetDonorId: new Types.ObjectId(targetDonorId as any),
+          hospitalId: hospitalId ? new Types.ObjectId(hospitalId) : null,
         },
+        $push: {
+          timeline: {
+            event: 'donor_accepted',
+            timestamp: now
+          }
+        }
       };
 
       const updated = await Request.findOneAndUpdate(filter, update, { new: true });
@@ -378,7 +405,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
       }
 
-      res.status(200).json({ success: true, message: 'Thank you â€” you have accepted the request.' });
+      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
       return;
     }
 
@@ -445,6 +472,12 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
 
     const previousStatus = requestObj.status;
     requestObj.status = status as string;
+
+    if (!requestObj.timeline) requestObj.timeline = [];
+    requestObj.timeline.push({
+      event: `status_changed_to_${(status as string).toLowerCase()}`,
+      timestamp: new Date()
+    });
 
     if (status === 'FULFILLED' && previousStatus !== 'FULFILLED' && requestObj.type === 'Blood') {
       const hospitalProfile = await HospitalProfile.findOne({ userId: req.user.id });

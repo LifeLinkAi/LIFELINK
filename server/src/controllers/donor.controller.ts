@@ -29,7 +29,7 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
         id: user._id.toString(),
         name: user.name,
         email: user.email,
-        location: profile!.location ?? '',
+        location: (profile! as any).address ?? '',
         bloodType: profile!.bloodType,
         tier: profile!.tier,
         status: profile!.status,
@@ -118,7 +118,7 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location ?? '',
+      location: (profile as any).address ?? '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -198,7 +198,7 @@ export const createDonorBulk = async (req: AuthRequest, res: Response, next: Nex
         id: user._id.toString(),
         name: user.name,
         email: user.email,
-        location: profile.location ?? '',
+        location: (profile as any).address ?? '',
         bloodType: profile.bloodType,
         tier: profile.tier,
         status: profile.status,
@@ -240,7 +240,7 @@ export const updateDonor = async (req: AuthRequest, res: Response, next: NextFun
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location ?? '',
+      location: (profile as any).address ?? '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -302,8 +302,8 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
       email: user.email,
       // MERGED: donor branch provides location string + coordinates array;
       // origin branch had location:''. Both preserved here.
-      location: profile!.location ?? '',
-      coordinates: profile!.coordinates ?? [],
+      location: (profile! as any).address ?? '',
+      coordinates: (profile! as any).location?.coordinates || [],
       bloodType: profile!.bloodType,
       tier: profile!.tier,
       status: profile!.status,
@@ -343,7 +343,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       isSetupComplete: true,
       status: 'Available',
     };
-    if (location !== undefined) updateFields.location = location;
+    if (location !== undefined) updateFields.address = location;
 
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
@@ -355,7 +355,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      location: profile.location ?? '',
+      location: (profile as any).address ?? '',
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
