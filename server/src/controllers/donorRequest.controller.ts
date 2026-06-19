@@ -294,7 +294,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       }
       request.rejectedAt = new Date();
 
-      if (isAssigned) {
+if (isAssigned) {
         request.status = 'Pending';
         // Find the next best compatible donor
         const nextDonor = await findBestCompatibleDonorForRequest(request);
@@ -304,7 +304,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
           try {
             const nextDonorUser = await User.findById(nextDonor.userId).select('name email');
             if (nextDonorUser && nextDonorUser.email) {
-              const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/incoming-requests`;
+              const inviteUrl = `${(process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000')}/donor/incoming-requests`;
               await sendDonorRequestNotification(nextDonorUser.email, nextDonorUser.name, {
                 urgency: request.urgency,
                 type: request.type,

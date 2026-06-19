@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 type RequestType   = 'Blood' | 'Organ';
-type RequestStatus = 'PENDING' | 'DONOR_NOTIFIED' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+type RequestStatus = 'PENDING' | 'DONOR_NOTIFIED' | 'PENDING_HOSPITAL' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 interface BackendRequest {
   id: string;
@@ -51,9 +51,10 @@ interface PatientRequest {
 }
 
 const TIMELINE_STEPS: Array<{ event: string; statuses: RequestStatus[] }> = [
-  { event: 'Request Submitted', statuses: ['PENDING', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Donors Notified', statuses: ['DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Request Accepted', statuses: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Request Submitted',  statuses: ['PENDING', 'DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donors Notified',    statuses: ['DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donor Accepted',     statuses: ['PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Hospital Approved',  statuses: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
   { event: 'Donation Completed', statuses: ['COMPLETED'] },
 ];
 
@@ -78,8 +79,9 @@ function buildTimeline(req: BackendRequest): PatientRequest['timeline'] {
 function normalizeStatus(status: string): RequestStatus {
   const rawStatus = status.toUpperCase();
   if (['COMPLETED', 'FULFILLED'].includes(rawStatus)) return 'COMPLETED';
-  if (['APPROVED', 'ACCEPTED'].includes(rawStatus)) return 'APPROVED';
   if (['IN_PROGRESS'].includes(rawStatus)) return 'IN_PROGRESS';
+  if (['APPROVED', 'ACCEPTED'].includes(rawStatus)) return 'APPROVED';
+  if (['PENDING_HOSPITAL'].includes(rawStatus)) return 'PENDING_HOSPITAL';
   if (['DONOR_NOTIFIED', 'DONOR_FOUND', 'MATCHING'].includes(rawStatus)) return 'DONOR_NOTIFIED';
   if (rawStatus === 'CANCELLED') return 'CANCELLED';
   return 'PENDING';
@@ -110,12 +112,13 @@ function mapBackendRequest(req: BackendRequest): PatientRequest {
 }
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
-  PENDING:        { label: 'Pending',          color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
-  DONOR_NOTIFIED: { label: 'Donors Notified',  color: '#1A5FAA', bg: '#E3F0FF', border: '#93C5FD' },
-  APPROVED:       { label: 'Accepted',         color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
-  IN_PROGRESS:    { label: 'In Progress',      color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
-  COMPLETED:      { label: 'Completed',        color: '#2B6B0A', bg: '#E8F5E0', border: '#86EFAC' },
-  CANCELLED:      { label: 'Cancelled',        color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
+  PENDING:          { label: 'Pending',          color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
+  DONOR_NOTIFIED:   { label: 'Donors Notified',  color: '#1A5FAA', bg: '#E3F0FF', border: '#93C5FD' },
+  PENDING_HOSPITAL: { label: 'Donor Accepted',   color: '#7C3AED', bg: '#EDE9FE', border: '#C4B5FD' },
+  APPROVED:         { label: 'Hospital Approved',color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
+  IN_PROGRESS:      { label: 'In Progress',      color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
+  COMPLETED:        { label: 'Completed',        color: '#2B6B0A', bg: '#E8F5E0', border: '#86EFAC' },
+  CANCELLED:        { label: 'Cancelled',        color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
 };
 
 const TYPE_CONFIG: Record<RequestType, { icon: React.ReactNode; color: string; bg: string }> = {
@@ -183,7 +186,7 @@ function RequestCard({ req }: { req: PatientRequest }) {
       {/* Timeline */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-[#F0EDE3] bg-[#FAFAF7]">
-          {req.status === 'APPROVED' && req.donorName && (
+          {(req.status === 'APPROVED' || req.status === 'PENDING_HOSPITAL') && req.donorName && (
             <div className="mb-4 mt-4 rounded-xl bg-sky-50 border border-sky-100 p-4">
               <p className="text-[11px] font-bold text-sky-850 uppercase tracking-wide mb-2">Donor Details</p>
               <div className="grid grid-cols-2 gap-2.5 text-xs">
@@ -279,7 +282,7 @@ export default function RequestStatusPage() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const ACTIVE_STATUSES = ['PENDING', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS'];
+  const ACTIVE_STATUSES = ['PENDING', 'DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS'];
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -300,6 +303,9 @@ export default function RequestStatusPage() {
   useEffect(() => {
     if (!user) return;
     fetchHistory();
+    // Auto-poll every 30 s so donor accept/decline is reflected without manual refresh
+    const interval = setInterval(fetchHistory, 30_000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const displayRequests = requests.map(mapBackendRequest);
