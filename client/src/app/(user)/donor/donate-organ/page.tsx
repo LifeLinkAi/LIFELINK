@@ -33,6 +33,10 @@ export default function OrganDonation() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Guidelines & Legal Consent States
+  const [isGuidelinesAccepted, setIsGuidelinesAccepted] = useState(false);
+  const [isGuidelinesModalOpen, setIsGuidelinesModalOpen] = useState(false);
+
   // Health checklist states
   const [chronicIllness, setChronicIllness] = useState<boolean | null>(null);
   const [infectiousDisease, setIninfectiousDisease] = useState<boolean | null>(null);
@@ -320,6 +324,7 @@ export default function OrganDonation() {
                 <button
                   onClick={() => {
                     setModalStep(1);
+                    setIsGuidelinesAccepted(false);
                     setIsModalOpen(true);
                   }}
                   className="px-6 py-3 bg-[#3b5e2b] text-white font-bold rounded-full hover:bg-[#2d4721] transition-all shadow-md text-xs tracking-wider uppercase font-dmsans"
@@ -754,6 +759,27 @@ export default function OrganDonation() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Legal Consent Checkbox & Guidelines Red Link */}
+                    <div className="mt-6 border-t border-slate-100 pt-4 flex items-start gap-2.5 bg-slate-50/40 p-4 rounded-2xl border border-gray-100">
+                      <input
+                        type="checkbox"
+                        id="consent-checkbox"
+                        checked={isGuidelinesAccepted}
+                        onChange={(e) => setIsGuidelinesAccepted(e.target.checked)}
+                        className="mt-1 w-4 h-4 text-[#3b5e2b] border-gray-300 rounded focus:ring-[#3b5e2b] cursor-pointer"
+                      />
+                      <label htmlFor="consent-checkbox" className="text-[11px] text-gray-500 leading-normal select-none">
+                        I confirm that I have read, understood, and agreed to the{" "}
+                        <span
+                          onClick={() => setIsGuidelinesModalOpen(true)}
+                          className="text-red-600 hover:text-red-700 underline font-bold cursor-pointer transition-colors"
+                        >
+                          Organ Donation Guidelines & Legal Consent Statement
+                        </span>
+                        . Ticking this box is required to register as an available donor.
+                      </label>
+                    </div>
                   </div>
                 </div>
               )}
@@ -792,13 +818,94 @@ export default function OrganDonation() {
               ) : (
                 <button
                   onClick={handleReadinessSubmit}
-                  disabled={isSaving || isUploading}
+                  disabled={isSaving || isUploading || !isGuidelinesAccepted}
                   className="px-6 py-2.5 text-xs font-bold bg-[#3b5e2b] text-white rounded-full hover:bg-[#2d4721] transition-colors shadow-sm ml-auto disabled:opacity-60 flex items-center gap-1.5"
                 >
                   {isSaving && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   Submit Profile
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROFESSIONAL ORGAN DONATION GUIDELINES & LEGAL CONSENT MODAL */}
+      {isGuidelinesModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-[2rem] border border-red-100 shadow-2xl max-w-lg w-full p-8 relative flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Title */}
+            <div className="mb-4 pb-3 border-b border-slate-100">
+              <h4 className="text-xl font-serif font-black text-gray-950 flex items-center gap-2">
+                <span className="material-symbols-outlined text-red-600 text-[24px]">gavel</span>
+                <span>Organ Donation Guidelines &amp; Legal Consent</span>
+              </h4>
+              <p className="text-[11px] text-gray-400 mt-0.5">Please review the official regulatory terms before registering.</p>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto pr-1 text-xs text-gray-600 space-y-4 leading-relaxed my-2">
+              <section>
+                <h5 className="font-bold text-gray-900 mb-1">1. Voluntary Altruistic Intent</h5>
+                <p>
+                  By registering, you confirm that your decision to donate is entirely voluntary and altruistic. 
+                  Any exchange of monetary compensation, rewards, or valuable consideration in connection with 
+                  this organ donation is strictly illegal under the Organ Transplant Act and subject to severe prosecution.
+                </p>
+              </section>
+
+              <section>
+                <h5 className="font-bold text-gray-900 mb-1">2. Medical Screening &amp; Testing Consent</h5>
+                <p>
+                  You agree to undergo comprehensive medical screening, including HLA (tissue typing) checks, infectious disease panels, 
+                  and renal/hepatic clinical evaluations. These screens ensure safety for both donor and recipient. 
+                  All results will be held securely in accordance with medical confidentiality standards.
+                </p>
+              </section>
+
+              <section>
+                <h5 className="font-bold text-gray-900 mb-1">3. Right to Withdraw Consent</h5>
+                <p>
+                  You retain the absolute, unconditional right to cancel your donor availability and withdraw your consent 
+                  at any time prior to the surgical transplant procedure. Doing so is simple and can be done instantly 
+                  via your Registry Status dashboard.
+                </p>
+              </section>
+
+              <section>
+                <h5 className="font-bold text-gray-950 mb-1">4. Matching &amp; Allocation Protocol</h5>
+                <p>
+                  Recipient matching is based strictly on clinical compatibility metrics (blood group, tissue typing, size) 
+                  and medical urgency ratings. Coordination is handled by certified medical facilities only.
+                </p>
+              </section>
+
+              <section>
+                <h5 className="font-bold text-gray-950 mb-1">5. Final Legal Declarations</h5>
+                <p>
+                  You declare that the health information you provided is accurate to the best of your knowledge. 
+                  You understand that misleading medical statements could lead to post-matching complications.
+                </p>
+              </section>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                onClick={() => setIsGuidelinesModalOpen(false)}
+                className="px-5 py-2.5 text-xs font-bold text-gray-500 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setIsGuidelinesAccepted(true);
+                  setIsGuidelinesModalOpen(false);
+                }}
+                className="px-6 py-2.5 text-xs font-bold bg-[#3b5e2b] text-white rounded-full hover:bg-[#2d4721] transition-colors shadow-sm"
+              >
+                Accept &amp; Close
+              </button>
             </div>
           </div>
         </div>
