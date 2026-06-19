@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,18 +31,7 @@ const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: strin
   { key: 'low',      label: 'Low',       desc: 'Scheduled or elective procedure', color: '#2B6B0A', bg: '#E8F5E0' },
 ];
 
-const HOSPITALS = [
-  'LifeLink Main Campus',
-  'Kozhikode Medical College',
-  'Baby Memorial Hospital',
-  'MIMS Hospital',
-  'Aster MIMS',
-];
 
-const RECENT_REQUESTS = [
-  { id: 'BR-2041', bloodGroup: 'O-', units: 2, urgency: 'critical' as Urgency, status: 'MATCHING',   date: '2 hrs ago'  },
-  { id: 'BR-2028', bloodGroup: 'O-', units: 1, urgency: 'medium'   as Urgency, status: 'COMPLETED',  date: '3 days ago' },
-];
 
 const STATUS_CONFIG = {
   PENDING:     { label: 'Pending',     color: '#B86E00', bg: '#FFF3E0' },
@@ -69,6 +58,30 @@ export default function RequestBloodPage() {
   const { user } = useAuth();
   const router = useRouter();
 
+  const [hospitalsList, setHospitalsList] = useState<{id: string, name: string}[]>([]);
+  const [recentRequests, setRecentRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchData = async () => {
+      try {
+        const [hospRes, reqRes] = await Promise.all([
+          api.get('/hospitals'),
+          api.get('/requests/my-history')
+        ]);
+        if (!mounted) return;
+        setHospitalsList(hospRes.data || []);
+        if (reqRes.data?.data) {
+          setRecentRequests(reqRes.data.data.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('Failed to fetch data', err);
+      }
+    };
+    fetchData();
+    return () => { mounted = false; };
+  }, []);
+
   const isValid = form.bloodGroup !== '' && form.hospital !== '' && form.contactPhone !== '';
 
   const handleSubmit = () => {
@@ -82,7 +95,8 @@ export default function RequestBloodPage() {
 
     const requestBody = {
       patientName: user?.name || 'Patient',
-      facility: form.hospital,
+      facility: hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital,
+      hospitalId: form.hospital,
       age: typeof age === 'number' ? age : undefined,
       gender: gender || undefined,
       organType: '',
@@ -189,7 +203,7 @@ export default function RequestBloodPage() {
             </div>
             <div className="flex justify-between text-[13px]">
               <span className="text-[#6B7A5A]">Hospital</span>
-              <span className="font-semibold text-[#1a2e0a]">{form.hospital}</span>
+              <span className="font-semibold text-[#1a2e0a]">{hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital}</span>
             </div>
           </div>
           <div className="flex gap-3 w-full">
@@ -229,7 +243,7 @@ export default function RequestBloodPage() {
             {[
               { label: 'Blood Group',  value: form.bloodGroup },
               { label: 'Units',        value: `${form.units} unit${form.units > 1 ? 's' : ''}` },
-              { label: 'Hospital',     value: form.hospital },
+              { label: 'Hospital',     value: hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital },
               { label: 'Contact',      value: form.contactPhone },
             ].map(r => (
               <div key={r.label} className="bg-[#F5F2E8] rounded-lg p-3">
@@ -369,7 +383,7 @@ export default function RequestBloodPage() {
               className="w-full h-10 px-3 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-red-400 transition-colors text-[#3A4A2A]"
             >
               <option value="">Select hospital...</option>
-              {HOSPITALS.map(h => <option key={h} value={h}>{h}</option>)}
+              {hospitalsList.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
           </div>
 
@@ -450,13 +464,16 @@ export default function RequestBloodPage() {
               <Clock size={13} /> Recent Requests
             </p>
             <div className="flex flex-col gap-2">
-              {RECENT_REQUESTS.map(r => {
-                const sc = STATUS_CONFIG[r.status as keyof typeof STATUS_CONFIG];
+              {recentRequests.map(r => {
+                const reqStatus = r.status?.toUpperCase() || 'PENDING';
+                const sc = STATUS_CONFIG[reqStatus as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PENDING;
+                const reqId = r.id || r._id;
+                const reqDate = new Date(r.registeredDate || r.createdAt).toLocaleDateString();
                 return (
-                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-[#F0EDE3] last:border-0">
+                  <div key={reqId} className="flex items-center justify-between py-2 border-b border-[#F0EDE3] last:border-0">
                     <div>
-                      <p className="text-[12.5px] font-semibold text-[#1a2e0a]">{r.id}</p>
-                      <p className="text-[11px] text-[#8A9A7A]">{r.bloodGroup} - {r.units}u - {r.date}</p>
+                      <p className="text-[12.5px] font-semibold text-[#1a2e0a]">{reqId}</p>
+                      <p className="text-[11px] text-[#8A9A7A]">{r.bloodGroup} - {r.units}u - {reqDate}</p>
                     </div>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                       style={{ color: sc.color, background: sc.bg }}>

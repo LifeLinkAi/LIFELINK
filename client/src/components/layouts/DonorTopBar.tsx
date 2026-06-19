@@ -51,9 +51,9 @@ export function DonorTopBar({ onMenuClick, searchPlaceholder = "Search..." }: Do
 
         {/* Right: SOS + avatar */}
         <div className="flex items-center gap-3 shrink-0">
-          <button className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap shadow-sm">
+          <a href="/donor/emergency-alerts" className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap shadow-sm">
             ✱ SOS
-          </button>
+          </a>
 
           <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shrink-0" title={name}>
             {avatar ? (

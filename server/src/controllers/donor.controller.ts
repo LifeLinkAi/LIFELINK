@@ -326,7 +326,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
-    const { bloodType, location, phone } = req.body;
+    const { bloodType, location, coordinates, phone } = req.body;
     if (!bloodType || !phone) {
       return next(new ApiError(400, 'Blood type and phone number are required.'));
     }
@@ -336,6 +336,12 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       return next(new ApiError(404, 'Donor user not found.'));
     }
 
+    const hasValidCoords = Array.isArray(coordinates) &&
+      coordinates.length === 2 &&
+      typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number' &&
+      coordinates[0] >= -180 && coordinates[0] <= 180 &&
+      coordinates[1] >= -90 && coordinates[1] <= 90;
+
     const updateFields: Record<string, any> = {
       bloodType,
       phone,
@@ -343,6 +349,12 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       status: 'Available',
     };
     if (location !== undefined) updateFields.address = location;
+    if (hasValidCoords) {
+      updateFields.location = {
+        type: 'Point',
+        coordinates: coordinates
+      };
+    }
 
     const profile = await DonorProfile.findOneAndUpdate(
       { userId: user._id },
@@ -355,6 +367,7 @@ export const completeDonorSetup = async (req: AuthRequest, res: Response, next: 
       name: user.name,
       email: user.email,
       location: (profile as any).address ?? '',
+      coordinates: (profile as any).location?.coordinates || [],
       bloodType: profile.bloodType,
       tier: profile.tier,
       status: profile.status,
@@ -579,6 +592,48 @@ function extractDonationDate(text: string): string | null {
   return normalizeDate(best.day, best.month, best.year);
 }
 
+/**
+ * Extract the blood group from raw PDF text.
+ */
+function extractBloodGroup(text: string): string | null {
+  const normalized = text.toLowerCase().replace(/[\s_]+/g, ' ');
+
+  // Search for explicit labels first like "blood group: A+" or "blood type: O positive"
+  const labelPatterns = [
+    /(?:blood\s+group|blood\s+type|group|type)\s*[:\-]?\s*\b(ab|a|b|o)\s*([+\-]|positive|negative|pos|neg)\b/i,
+    /\b(ab|a|b|o)\s*(?:group|type|blood)\b/i,
+  ];
+
+  for (const pattern of labelPatterns) {
+    const match = pattern.exec(normalized);
+    if (match) {
+      const group = match[1].toUpperCase();
+      const rh = match[2].toLowerCase();
+      const sign = (rh.includes('-') || rh.includes('neg')) ? '-' : '+';
+      return `${group}${sign}`;
+    }
+  }
+
+  // Standalone patterns e.g. "O+" or "A-" or "AB+"
+  const standalonePattern = /\b(ab|a|b|o)\s*([+\-])\b/i;
+  const match = standalonePattern.exec(text);
+  if (match) {
+    return `${match[1].toUpperCase()}${match[2]}`;
+  }
+
+  // Text based positive/negative without symbol
+  const textPattern = /\b(ab|a|b|o)\s+(positive|negative|pos|neg)\b/i;
+  const textMatch = textPattern.exec(normalized);
+  if (textMatch) {
+    const group = textMatch[1].toUpperCase();
+    const rh = textMatch[2].toLowerCase();
+    const sign = rh.includes('neg') ? '-' : '+';
+    return `${group}${sign}`;
+  }
+
+  return null;
+}
+
 // ── uploadCertificate controller ─────────────────────────────────────────────
 
 export const uploadCertificate = async (
@@ -639,17 +694,27 @@ export const uploadCertificate = async (
 
     logger.info(`Extracted donation date "${lastDonationDate}" from ${uniqueFilename}`);
 
-    // ── Persist the extracted date to the donor's profile in MongoDB ──────────
+    // Extract blood group
+    const extractedBloodType = extractBloodGroup(rawText);
+    
+    const updateQuery: Record<string, any> = { lastDonation: lastDonationDate };
+    if (extractedBloodType) {
+      updateQuery.bloodType = extractedBloodType;
+      logger.info(`Extracted blood type "${extractedBloodType}" from ${uniqueFilename}`);
+    }
+
+    // ── Persist the extracted date and blood group to the donor's profile in MongoDB ──────────
     await DonorProfile.findOneAndUpdate(
       { userId: req.user.id },
-      { $set: { lastDonation: lastDonationDate } },
+      { $set: updateQuery },
       { new: true }
     );
-    logger.info(`Saved lastDonation "${lastDonationDate}" to profile for donor ${req.user.id}`);
+    logger.info(`Saved lastDonation and bloodType update to profile for donor ${req.user.id}`);
 
     res.status(200).json({
       success: true,
       lastDonationDate,
+      extractedBloodGroup: extractedBloodType || undefined,
     });
   } catch (error: any) {
     logger.error(`uploadCertificate unexpected error: ${error.message}`);

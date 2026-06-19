@@ -23,8 +23,8 @@ router.get('/', authenticate, getRequests);
 
 // --- Patient & Hospital Request Routes ---
 // Routes for creating and tracking patient-specific needs
-router.post('/patient', authenticate, authorize('Patient', 'Hospital'), createPatientRequest);
-router.get('/my-history', authenticate, authorize('Patient', 'Hospital'), getMyRequests);
+router.post('/patient', authenticate, authorize('Patient', 'Hospital', 'Donor'), createPatientRequest);
+router.get('/my-history', authenticate, authorize('Patient', 'Hospital', 'Donor'), getMyRequests);
 
 // --- Hospital Request Management Routes ---
 // Hospital dashboard endpoints for reviewing and fulfilling incoming needs
@@ -39,8 +39,8 @@ router.post('/:id/respond', respondToRequest);
 router.post('/:id/interest', authenticate, authorize('Donor'), expressInterest);
 
 // Manual selection endpoints
-router.get('/:id/find-matches', authenticate, authorize('Patient', 'Hospital'), findMatchesForRequest);
-router.post('/:id/dispatch', authenticate, authorize('Patient', 'Hospital'), dispatchToDonors);
+router.get('/:id/find-matches', authenticate, authorize('Patient', 'Hospital', 'Donor'), findMatchesForRequest);
+router.post('/:id/dispatch', authenticate, authorize('Patient', 'Hospital', 'Donor'), dispatchToDonors);
 
 // --- Admin Management Routes ---
 // High-level system overrides restricted strictly to system administrators

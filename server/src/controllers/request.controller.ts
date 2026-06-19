@@ -150,12 +150,12 @@ export const deleteRequest = async (req: AuthRequest, res: Response, next: NextF
 
 export const createPatientRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || (req.user.role !== 'Patient' && req.user.role !== 'Hospital')) {
-      return next(new ApiError(403, 'Access denied. Patient or Hospital role required to make requests.'));
+    if (!req.user || (req.user.role !== 'Patient' && req.user.role !== 'Hospital' && req.user.role !== 'Donor')) {
+      return next(new ApiError(403, 'Access denied. Patient, Hospital or Donor role required to make requests.'));
     }
 
     const {
-      patientName, facility, contactPhone, age, gender, organType,
+      patientName, facility, hospitalId, contactPhone, age, gender, organType,
       bloodGroup, units, urgency, facilityType, notes, type
     } = req.body;
 
@@ -168,6 +168,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       requestedBy: req.user.id, // Support structural identity metrics across dashboards
       patientName,
       facility,
+      hospitalId: hospitalId || null,
       age,
       gender,
       contactPhone,
@@ -197,7 +198,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       try {
         const donorUser = await User.findById(bestDonor.userId).select('name email');
         if (donorUser && donorUser.email) {
-          const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/incoming-requests`;
+          const inviteUrl = `${(process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000')}/donor/incoming-requests`;
           await sendDonorRequestNotification(donorUser.email, donorUser.name, {
             urgency: newReq.urgency,
             type: newReq.type,
@@ -292,7 +293,7 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
       if (!toEmail) return;
       const entry = matchedEntries.find((e: any) => e.donorId?.toString() === d._id.toString());
       if (!entry) return;
-      const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/respond?requestId=${requestObj._id}&token=${entry.inviteToken}`;
+      const inviteUrl = `${(process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000')}/donor/respond?requestId=${requestObj._id}&token=${entry.inviteToken}`;
       const requestDetails = {
         urgency: requestObj.urgency,
         type: requestObj.type,
@@ -334,13 +335,26 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
-    const requests = await Request.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    const requests = await Request.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'acceptedDonorId',
+        select: 'bloodType userId',
+        populate: { path: 'userId', select: 'name email' },
+      })
+      .lean();
 
-    const mapped = requests.map(r => {
-      const obj = r.toObject();
+    const mapped = requests.map((r: any) => {
+      const donorProfile = r.acceptedDonorId as any;
+      const donorUser = donorProfile?.userId as any;
       return {
-        id: obj._id.toString(),
-        ...obj,
+        id: r._id.toString(),
+        ...r,
+        // Flatten donor details for the patient UI
+        donorName: donorUser?.name || null,
+        donorEmail: donorUser?.email || null,
+        donorBloodType: donorProfile?.bloodType || null,
+        acceptedAt: r.updatedAt || null,
       };
     });
 
@@ -379,18 +393,27 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     if (donorResponse === 'ACCEPTED') {
       const donorId = matched.donorId;
+
+      // If this specific donor already accepted the request, return a success response
+      if (matched.status === 'ACCEPTED' && requestObj.acceptedDonorId?.toString() === donorId.toString()) {
+        res.status(200).json({ success: true, message: 'You have already accepted this request.' });
+        return;
+      }
+
       const donorProfile = await DonorProfile.findById(new Types.ObjectId(donorId));
       if (!donorProfile) return next(new ApiError(404, 'Donor profile not found.'));
       const targetDonorId = donorProfile.userId;
 
-      let hospitalId = null;
-      const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
-      if (creator && creator.role === 'Hospital') {
-        hospitalId = creator._id;
-      } else if (requestObj.facility) {
-        const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
-        if (matchingHospital) {
-          hospitalId = matchingHospital._id;
+      let hospitalId = requestObj.hospitalId || null;
+      if (!hospitalId) {
+        const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
+        if (creator && creator.role === 'Hospital') {
+          hospitalId = creator._id as any;
+        } else if (requestObj.facility) {
+          const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
+          if (matchingHospital) {
+            hospitalId = matchingHospital._id as any;
+          }
         }
       }
 
@@ -407,7 +430,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
           status: 'PENDING_HOSPITAL',
           acceptedDonorId: new Types.ObjectId(donorId),
           targetDonorId: new Types.ObjectId(targetDonorId as any),
-          hospitalId: hospitalId ? new Types.ObjectId(hospitalId) : null,
+          hospitalId: hospitalId ? new Types.ObjectId(hospitalId.toString()) : null,
         },
         $push: {
           timeline: {
@@ -454,7 +477,7 @@ export const getHospitalIncomingRequests = async (req: AuthRequest, res: Respons
 
     const requests = await Request.find({
       type: { $in: ['Blood', 'Organ'] },
-      status: { $in: ['Pending', 'PENDING', 'APPROVED', 'IN_PROGRESS', 'FULFILLED'] },
+      status: { $in: ['Pending', 'PENDING', 'PENDING_HOSPITAL', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS', 'FULFILLED'] },
     })
       .sort({ createdAt: -1 })
       .populate({

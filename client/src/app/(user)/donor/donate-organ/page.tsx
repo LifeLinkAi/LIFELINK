@@ -1,8 +1,13 @@
-"use client";
-import React, { useState, useEffect } from "react";
+﻿"use client";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/axios";
 import { OrganPreferenceSelector } from "@/components/donor/OrganPreferenceSelector";
 import { useUpdateDonorProfile } from "@/hooks/useUpdateDonorProfile";
+import { useIncomingRequests } from "@/hooks/useIncomingRequests";
+import { IncomingRequest } from "@/services/incomingRequestService";
+import { useRequestResponse } from "@/hooks/useRequestResponse";
+import { RequestActions } from "@/components/donor/RequestActions";
+import toast, { Toaster } from "react-hot-toast";
 
 interface ProfileData {
   id: string;
@@ -19,6 +24,12 @@ export default function OrganDonation() {
   const [editing, setEditing] = useState(false);
   const [draftOrgans, setDraftOrgans] = useState<string[]>([]);
   const { update, isLoading: isSaving } = useUpdateDonorProfile();
+  
+  // Incoming Requests & Responses Hooks/States (from theirs branch)
+  const { requests, isLoading: isLoadingRequests, error: requestsError, refetch } = useIncomingRequests("Organ");
+  const { respond } = useRequestResponse();
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<IncomingRequest | null>(null);
   
   // Custom Toast State
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -139,7 +150,7 @@ export default function OrganDonation() {
     if (result) {
       setProfile((p) => p ? { ...p, organsWillingToDonate: draftOrgans } : p);
       setEditing(false);
-      showToast("✓ Organ preferences updated successfully.");
+      showToast("Γ£ô Organ preferences updated successfully.");
       if (profile) {
         fetchPatients(draftOrgans, profile.bloodType, profile.id);
       }
@@ -210,7 +221,7 @@ export default function OrganDonation() {
     const result = await update(payload);
     if (result) {
       setIsModalOpen(false);
-      showToast("✓ Your readiness profile has been submitted successfully!");
+      showToast("Γ£ô Your readiness profile has been submitted successfully!");
       loadProfile();
     }
   };
@@ -226,21 +237,41 @@ export default function OrganDonation() {
 
     const result = await update(payload);
     if (result) {
-      showToast("✓ Availability cancelled successfully.");
+      showToast("Γ£ô Availability cancelled successfully.");
       loadProfile();
     }
   };
+
+  const handleRespond = useCallback(
+    async (requestId: string, action: "ACCEPTED" | "DECLINED") => {
+      setRespondingId(requestId);
+      try {
+        const res = await respond(requestId, action);
+        if (res && res.success) {
+          toast.success(`Request successfully ${action === "ACCEPTED" ? "accepted" : "declined"}!`);
+        } else {
+          toast.error("Failed to respond to request.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "An unexpected error occurred.");
+      } finally {
+        refetch();
+        setRespondingId(null);
+      }
+    },
+    [respond, refetch]
+  );
 
   const handleSendInterest = async (requestId: string) => {
     try {
       const res = await api.post(`/requests/${requestId}/interest`);
       if (res.data.success) {
         setInterestedRequestIds((prev) => [...prev, requestId]);
-        showToast("✓ Interest sent! The hospital has been notified.");
+        showToast("Γ£ô Interest sent! The hospital has been notified.");
       }
     } catch (err: any) {
       const msg = err.response?.data?.message ?? err.message ?? "Failed to log interest.";
-      showToast(`❌ ${msg}`);
+      showToast(`Γ¥î ${msg}`);
     }
   };
 
@@ -248,6 +279,7 @@ export default function OrganDonation() {
 
   return (
     <main className="p-6 lg:p-8 max-w-6xl mx-auto relative">
+      <Toaster position="top-right" />
       {/* Toast Alert */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-50 bg-[#eef4e2] border border-[#d2e4c0] rounded-2xl p-4 flex items-center gap-3 text-sm font-semibold text-[#3b5e2b] shadow-xl animate-fade-in-down">
@@ -684,7 +716,7 @@ export default function OrganDonation() {
                           {isUploading ? (
                             <p className="text-[10px] text-[#3b5e2b] font-semibold mt-1">Uploading file...</p>
                           ) : (
-                            <p className="text-[10px] text-[#5b8a3e] font-semibold mt-1">✓ Uploaded successfully</p>
+                            <p className="text-[10px] text-[#5b8a3e] font-semibold mt-1">Γ£ô Uploaded successfully</p>
                           )}
                         </div>
                       ) : (

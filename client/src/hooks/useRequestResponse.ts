@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { respondToRequest, RequestResponseResult } from '@/services/requestResponseService';
 
 interface UseRequestResponseReturn {
-  respond: (requestId: string, action: 'ACCEPTED' | 'DECLINED') => Promise<RequestResponseResult | null>;
+  respond: (requestId: string, action: 'ACCEPTED' | 'DECLINED') => Promise<RequestResponseResult>;
   isLoading: boolean;
   error: string | null;
 }
@@ -17,7 +17,7 @@ export function useRequestResponse(): UseRequestResponseReturn {
   const [error, setError] = useState<string | null>(null);
 
   const respond = useCallback(
-    async (requestId: string, action: 'ACCEPTED' | 'DECLINED'): Promise<RequestResponseResult | null> => {
+    async (requestId: string, action: 'ACCEPTED' | 'DECLINED'): Promise<RequestResponseResult> => {
       setIsLoading(true);
       setError(null);
       try {
@@ -25,7 +25,7 @@ export function useRequestResponse(): UseRequestResponseReturn {
       } catch (err: any) {
         const msg = err.response?.data?.message ?? err.message ?? 'Failed to respond to request.';
         setError(msg);
-        return null;
+        throw new Error(msg);
       } finally {
         setIsLoading(false);
       }

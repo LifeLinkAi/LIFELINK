@@ -47,19 +47,20 @@ const getCompatibleBloodTypes = (bloodGroup: string): string[] => {
 
 export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) => {
   try {
-    // 1. Hard Constraints: Location Validation
-    if (!request.location || !Array.isArray(request.location.coordinates) || request.location.coordinates.length !== 2) {
-      logger.warn('Matching skipped: Request missing valid GeoJSON location coordinates.');
-      return [];
-    }
-
-    const [reqLng, reqLat] = request.location.coordinates;
+    const hasLocation = request.location &&
+      Array.isArray(request.location.coordinates) &&
+      request.location.coordinates.length === 2 &&
+      !(request.location.coordinates[0] === 0 && request.location.coordinates[1] === 0);
 
     // 2. Base Database Query Setup
     const query: any = {
       status: { $in: ['Available', 'Verified'] },
       isSetupComplete: true,
-      location: {
+    };
+
+    if (hasLocation) {
+      const [reqLng, reqLat] = request.location!.coordinates;
+      query.location = {
         $near: {
           $geometry: {
             type: 'Point',
@@ -67,8 +68,8 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
           },
           $maxDistance: 500000, // Strict 500km boundary metric
         },
-      },
-    };
+      };
+    }
 
     // 3. Category Evaluation Routing
     if (request.type === 'Blood') {
@@ -93,17 +94,26 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
 
     // 4. Mathematical Weighted Scoring Engine
     const evaluatedDonors = rawDonors.map((donor: any) => {
-      if (!donor.location || !donor.location.coordinates) return null;
-      const [donorLng, donorLat] = donor.location.coordinates;
+      const hasDonorLoc = donor.location &&
+        Array.isArray(donor.location.coordinates) &&
+        donor.location.coordinates.length === 2 &&
+        !(donor.location.coordinates[0] === 0 && donor.location.coordinates[1] === 0);
 
-      // Calculate True Structural Distance
-      const trueDistanceMeters = calculateHaversineDistance(reqLat, reqLng, donorLat, donorLng);
-      
-      // Secondary absolute protection barrier for manual geo calculations
-      if (trueDistanceMeters > 500000) return null;
+      let trueDistanceMeters = 999999;
+      let proximityScore = 0;
 
-      // Component A: Proximity Linear Decay Score (Max 40)
-      const proximityScore = 40 * (1 - trueDistanceMeters / 50000);
+      if (hasLocation && hasDonorLoc) {
+        const [reqLng, reqLat] = request.location!.coordinates;
+        const [donorLng, donorLat] = donor.location.coordinates;
+        trueDistanceMeters = calculateHaversineDistance(reqLat, reqLng, donorLat, donorLng);
+        
+        // Secondary absolute protection barrier for manual geo calculations
+        if (trueDistanceMeters > 500000) return null;
+
+        if (trueDistanceMeters <= 50000) {
+          proximityScore = 40 * (1 - trueDistanceMeters / 50000);
+        }
+      }
 
       // Component B: Urgency Escalation Matrix (Max 35)
       let urgencyScore = 5;
@@ -131,8 +141,8 @@ export const findNearbyCompatibleDonors = async (request: MatchingRequestInput) 
         phone: donor.userId?.phone || 'N/A',
         bloodType: donor.bloodType,
         organsWillingToDonate: donor.organsWillingToDonate,
-        distance: `${(trueDistanceMeters / 1000).toFixed(1)} km`,
-        distanceInMeters: trueDistanceMeters,
+        distance: trueDistanceMeters === 999999 ? 'Distance pending' : `${(trueDistanceMeters / 1000).toFixed(1)} km`,
+        distanceInMeters: trueDistanceMeters === 999999 ? null : trueDistanceMeters,
         matchPercentage,
       };
     });
@@ -223,16 +233,20 @@ export const findBestCompatibleDonorForRequest = async (request: any) => {
       // 4. Distance Calculation (Haversine, max 50km)
       let proximityScore = 0;
       let trueDistanceMeters = 999999;
-      if (
-        request.location &&
+      
+      const hasReqLoc = request.location &&
         Array.isArray(request.location.coordinates) &&
         request.location.coordinates.length === 2 &&
-        donor.coordinates &&
-        Array.isArray(donor.coordinates) &&
-        donor.coordinates.length === 2
-      ) {
+        !(request.location.coordinates[0] === 0 && request.location.coordinates[1] === 0);
+
+      const hasDonorLoc = donor.location &&
+        Array.isArray(donor.location.coordinates) &&
+        donor.location.coordinates.length === 2 &&
+        !(donor.location.coordinates[0] === 0 && donor.location.coordinates[1] === 0);
+
+      if (hasReqLoc && hasDonorLoc) {
         const [reqLng, reqLat] = request.location.coordinates;
-        const [donorLng, donorLat] = donor.coordinates;
+        const [donorLng, donorLat] = donor.location.coordinates;
         trueDistanceMeters = calculateHaversineDistance(reqLat, reqLng, donorLat, donorLng);
         if (trueDistanceMeters <= 50000) {
           proximityScore = 40 * (1 - trueDistanceMeters / 50000);
