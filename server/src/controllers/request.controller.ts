@@ -537,3 +537,75 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
     next(error);
   }
 };
+
+export const expressInterest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!req.user) {
+      return next(new ApiError(401, 'Not authenticated.'));
+    }
+
+    const donorProfile = await DonorProfile.findOne({ userId: req.user.id });
+    if (!donorProfile) {
+      return next(new ApiError(404, 'Donor profile not found.'));
+    }
+
+    const requestObj = await Request.findById(id);
+    if (!requestObj) {
+      return next(new ApiError(404, 'Transplant request not found.'));
+    }
+
+    // Check if donor already exists in matchedDonors
+    const alreadyMatched = requestObj.matchedDonors.some(
+      (m: any) => m.donorId.toString() === donorProfile._id.toString()
+    );
+
+    if (alreadyMatched) {
+      return next(new ApiError(400, 'You have already expressed interest or been matched to this request.'));
+    }
+
+    const inviteToken = crypto.randomBytes(20).toString('hex');
+    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Push into matchedDonors with status 'ACCEPTED'
+    requestObj.matchedDonors.push({
+      donorId: donorProfile._id as any,
+      status: 'ACCEPTED',
+      inviteToken,
+      tokenExpiresAt,
+      respondedAt: new Date(),
+    });
+
+    requestObj.acceptedDonorId = donorProfile._id as any;
+    requestObj.targetDonorId = new Types.ObjectId(req.user.id) as any;
+    
+    // Find coordinating hospital ID
+    let hospitalId: any = null;
+    const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
+    if (creator && creator.role === 'Hospital') {
+      hospitalId = creator._id;
+    } else if (requestObj.facility) {
+      const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
+      if (matchingHospital) {
+        hospitalId = matchingHospital._id;
+      }
+    }
+    requestObj.hospitalId = hospitalId;
+    requestObj.status = 'PENDING_HOSPITAL';
+
+    if (!requestObj.timeline) {
+      requestObj.timeline = [];
+    }
+
+    requestObj.timeline.push({
+      event: 'donor_accepted',
+      timestamp: new Date(),
+    });
+
+    await requestObj.save();
+
+    res.status(200).json({ success: true, message: 'Interest expressed successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};

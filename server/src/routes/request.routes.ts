@@ -10,7 +10,8 @@ import {
   deleteRequest,
   respondToRequest,
   findMatchesForRequest,
-  dispatchToDonors
+  dispatchToDonors,
+  expressInterest
 } from '../controllers/request.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -33,6 +34,9 @@ router.patch('/:id/status', authenticate, authorize('Hospital'), updateRequestSt
 // --- Manual Selection & Donor Responses ---
 // Donor response endpoint - token-based, no authentication required so donors can respond via email link
 router.post('/:id/respond', respondToRequest);
+
+// Donor self-initiated interest expression route
+router.post('/:id/interest', authenticate, authorize('Donor'), expressInterest);
 
 // Manual selection endpoints
 router.get('/:id/find-matches', authenticate, authorize('Patient', 'Hospital'), findMatchesForRequest);
