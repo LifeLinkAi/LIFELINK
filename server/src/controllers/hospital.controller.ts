@@ -97,7 +97,7 @@ export const createHospital = async (req: AuthRequest, res: Response, next: Next
     });
 
     // Send invitation email
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const clientUrl = (process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000');
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
     try {
@@ -566,7 +566,7 @@ export const bulkInviteHospitals = async (req: AuthRequest, res: Response, next:
         inviteTokenExpires,
       });
 
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const clientUrl = (process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000');
       const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
       try {

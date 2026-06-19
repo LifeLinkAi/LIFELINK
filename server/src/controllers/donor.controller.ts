@@ -104,7 +104,7 @@ export const createDonor = async (req: AuthRequest, res: Response, next: NextFun
     if (!profile) throw new Error('Failed to create donor profile');
 
     // Send donor invite email asynchronously
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const clientUrl = (process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000');
     const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
     try {
@@ -441,7 +441,7 @@ export const bulkInviteDonors = async (req: AuthRequest, res: Response, next: Ne
         { upsert: true, setDefaultsOnInsert: false }
       );
 
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const clientUrl = (process.env.NODE_ENV === 'production' ? process.env.CLIENT_URL : 'http://localhost:3000');
       const inviteUrl = `${clientUrl.replace(/\/$/, '')}/register?token=${inviteToken}`;
 
       try {

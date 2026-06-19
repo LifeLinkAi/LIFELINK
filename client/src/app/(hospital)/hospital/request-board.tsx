@@ -95,7 +95,7 @@ export function RequestBoard({
               </div>
               <p className="mt-4 text-[13px] text-[#3A4A2A]">{request.detail ?? ''}</p>
               <div className="mt-4 flex gap-2">
-                {request.status === 'PENDING' && (
+                {(request.status === 'PENDING' || request.status === 'Pending' || request.status === 'PENDING_HOSPITAL') && (
                   <button
                     disabled={actionLoading === request.id}
                     onClick={() => updateStatus(request.id, 'APPROVED')}
@@ -122,9 +122,9 @@ export function RequestBoard({
                     {actionLoading === request.id ? 'Saving…' : 'Fulfill'}
                   </button>
                 )}
-                <button className="rounded-lg border border-[#D0CCBC] bg-white px-3 py-2 text-[12px] font-semibold text-[#3A4A2A] hover:border-[#7AB648]">
+                {/* <button className="rounded-lg border border-[#D0CCBC] bg-white px-3 py-2 text-[12px] font-semibold text-[#3A4A2A] hover:border-[#7AB648]">
                   Open Timeline
-                </button>
+                </button> */}
               </div>
             </article>
           ))
