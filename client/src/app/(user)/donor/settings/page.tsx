@@ -124,6 +124,9 @@ export default function Settings() {
       });
       if (data.success && data.lastDonationDate) {
         setLastDonationDate(data.lastDonationDate);
+        if (data.extractedBloodGroup) {
+          setBloodType(data.extractedBloodGroup);
+        }
         markDirty();
       } else {
         setUploadError("Server returned an unexpected response.");

@@ -10,6 +10,21 @@ import { sendMail, sendDonorRequestNotification } from '../services/notification
 import { findBestCompatibleDonorForRequest } from '../services/matching/donor-match.service';
 import { logger } from '../utils/logger';
 
+const getRecipientBloodTypes = (donorBloodType: string): string[] => {
+  const d = donorBloodType.toUpperCase().trim();
+  const matrix: Record<string, string[]> = {
+    'O-': ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'],
+    'O+': ['O+', 'A+', 'B+', 'AB+'],
+    'A-': ['A+', 'A-', 'AB+', 'AB-'],
+    'A+': ['A+', 'AB+'],
+    'B-': ['B+', 'B-', 'AB+', 'AB-'],
+    'B+': ['B+', 'AB+'],
+    'AB-': ['AB+', 'AB-'],
+    'AB+': ['AB+'],
+  };
+  return matrix[d] || [d];
+};
+
 /**
  * GET /donors/requests
  * Returns all open requests visible to this donor, enriched with
@@ -27,10 +42,24 @@ export const getDonorRequests = async (req: AuthRequest, res: Response, next: Ne
       return;
     }
 
-    // Filter requests where assignedDonorId === currentDonorId and status is Pending/Active
+    const recipientBloodTypes = getRecipientBloodTypes(donorProfile.bloodType ?? 'O-');
+
+    // Filter requests where assignedDonorId === currentDonorId OR notifiedDonors contains currentDonorId
+    // OR compatibility match for broadcast requests (urgency critical/high/urgent/emergency)
     const filter: Record<string, any> = {
-      assignedDonorId: donorProfile._id,
-      status: { $in: ['Pending', 'PENDING', 'Active', 'ACTIVE'] },
+      rejectedBy: { $ne: donorProfile._id },
+      status: { $in: ['Pending', 'PENDING', 'Active', 'ACTIVE', 'DONOR_NOTIFIED'] },
+      $or: [
+        { assignedDonorId: donorProfile._id },
+        { notifiedDonors: donorProfile._id },
+        {
+          urgency: { $in: ['critical', 'high', 'urgent', 'emergency', 'Critical', 'High', 'Urgent', 'Emergency', 'CRITICAL', 'HIGH', 'URGENT', 'EMERGENCY'] },
+          $or: [
+            { type: 'Blood', bloodGroup: { $in: recipientBloodTypes } },
+            { type: 'Organ', organType: { $in: donorProfile.organsWillingToDonate || [] } }
+          ]
+        }
+      ],
     };
     if (req.query.type) filter.type = req.query.type;
 
@@ -75,15 +104,6 @@ export const getDonorRequests = async (req: AuthRequest, res: Response, next: Ne
 /**
  * POST /donors/requests/:id/respond
  * Accepts or declines a request. Body: { action: 'ACCEPTED' | 'DECLINED' }
- * On ACCEPTED:
- *   - Updates status to 'Accepted'
- *   - Populates donor details (acceptedBy, acceptedAt, etc.)
- *   - Creates a DonationRecord (status: Pending)
- *   - Sends email notification to request originator (SendGrid)
- * On DECLINED:
- *   - Appends donor profile ID to rejectedBy array
- *   - Recalculates match and assigns to the next best compatible donor
- *   - Sends email update to request originator (SendGrid)
  */
 export const respondToRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -102,9 +122,23 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
     const profile = await DonorProfile.findOne({ userId: req.user.id });
     if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
 
-    // Check if the request is assigned to this donor
-    if (!request.assignedDonorId || request.assignedDonorId.toString() !== profile._id.toString()) {
-      return next(new ApiError(403, 'This request is not assigned to you.'));
+    // Check if the request is exclusively assigned to this donor, or if they were notified/dispatched
+    const isAssigned = request.assignedDonorId && request.assignedDonorId.toString() === profile._id.toString();
+    const isNotified = request.notifiedDonors && request.notifiedDonors.some((did: any) => did.toString() === profile._id.toString());
+
+    // Check if it is a compatible broadcast request
+    const recipientBloodTypes = getRecipientBloodTypes(profile.bloodType ?? 'O-');
+    const isCriticalUrgent = ['critical', 'high', 'urgent', 'emergency', 'Critical', 'High', 'Urgent', 'Emergency', 'CRITICAL', 'HIGH', 'URGENT', 'EMERGENCY'].includes(request.urgency);
+    let isCompatible = false;
+    if (request.type === 'Blood') {
+      isCompatible = recipientBloodTypes.includes(request.bloodGroup);
+    } else if (request.type === 'Organ') {
+      isCompatible = request.organType ? (profile.organsWillingToDonate || []).includes(request.organType as any) : false;
+    }
+    const isBroadcastAllowed = isCriticalUrgent && isCompatible;
+
+    if (!isAssigned && !isNotified && !isBroadcastAllowed) {
+      return next(new ApiError(403, 'This request is not assigned or dispatched to you.'));
     }
 
     // Upsert the donor response
@@ -121,6 +155,15 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     logger.info(`Donor ${req.user.id} responded ${action} to request ${id}`);
 
+    // If there is a matchedDonors entry, update its status as well
+    const matchedDonorEntry = request.matchedDonors && request.matchedDonors.find(
+      (m: any) => m.donorId && m.donorId.toString() === profile._id.toString()
+    );
+    if (matchedDonorEntry) {
+      matchedDonorEntry.status = action;
+      matchedDonorEntry.respondedAt = new Date();
+    }
+
     if (action === 'ACCEPTED') {
       // Lock the request
       if (request.status === 'Accepted' || request.acceptedDonorId) {
@@ -130,8 +173,32 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       const donorUser = await User.findById(req.user.id).select('name email');
       if (!donorUser) return next(new ApiError(404, 'Donor user account not found.'));
 
-      request.status = 'Accepted';
-      request.acceptedDonorId = profile._id as any;
+      let hospitalId = null;
+      const creator = await User.findById(request.requestedBy).select('role');
+      if (creator && creator.role === 'Hospital') {
+        hospitalId = creator._id;
+      } else if (request.facility) {
+        const matchingHospital = await User.findOne({ name: request.facility, role: 'Hospital' }).select('_id');
+        if (matchingHospital) {
+          hospitalId = matchingHospital._id;
+        }
+      }
+
+      if (isNotified) {
+        request.status = 'PENDING_HOSPITAL';
+        request.acceptedDonorId = profile._id as any;
+        request.targetDonorId = donorUser._id as any;
+        request.hospitalId = hospitalId as any;
+        if (!request.timeline) request.timeline = [];
+        request.timeline.push({
+          event: 'donor_accepted',
+          timestamp: new Date()
+        });
+      } else {
+        request.status = 'Accepted';
+        request.acceptedDonorId = profile._id as any;
+      }
+
       request.acceptedBy = donorUser.name;
       request.acceptedAt = new Date();
       request.donorId = donorUser._id as any;
@@ -161,29 +228,61 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       );
 
       // Send SendGrid email to patient
-      if ((request as any).requestedBy) {
-        try {
-          const requester = await User.findById((request as any).requestedBy).select('name email');
-          if (requester && requester.email) {
-            await sendMail({
-              to: requester.email,
-              subject: 'Donation Request Accepted',
-              html: `
-                <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background-color:#fcfcf9;">
-                  <h2 style="color:#123e20;margin-top:0;">Donation Request Accepted</h2>
-                  <p>Your request has been accepted.</p>
-                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;" />
-                  <p><strong>Donor:</strong> ${donorUser.name}</p>
-                  <p><strong>Blood Type:</strong> ${profile.bloodType ?? 'N/A'}</p>
-                  <p><strong>Hospital:</strong> ${(request as any).facility || 'N/A'}</p>
-                  <p><strong>Date:</strong> ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                </div>
-              `
-            });
-          }
-        } catch (err: any) {
-          logger.error(`Failed to send acceptance email to patient: ${err.message}`);
+      try {
+        let recipient = null;
+
+        if (request.userId) {
+          const user = await User.findById(request.userId).select('name email role');
+          if (user && user.role === 'Patient') recipient = user;
         }
+
+        if (!recipient && request.requestedBy) {
+          const user = await User.findById(request.requestedBy).select('name email role');
+          if (user && user.role === 'Patient') recipient = user;
+        }
+
+        if (!recipient && request.patientName) {
+          recipient = await User.findOne({
+            role: 'Patient',
+            name: { $regex: new RegExp('^' + request.patientName.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+          }).select('name email role');
+        }
+
+        if (!recipient) {
+          const targetUserId = request.userId || request.requestedBy;
+          if (targetUserId) {
+            recipient = await User.findById(targetUserId).select('name email role');
+          }
+        }
+
+        // ==========================================
+        // ADDED SAFETY CHECK HERE
+        // ==========================================
+        if (recipient && recipient._id.toString() === req.user.id.toString()) {
+          logger.warn(`Safety Check: Prevented sending Acceptance email to the donor themselves (${req.user.id}).`);
+          recipient = null; // Clear recipient so email doesn't send
+        }
+
+        if (recipient && recipient.email) {
+          await sendMail({
+            to: recipient.email,
+            subject: 'Donation Request Accepted',
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;line-height:1.6;">
+                <p>Hello ${request.patientName || recipient.name || 'Patient'},</p>
+                <p>Good news!</p>
+                <p>Your donation request has been accepted by donor ${donorUser.name}.</p>
+                <p><strong>Blood Type:</strong><br/>${profile.bloodType ?? 'N/A'}</p>
+                <p><strong>Hospital:</strong><br/>${request.facility || 'N/A'}</p>
+                <p><strong>Date:</strong><br/>${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                <p>Please wait for further instructions.</p>
+                <p>Thank you,<br/>LifeLink Network</p>
+              </div>
+            `
+          });
+        }
+      } catch (err: any) {
+        logger.error(`Failed to send acceptance email to patient: ${err.message}`);
       }
     } else if (action === 'DECLINED') {
       // Reject Flow
@@ -194,54 +293,93 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         request.rejectedBy.push(profile._id as any);
       }
       request.rejectedAt = new Date();
-      request.status = 'Pending';
 
-      // Find the next best compatible donor
-      const nextDonor = await findBestCompatibleDonorForRequest(request);
-      if (nextDonor) {
-        request.assignedDonorId = nextDonor._id as any;
-        // Notify the new donor via SendGrid
-        try {
-          const nextDonorUser = await User.findById(nextDonor.userId).select('name email');
-          if (nextDonorUser && nextDonorUser.email) {
-            const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/incoming-requests`;
-            await sendDonorRequestNotification(nextDonorUser.email, nextDonorUser.name, {
-              urgency: request.urgency,
-              type: request.type,
-              bloodGroup: request.bloodGroup,
-              organType: request.organType,
-              facility: request.facility,
-              patientName: request.patientName,
-            }, inviteUrl);
+      if (isAssigned) {
+        request.status = 'Pending';
+        // Find the next best compatible donor
+        const nextDonor = await findBestCompatibleDonorForRequest(request);
+        if (nextDonor) {
+          request.assignedDonorId = nextDonor._id as any;
+          // Notify the new donor via SendGrid
+          try {
+            const nextDonorUser = await User.findById(nextDonor.userId).select('name email');
+            if (nextDonorUser && nextDonorUser.email) {
+              const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/donor/incoming-requests`;
+              await sendDonorRequestNotification(nextDonorUser.email, nextDonorUser.name, {
+                urgency: request.urgency,
+                type: request.type,
+                bloodGroup: request.bloodGroup,
+                organType: request.organType,
+                facility: request.facility,
+                patientName: request.patientName,
+              }, inviteUrl);
+            }
+          } catch (err: any) {
+            logger.error(`Error notifying next best donor: ${err.message}`);
           }
-        } catch (err: any) {
-          logger.error(`Error notifying next best donor: ${err.message}`);
+        } else {
+          request.assignedDonorId = null;
         }
-      } else {
-        request.assignedDonorId = null;
       }
 
       await request.save();
 
       // Send SendGrid email to patient
-      if ((request as any).requestedBy) {
-        try {
-          const requester = await User.findById((request as any).requestedBy).select('name email');
-          if (requester && requester.email) {
-            await sendMail({
-              to: requester.email,
-              subject: 'Donation Request Update',
-              html: `
-                <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background-color:#fcfcf9;">
-                  <p>The assigned donor declined your request.</p>
-                  <p>Your request has been reassigned to another compatible donor.</p>
-                </div>
-              `
-            });
-          }
-        } catch (err: any) {
-          logger.error(`Failed to send decline email to patient: ${err.message}`);
+      try {
+        let recipient = null;
+
+        if (request.userId) {
+          const user = await User.findById(request.userId).select('name email role');
+          if (user && user.role === 'Patient') recipient = user;
         }
+
+        if (!recipient && request.requestedBy) {
+          const user = await User.findById(request.requestedBy).select('name email role');
+          if (user && user.role === 'Patient') recipient = user;
+        }
+
+        if (!recipient && request.patientName) {
+          recipient = await User.findOne({
+            role: 'Patient',
+            name: { $regex: new RegExp('^' + request.patientName.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+          }).select('name email role');
+        }
+
+        const donorUserForDecline = await User.findById(req.user.id).select('name email');
+
+        if (!recipient) {
+          const targetUserId = request.userId || request.requestedBy;
+          if (targetUserId) {
+            recipient = await User.findById(targetUserId).select('name email role');
+          }
+        }
+
+        // ==========================================
+        // ADDED SAFETY CHECK HERE
+        // ==========================================
+        if (recipient && recipient._id.toString() === req.user.id.toString()) {
+          logger.warn(`Safety Check: Prevented sending Decline email to the donor themselves (${req.user.id}).`);
+          recipient = null; // Clear recipient so email doesn't send
+        }
+
+        if (recipient && recipient.email) {
+          const donorName = donorUserForDecline ? donorUserForDecline.name : 'a donor';
+          await sendMail({
+            to: recipient.email,
+            subject: 'Donation Request Update',
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;line-height:1.6;">
+                <p>Hello ${request.patientName || recipient.name || 'Patient'},</p>
+                <p>Unfortunately, donor ${donorName} is unable to fulfill your request at this time.</p>
+                <p>The system will continue searching for other compatible donors.</p>
+                <p>Thank you for your patience.</p>
+                <p>LifeLink Network</p>
+              </div>
+            `
+          });
+        }
+      } catch (err: any) {
+        logger.error(`Failed to send decline email to patient: ${err.message}`);
       }
     }
 
