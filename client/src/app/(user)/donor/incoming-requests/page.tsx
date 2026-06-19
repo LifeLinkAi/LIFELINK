@@ -6,6 +6,8 @@ import { useRequestResponse } from "@/hooks/useRequestResponse";
 import { RequestActions } from "@/components/donor/RequestActions";
 import { IncomingRequest } from "@/services/incomingRequestService";
 
+import toast from "react-hot-toast";
+
 type Tab = "All" | "Blood" | "Organ";
 
 const IcoBlood = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /></svg>;
@@ -47,16 +49,26 @@ export default function IncomingRequests() {
   const eligibility = useDonorEligibility();
   const typeFilter = activeTab === "All" ? undefined : activeTab;
   const { requests, isLoading, error, refetch } = useIncomingRequests(typeFilter);
-  const { respond } = useRequestResponse();
+  const { respond, error: respondError } = useRequestResponse();
 
   const hasRecord = !!(eligibility.lastDonation && eligibility.lastDonation !== "N/A");
   const isBlocked = hasRecord && !eligibility.isEligible;
 
   const handleRespond = useCallback(async (requestId: string, action: "ACCEPTED" | "DECLINED") => {
     setRespondingId(requestId);
-    await respond(requestId, action);
-    refetch();
-    setRespondingId(null);
+    try {
+      const res = await respond(requestId, action);
+      if (res && res.success) {
+        toast.success(`Request successfully ${action === "ACCEPTED" ? "accepted" : "declined"}!`);
+      } else {
+        toast.error("Failed to respond to request.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred.");
+    } finally {
+      refetch();
+      setRespondingId(null);
+    }
   }, [respond, refetch]);
 
   if (eligibility.isLoading) {

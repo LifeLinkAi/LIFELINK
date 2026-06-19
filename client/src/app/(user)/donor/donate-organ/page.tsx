@@ -1,8 +1,13 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/axios";
 import { OrganPreferenceSelector } from "@/components/donor/OrganPreferenceSelector";
 import { useUpdateDonorProfile } from "@/hooks/useUpdateDonorProfile";
+import { useIncomingRequests } from "@/hooks/useIncomingRequests";
+import { IncomingRequest } from "@/services/incomingRequestService";
+import { useRequestResponse } from "@/hooks/useRequestResponse";
+import { RequestActions } from "@/components/donor/RequestActions";
+import toast, { Toaster } from "react-hot-toast";
 
 interface ProfileData {
   bloodType: string;
@@ -16,6 +21,12 @@ export default function OrganDonation() {
   const [draftOrgans, setDraftOrgans] = useState<string[]>([]);
   const { update, isLoading: isSaving } = useUpdateDonorProfile();
   const [saved, setSaved] = useState(false);
+
+  const { requests, isLoading: isLoadingRequests, error: requestsError, refetch } = useIncomingRequests("Organ");
+  const { respond } = useRequestResponse();
+
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<IncomingRequest | null>(null);
 
   useEffect(() => {
     api.get("/donors/me").then((res) => {
@@ -35,11 +46,34 @@ export default function OrganDonation() {
       setEditing(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      refetch(); // Refetch requests to match updated organ preferences
     }
   };
 
+  const handleRespond = useCallback(
+    async (requestId: string, action: "ACCEPTED" | "DECLINED") => {
+      setRespondingId(requestId);
+      try {
+        const res = await respond(requestId, action);
+        if (res && res.success) {
+          toast.success(`Request successfully ${action === "ACCEPTED" ? "accepted" : "declined"}!`);
+        } else {
+          toast.error("Failed to respond to request.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "An unexpected error occurred.");
+      } finally {
+        refetch();
+        setRespondingId(null);
+      }
+    },
+    [respond, refetch]
+  );
+
   return (
     <main className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <Toaster position="top-right" />
+
       <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
         <div>
           <h2 className="text-4xl font-serif text-[#1e293b] font-bold mb-2 tracking-tight">Organ Donation Management</h2>
@@ -73,7 +107,7 @@ export default function OrganDonation() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
         <div className="lg:col-span-7 space-y-6">
           {/* Registry Status */}
           <div className="bg-gradient-to-br from-[#f1f7e8] to-[#ffffff] border border-[#e1ead2] rounded-[2rem] p-8 shadow-sm relative overflow-hidden">
@@ -221,6 +255,200 @@ export default function OrganDonation() {
           </div>
         </div>
       </div>
+
+      {/* Active Organ Matching Requests Section */}
+      <div className="bg-white border border-gray-100 rounded-[2rem] p-6 sm:p-8 shadow-sm">
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Active Organ Matching Requests</h3>
+          <p className="text-xs text-gray-500 mt-1">Cross-referenced with your organ registry willing preference and tissue typing compatibility.</p>
+        </div>
+
+        <div className="space-y-4">
+          {isLoadingRequests && (
+            <div className="flex justify-center py-6">
+              <div className="w-8 h-8 border-4 border-[#3b5e2b] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!isLoadingRequests && requestsError && (
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+              <p className="text-sm font-bold text-red-700 mb-3">{requestsError}</p>
+              <button onClick={refetch} className="text-xs font-bold text-[#3b5e2b] border border-[#d2e4c0] px-4 py-2 rounded-xl hover:bg-[#f0f8e8]">
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!isLoadingRequests && !requestsError && requests.length === 0 && (
+            <div className="bg-gray-50 border border-gray-100 border-dashed rounded-2xl p-12 text-center">
+              <p className="text-xs text-gray-500">No active organ matching requests found matching your selections.</p>
+            </div>
+          )}
+
+          {!isLoadingRequests &&
+            requests.map((req) => (
+              <div key={req.id} className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center font-bold text-blue-600 border border-blue-100 shrink-0 uppercase text-xs">
+                    {req.organType?.substring(0, 3) || "Org"}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-gray-900 text-sm truncate">
+                      Patient: {req.patientName || "Anonymous"} • {req.facility || "Hospital"}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-500">{req.distance || "Distance pending"}</span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-gray-500">Registered: {req.registeredDate ? new Date(req.registeredDate).toLocaleDateString() : "Just now"}</span>
+                      <span className="bg-orange-50 text-orange-600 text-[9px] font-bold px-2 py-1 rounded uppercase">
+                        {req.organType}
+                      </span>
+                      <span className="bg-red-100 text-red-600 text-[9px] font-bold px-2 py-1 rounded uppercase">
+                        {req.urgency}
+                      </span>
+                      <span className="bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-1 rounded uppercase">
+                        {req.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto items-center">
+                  <button
+                    onClick={() => setSelectedRequest(req)}
+                    className="w-full sm:w-auto text-xs font-bold text-gray-600 border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    Details
+                  </button>
+                  <RequestActions
+                    requestId={req.id}
+                    donorResponse={req.donorResponse}
+                    isBlocked={false}
+                    daysRemaining={0}
+                    isLoading={respondingId === req.id}
+                    onAccept={(id) => handleRespond(id, "ACCEPTED")}
+                    onDecline={(id) => handleRespond(id, "DECLINED")}
+                  />
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* DETAILED REQUEST ACCEPATION MODAL */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="bg-[#3b5e2b] text-white p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] bg-white/20 text-white font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {selectedRequest.type} Request Details
+                  </span>
+                  <h3 className="text-2xl font-bold font-serif mt-2">
+                    {selectedRequest.organType} Match Request
+                  </h3>
+                </div>
+                <button onClick={() => setSelectedRequest(null)} className="text-white/80 hover:text-white transition-colors">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Details Body */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Patient Name</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.patientName || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Emergency Priority</label>
+                  <p className="text-sm font-black text-red-600 mt-0.5">{selectedRequest.urgency || "Standard"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Requested Organ</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.organType || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Hospital Name</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">{selectedRequest.facility || "—"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Hospital Location</label>
+                  <p className="text-sm font-semibold text-gray-950 mt-0.5">{selectedRequest.distance || "Nearby"}</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Required Quantity</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">
+                    {selectedRequest.units ? `${selectedRequest.units} units` : "1 unit"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Required Date & Time</label>
+                  <p className="text-sm font-medium text-gray-950 mt-0.5">
+                    {selectedRequest.registeredDate ? new Date(selectedRequest.registeredDate).toLocaleString() : "As soon as possible"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Contact Information</label>
+                  <p className="text-sm font-bold text-gray-950 mt-0.5">
+                    {selectedRequest.contactPhone || "Available upon acceptance"}
+                  </p>
+                </div>
+              </div>
+
+              {selectedRequest.notes && (
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Additional Notes</label>
+                  <p className="text-xs text-gray-600 mt-1 bg-gray-50 rounded-xl p-3 border border-gray-100 leading-relaxed">
+                    {selectedRequest.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row gap-2 border-t border-gray-100 justify-end">
+              <button
+                onClick={() => setSelectedRequest(null)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-100 transition-colors"
+              >
+                Close
+              </button>
+              {selectedRequest.donorResponse === "PENDING" && (
+                <>
+                  <button
+                    onClick={() => {
+                      const reqId = selectedRequest.id;
+                      setSelectedRequest(null);
+                      handleRespond(reqId, "DECLINED");
+                    }}
+                    disabled={respondingId === selectedRequest.id}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors"
+                  >
+                    Decline Request
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reqId = selectedRequest.id;
+                      setSelectedRequest(null);
+                      handleRespond(reqId, "ACCEPTED");
+                    }}
+                    disabled={respondingId === selectedRequest.id}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#3b5e2b] text-white text-xs font-bold hover:bg-green-700 transition-colors shadow-sm"
+                  >
+                    Accept Request
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

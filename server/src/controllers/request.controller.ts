@@ -150,8 +150,8 @@ export const deleteRequest = async (req: AuthRequest, res: Response, next: NextF
 
 export const createPatientRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    if (!req.user || (req.user.role !== 'Patient' && req.user.role !== 'Hospital')) {
-      return next(new ApiError(403, 'Access denied. Patient or Hospital role required to make requests.'));
+    if (!req.user || (req.user.role !== 'Patient' && req.user.role !== 'Hospital' && req.user.role !== 'Donor')) {
+      return next(new ApiError(403, 'Access denied. Patient, Hospital or Donor role required to make requests.'));
     }
 
     const {

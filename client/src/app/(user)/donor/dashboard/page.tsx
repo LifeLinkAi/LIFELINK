@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import api from "@/lib/axios";
 import { toast } from "react-hot-toast";
 import { useDonorEligibility } from "@/hooks/useDonorEligibility";
+import { LocationPicker, LocationValue } from "@/components/donor/LocationPicker";
 
 interface DonorProfileData {
   id: string;
@@ -22,7 +23,7 @@ export default function DonorDashboard() {
   const [profile, setProfile] = useState<DonorProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [bloodType, setBloodType] = useState("O-");
-  const [location, setLocation] = useState("");
+  const [locationValue, setLocationValue] = useState<LocationValue>({ label: "", coordinates: null });
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,7 +37,10 @@ export default function DonorDashboard() {
       setProfile(res.data);
       if (res.data) {
         setBloodType(res.data.bloodType || "O-");
-        setLocation(res.data.location || "");
+        setLocationValue({
+          label: res.data.location || "",
+          coordinates: res.data.coordinates?.length === 2 ? res.data.coordinates : null
+        });
         setPhone(res.data.phone || "");
       }
     } catch (error) {
@@ -51,10 +55,15 @@ export default function DonorDashboard() {
 
   const handleWizardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bloodType || !location || !phone) { toast.error("Please fill in all setup fields."); return; }
+    if (!bloodType || !locationValue.label || !phone) { toast.error("Please fill in all setup fields."); return; }
     try {
       setIsSubmitting(true);
-      const res = await api.put("/donors/setup-complete", { bloodType, location, phone });
+      const res = await api.put("/donors/setup-complete", {
+        bloodType,
+        location: locationValue.label,
+        coordinates: locationValue.coordinates,
+        phone
+      });
       setProfile(res.data);
       toast.success("Profile setup complete! Welcome to LIFELINK.");
     } catch (error: any) {
@@ -102,9 +111,10 @@ export default function DonorDashboard() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Current City &amp; State</label>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Chicago, IL" required
-                  className="w-full bg-neutral-50 border border-gray-200 p-3.5 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-[#3b5e2b] focus:ring-1 focus:ring-[#3b5e2b] transition-all" />
+                <LocationPicker
+                  initialLabel={locationValue.label}
+                  onChange={(val) => setLocationValue(val)}
+                />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Official Phone Number</label>
