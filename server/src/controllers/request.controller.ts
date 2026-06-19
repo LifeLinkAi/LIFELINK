@@ -408,11 +408,11 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       if (!hospitalId) {
         const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
         if (creator && creator.role === 'Hospital') {
-          hospitalId = creator._id;
+          hospitalId = creator._id as any;
         } else if (requestObj.facility) {
           const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
           if (matchingHospital) {
-            hospitalId = matchingHospital._id;
+            hospitalId = matchingHospital._id as any;
           }
         }
       }
@@ -430,7 +430,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
           status: 'PENDING_HOSPITAL',
           acceptedDonorId: new Types.ObjectId(donorId),
           targetDonorId: new Types.ObjectId(targetDonorId as any),
-          hospitalId: hospitalId ? new Types.ObjectId(hospitalId) : null,
+          hospitalId: hospitalId ? new Types.ObjectId(hospitalId.toString()) : null,
         },
         $push: {
           timeline: {
