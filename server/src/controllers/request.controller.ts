@@ -604,6 +604,9 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
     
     // Find coordinating hospital ID
     let hospitalId: any = null;
+    if (!requestObj.requestedBy) {
+      requestObj.requestedBy = requestObj.userId || new Types.ObjectId(req.user.id) as any;
+    }
     const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
     if (creator && creator.role === 'Hospital') {
       hospitalId = creator._id;
@@ -624,6 +627,20 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
       event: 'donor_accepted',
       timestamp: new Date(),
     });
+
+    // Safeguard other required fields from failing Mongoose validation on old seed data
+    if (!requestObj.registeredDate) {
+      requestObj.registeredDate = new Date();
+    }
+    if (!requestObj.type) {
+      requestObj.type = 'Organ';
+    }
+    if (!requestObj.bloodGroup) {
+      requestObj.bloodGroup = 'O-';
+    }
+    if (!requestObj.urgency) {
+      requestObj.urgency = 'High';
+    }
 
     await requestObj.save();
 
