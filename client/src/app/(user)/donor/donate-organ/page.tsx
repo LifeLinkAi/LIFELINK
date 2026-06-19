@@ -211,6 +211,22 @@ export default function OrganDonation() {
     }
   };
 
+  const handleCancelAvailability = async () => {
+    const confirmCancel = window.confirm("Are you sure you want to cancel your organ donation availability? This will hide your profile from matching patients.");
+    if (!confirmCancel) return;
+
+    const payload = {
+      isAvailable: false,
+      organsWillingToDonate: [],
+    };
+
+    const result = await update(payload);
+    if (result) {
+      showToast("✓ Availability cancelled successfully.");
+      loadProfile();
+    }
+  };
+
   const handleSendInterest = async (requestId: string) => {
     try {
       const res = await api.post(`/requests/${requestId}/interest`);
@@ -357,6 +373,21 @@ export default function OrganDonation() {
                       <div className="text-xs font-bold text-gray-800">{f.val}</div>
                     </div>
                   ))}
+                </div>
+
+                <div className="border-t border-gray-200 pt-6 mt-6 flex justify-end">
+                  <button
+                    onClick={handleCancelAvailability}
+                    disabled={isSaving}
+                    className="text-xs font-bold text-red-600 border border-red-200 rounded-full px-5 py-2.5 hover:bg-red-50 transition-colors bg-white shadow-sm flex items-center gap-2"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="15" y1="9" x2="9" y2="15" />
+                      <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                    Cancel Availability
+                  </button>
                 </div>
               </div>
             </div>
