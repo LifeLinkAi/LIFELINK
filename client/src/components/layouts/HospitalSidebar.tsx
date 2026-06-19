@@ -14,7 +14,7 @@ const NAV = [
   { label: 'Dashboard',          href: '/hospital/dashboard',              icon: LayoutDashboard },
   { label: 'Emergencies',        href: '/hospital/emergencies',            icon: AlertTriangle   },
   { label: 'Blood Requests',     href: '/hospital/blood-requests',         icon: Droplets        },
-  { label: 'Organ Requests',     href: '/hospital/organ-requests',         icon: Heart           },
+  { label: 'Organ Management',  href: '/hospital/organ-management',        icon: Heart           },
   { label: 'Donation Monitor',   href: '/hospital/donation-monitor',       icon: Star            },
   { label: 'Donor Verification', href: '/hospital/donor-verification',     icon: ShieldCheck     },
   { label: 'Blood Stock',        href: '/hospital/blood-stock',            icon: FlaskConical    },

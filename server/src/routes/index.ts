@@ -8,6 +8,7 @@ import patientRouter from './patient.routes';
 import requestRouter from './request.routes';
 import uploadRouter from './upload.routes';
 import donationRouter from './donation.routes';
+import organWaitlistRouter from './organWaitlist.routes';
 
 const router = Router();
 
@@ -21,5 +22,7 @@ router.use('/patients', patientRouter);
 router.use('/requests', requestRouter);
 router.use('/upload', uploadRouter);
 router.use('/donations', donationRouter);
+router.use('/organ-waitlist', organWaitlistRouter);
 
 export default router;
+
