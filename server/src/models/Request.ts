@@ -48,6 +48,7 @@ export interface IRequest extends Document {
   donorBloodType?: string | null;
   rejectedBy: Schema.Types.ObjectId[];
   rejectedAt?: Date | null;
+  waitlistId?: Schema.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -206,6 +207,12 @@ const requestSchema = new Schema<IRequest>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,
+    },
+    waitlistId: {
+      type: Schema.Types.ObjectId,
+      ref: 'OrganWaitlist',
+      default: null,
+      index: true,
     },
     timeline: {
       type: [{

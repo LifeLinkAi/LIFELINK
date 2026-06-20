@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/lib/axios";
 import { OrganPreferenceSelector } from "@/components/donor/OrganPreferenceSelector";
@@ -11,6 +11,7 @@ import toast, { Toaster } from "react-hot-toast";
 
 interface ProfileData {
   id: string;
+  donorProfileId: string;
   bloodType: string;
   organsWillingToDonate: string[];
   isSetupComplete: boolean;
@@ -57,6 +58,7 @@ export default function OrganDonation() {
   const [patients, setPatients] = useState<any[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(false);
   const [interestedRequestIds, setInterestedRequestIds] = useState<string[]>([]);
+  const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null);
 
   const showToast = (message: string) => {
     setToastMsg(message);
@@ -77,7 +79,7 @@ export default function OrganDonation() {
     return false;
   };
 
-  const fetchPatients = async (organs: string[], bloodType: string, donorUserId: string) => {
+  const fetchPatients = async (organs: string[], bloodType: string, donorUserId: string, donorProfileId: string) => {
     try {
       setLoadingPatients(true);
       const res = await api.get("/requests?type=Organ");
@@ -87,7 +89,7 @@ export default function OrganDonation() {
         if (r.type !== "Organ") return false;
         
         // Active match-finding states
-        const activeStates = ["PENDING", "Pending", "Matching", "Awaiting Match", "PENDING_DONOR_ACCEPT"];
+        const activeStates = ["PENDING", "Pending", "Matching", "Awaiting Match", "PENDING_DONOR_ACCEPT", "Waitlisted", "Waitlist", "WAITLISTED", "WAITLIST"];
         if (!activeStates.includes(r.status)) return false;
         
         // Match organ type
@@ -105,7 +107,7 @@ export default function OrganDonation() {
       const interestSentIds = compatible
         .filter((r: any) => 
           r.targetDonorId === donorUserId || 
-          (r.matchedDonors && r.matchedDonors.some((m: any) => m.donorId === donorUserId || m.status === "ACCEPTED"))
+          (r.matchedDonors && r.matchedDonors.some((m: any) => m.donorId === donorProfileId || m.donorId === donorUserId || m.status === "ACCEPTED"))
         )
         .map((r: any) => r.id || r._id);
       setInterestedRequestIds(interestSentIds);
@@ -121,6 +123,7 @@ export default function OrganDonation() {
       const data = res.data;
       const parsedProfile: ProfileData = {
         id: data.id,
+        donorProfileId: data.donorProfileId ?? "",
         bloodType: data.bloodType ?? "O-",
         organsWillingToDonate: data.organsWillingToDonate ?? [],
         isSetupComplete: data.isSetupComplete ?? false,
@@ -136,7 +139,7 @@ export default function OrganDonation() {
       setSelectedBloodType(parsedProfile.bloodType);
 
       if (parsedProfile.isAvailable && parsedProfile.organsWillingToDonate.length > 0) {
-        fetchPatients(parsedProfile.organsWillingToDonate, parsedProfile.bloodType, parsedProfile.id);
+        fetchPatients(parsedProfile.organsWillingToDonate, parsedProfile.bloodType, parsedProfile.id, parsedProfile.donorProfileId);
       }
     }).catch(() => {});
   };
@@ -152,7 +155,7 @@ export default function OrganDonation() {
       setEditing(false);
       showToast("Γ£ô Organ preferences updated successfully.");
       if (profile) {
-        fetchPatients(draftOrgans, profile.bloodType, profile.id);
+        fetchPatients(draftOrgans, profile.bloodType, profile.id, profile.donorProfileId);
       }
     }
   };
@@ -476,50 +479,152 @@ export default function OrganDonation() {
               ) : patients.length > 0 ? (
                 <div className="space-y-4">
                   {patients.map((patient) => {
-                    const isInterested = interestedRequestIds.includes(patient.id || patient._id);
+                    const patientId = patient.id || patient._id;
+                    const isInterested = interestedRequestIds.includes(patientId);
+                    const isExpanded = expandedPatientId === patientId;
                     return (
-                      <div key={patient.id || patient._id} className="border border-gray-100 rounded-2xl p-6 hover:border-[#d2e4c0] transition-colors relative bg-slate-50/30">
-                        <div className="flex justify-between items-start gap-4 mb-3 flex-wrap">
+                      <div
+                        key={patientId}
+                        onClick={() => setExpandedPatientId(isExpanded ? null : patientId)}
+                        className={`border rounded-2xl p-6 transition-all duration-200 cursor-pointer ${
+                          isExpanded
+                            ? "border-[#3b5e2b] bg-slate-50 shadow-md"
+                            : "border-gray-100 hover:border-[#d2e4c0] bg-slate-50/30 shadow-sm"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-4 mb-2 flex-wrap">
                           <div>
-                            <span className="text-[10px] bg-[#eef4e2] text-[#3b5e2b] font-bold px-2 py-0.5 rounded mr-2 font-label-caps uppercase">
-                              {patient.organType}
-                            </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-label-caps uppercase ${
-                              patient.urgency === "Critical" ? "bg-red-50 text-red-600 border border-red-100" :
-                              patient.urgency === "High" ? "bg-orange-50 text-orange-600 border border-orange-100" :
-                              "bg-green-50 text-green-600 border border-green-100"
-                            }`}>
-                              {patient.urgency} Urgency
-                            </span>
-                            <h4 className="text-base font-bold text-gray-900 mt-2">
-                              Recipient: {patient.gender}, {patient.age} yrs
+                            <div className="flex flex-wrap gap-2 items-center mb-2">
+                              <span className="text-[10px] bg-[#eef4e2] text-[#3b5e2b] font-bold px-2.5 py-0.5 rounded font-label-caps uppercase">
+                                {patient.organType}
+                              </span>
+                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded font-label-caps uppercase ${
+                                patient.urgency === "Critical" ? "bg-red-50 text-red-600 border border-red-100" :
+                                patient.urgency === "High" ? "bg-orange-50 text-orange-600 border border-orange-100" :
+                                "bg-green-50 text-green-600 border border-green-100"
+                              }`}>
+                                {patient.urgency} Urgency
+                              </span>
+                            </div>
+                            <h4 className="text-base font-bold text-gray-900">
+                              Recipient: {patient.patientName || "Unknown"} ({patient.gender || "Unknown"}, {patient.age || 0} yrs)
                             </h4>
+                            <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                              <span className="material-symbols-outlined text-[14px]">local_hospital</span>
+                              Hospital: <span className="font-semibold text-gray-700">{patient.facility || "Coordinating Medical Center"}</span>
+                            </p>
                           </div>
 
-                          <button
-                            onClick={() => handleSendInterest(patient.id || patient._id)}
-                            disabled={isInterested}
-                            className={`text-xs font-bold px-5 py-2.5 rounded-full shadow-sm transition-all ${
-                              isInterested
-                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                : "bg-[#3b5e2b] text-white hover:bg-[#2d4721]"
-                            }`}
-                          >
-                            {isInterested ? "Interest Sent" : "Send Interest"}
-                          </button>
+                          <div className="flex items-center gap-1 text-[11px] text-[#5b8a3e] font-bold select-none mt-1 sm:mt-0">
+                            <span>{isExpanded ? "Hide Details" : "View Details"}</span>
+                            <span
+                              className="material-symbols-outlined text-[16px] transition-transform duration-200"
+                              style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                            >
+                              expand_more
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="text-xs text-gray-500 space-y-1.5 mt-2">
-                          <p className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[14px]">local_hospital</span>
-                            Hospital: <span className="font-semibold text-gray-700">{patient.facility || "Coordinating Medical Center"}</span>
-                          </p>
-                          {patient.notes && (
-                            <p className="italic text-gray-400 mt-2 bg-white p-3 rounded-xl border border-gray-100">
-                              &ldquo;{patient.notes}&rdquo;
-                            </p>
-                          )}
-                        </div>
+                        {/* Collapsible Details Panel */}
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-gray-200/80 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Blood Group</span>
+                                <span className="font-bold text-gray-800 bg-[#eef4e2]/60 border border-[#d2e4c0] px-2.5 py-1 rounded-lg">
+                                  {patient.bloodGroup}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Required Organ</span>
+                                <span className="font-semibold text-gray-700">{patient.organType || "Organ"}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Contact Phone</span>
+                                <span className="font-semibold text-gray-700">{patient.contactPhone || "Available on match confirmation"}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Registered Date</span>
+                                <span className="font-semibold text-gray-700">
+                                  {patient.registeredDate ? new Date(patient.registeredDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : "Recently"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Emergency Level</span>
+                                <span className="font-bold text-gray-700">{patient.urgency || "Standard"}</span>
+                              </div>
+                            </div>
+                            {/* Medical History & Comorbidities */}
+                            {(patient.medicalHistory || patient.comorbidities) && (
+                              <div className="border-t border-gray-100 pt-4 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {patient.medicalHistory && (
+                                  <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1.5">Medical History</span>
+                                    <p className="text-xs text-gray-600 leading-relaxed font-semibold">
+                                      {patient.medicalHistory}
+                                    </p>
+                                  </div>
+                                )}
+                                {patient.comorbidities && (
+                                  <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1.5">Comorbidities</span>
+                                    <p className="text-xs text-gray-600 leading-relaxed font-semibold">
+                                      {patient.comorbidities}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Legacy Notes */}
+                            {!patient.medicalHistory && !patient.comorbidities && patient.notes && (
+                              <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1.5">Hospital Intake Notes</span>
+                                <p className="text-xs text-gray-600 leading-relaxed italic">
+                                  &ldquo;{patient.notes}&rdquo;
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Medical Certificate */}
+                            {patient.medicalCertificateUrl && (
+                              <div className="border-t border-gray-100 pt-4 mt-2">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2">Medical Documentation</span>
+                                <a
+                                  href={patient.medicalCertificateUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-2 text-xs font-bold text-[#3b5e2b] bg-[#eef4e2]/60 hover:bg-[#eef4e2] border border-[#d2e4c0] rounded-xl px-4 py-2 transition-all shadow-sm cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">description</span>
+                                  View Medical Fitness Certificate
+                                </a>
+                              </div>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendInterest(patientId);
+                                }}
+                                disabled={isInterested}
+                                className={`text-xs font-bold px-6 py-2.5 rounded-full shadow-sm transition-all flex items-center gap-2 ${
+                                  isInterested
+                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                    : "bg-[#3b5e2b] text-white hover:bg-[#2d4721] cursor-pointer"
+                                }`}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">
+                                  {isInterested ? "check_circle" : "volunteer_activism"}
+                                </span>
+                                {isInterested ? "Interest Sent" : "Send Interest"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

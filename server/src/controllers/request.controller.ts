@@ -10,6 +10,7 @@ import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
 import { HospitalProfile } from '../models/HospitalProfile';
 import { User } from '../models/User';
+import { OrganWaitlist } from '../models/OrganWaitlist';
 
 // Helper function to safely parse and structure valid GeoJSON locations
 const parseGeoLocation = (body: any) => {
@@ -35,6 +36,43 @@ const parseGeoLocation = (body: any) => {
     type: 'Point',
     coordinates: coords
   };
+};
+
+// Define recipient blood type compatibility groups based on donor blood type
+const getCompatiblePatientBloodGroups = (donorBloodType: string): string[] => {
+  const d = donorBloodType.toUpperCase().trim();
+  if (d === 'O-') return ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+  if (d === 'O+') return ['O+', 'A+', 'B+', 'AB+'];
+  if (d === 'A-') return ['A-', 'A+', 'AB-', 'AB+'];
+  if (d === 'A+') return ['A+', 'AB+'];
+  if (d === 'B-') return ['B-', 'B+', 'AB-', 'AB+'];
+  if (d === 'B+') return ['B+', 'AB+'];
+  if (d === 'AB-') return ['AB-', 'AB+'];
+  if (d === 'AB+') return ['AB+'];
+  return [donorBloodType];
+};
+
+// Safeguard against missing/invalid required fields on legacy Mongoose documents on save
+const sanitizeRequestForSave = (requestObj: any, fallbackUserId?: string) => {
+  if (!requestObj.requestedBy) {
+    requestObj.requestedBy = requestObj.userId || (fallbackUserId ? new Types.ObjectId(fallbackUserId) : undefined);
+  }
+  if (!requestObj.registeredDate) {
+    requestObj.registeredDate = new Date();
+  }
+  if (!requestObj.type) {
+    requestObj.type = 'Organ';
+  }
+  if (!requestObj.bloodGroup) {
+    requestObj.bloodGroup = 'O-';
+  }
+  if (!requestObj.urgency) {
+    requestObj.urgency = 'High';
+  }
+  // Remove coordinates if they are empty or not exactly length of 2 (breaks 2dsphere indexing)
+  if (requestObj.location && (!Array.isArray(requestObj.location.coordinates) || requestObj.location.coordinates.length !== 2)) {
+    requestObj.location = undefined;
+  }
 };
 
 // ==========================================
@@ -64,6 +102,66 @@ const toRequestDto = (request: RequestRecord) => ({
 export const getRequests = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { type } = req.query;
+
+    // If type is Organ and user is a Donor, filter by compatibility and query from OrganWaitlist
+    if (type === 'Organ' && req.user && req.user.role === 'Donor') {
+      const donorProfile = await DonorProfile.findOne({ userId: req.user.id });
+      if (donorProfile && donorProfile.isAvailable && donorProfile.organsWillingToDonate?.length > 0) {
+        const organs = donorProfile.organsWillingToDonate;
+        const bloodType = donorProfile.bloodType || 'O-';
+        const compatibleBloodGroups = getCompatiblePatientBloodGroups(bloodType);
+        
+        const waitlistFilter = {
+          requiredOrgan: { $in: organs },
+          bloodGroup: { $in: compatibleBloodGroups },
+          status: { $in: ['Waitlisted', 'Waitlist', 'WAITLISTED', 'WAITLIST'] },
+        };
+
+        const waitlistedPatients = await OrganWaitlist.find(waitlistFilter)
+          .populate('hospitalId', 'name')
+          .sort({ createdAt: -1 });
+
+        const waitlistIds = waitlistedPatients.map(p => p._id);
+
+        // Fetch corresponding Request documents to map interest/matching info
+        const existingRequests = await Request.find({ waitlistId: { $in: waitlistIds } });
+
+        const mapped = waitlistedPatients.map(p => {
+          const patientObj = p.toObject();
+          const matchingReq = existingRequests.find(r => r.waitlistId?.toString() === patientObj._id.toString());
+          
+          return {
+            id: patientObj._id.toString(),
+            _id: patientObj._id,
+            patientName: patientObj.fullName,
+            age: patientObj.age,
+            gender: patientObj.gender,
+            contactPhone: patientObj.contact,
+            organType: patientObj.requiredOrgan,
+            bloodGroup: patientObj.bloodGroup,
+            urgency: patientObj.urgency,
+            status: patientObj.status,
+            facility: (patientObj.hospitalId as any)?.name || 'Coordinating Medical Center',
+            notes: patientObj.medicalHistory || patientObj.comorbidities || '',
+            medicalCertificateUrl: patientObj.medicalCertificateUrl || null,
+            medicalHistory: patientObj.medicalHistory || null,
+            comorbidities: patientObj.comorbidities || null,
+            registeredDate: patientObj.createdAt,
+            type: 'Organ',
+            matchedDonors: matchingReq ? matchingReq.matchedDonors : [],
+            targetDonorId: matchingReq ? matchingReq.targetDonorId : null,
+            acceptedDonorId: matchingReq ? matchingReq.acceptedDonorId : null,
+          };
+        });
+
+        res.status(200).json({ success: true, data: mapped });
+        return;
+      } else {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+    }
+
     const filter: any = {};
     if (type) {
       filter.type = type;
@@ -550,6 +648,7 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
       }
     }
 
+    sanitizeRequestForSave(requestObj, req.user?.id);
     await requestObj.save();
 
     res.status(200).json({
@@ -568,14 +667,49 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
       return next(new ApiError(401, 'Not authenticated.'));
     }
 
+    if (!isValidObjectId(id)) {
+      return next(new ApiError(400, 'Invalid request or patient ID.'));
+    }
+
     const donorProfile = await DonorProfile.findOne({ userId: req.user.id });
     if (!donorProfile) {
       return next(new ApiError(404, 'Donor profile not found.'));
     }
 
-    const requestObj = await Request.findById(id);
+    // Try to find an existing request by either request _id or waitlistId
+    let requestObj = await Request.findOne({
+      $or: [
+        { _id: new Types.ObjectId(id) },
+        { waitlistId: new Types.ObjectId(id) }
+      ]
+    });
+
     if (!requestObj) {
-      return next(new ApiError(404, 'Transplant request not found.'));
+      // Check if the ID corresponds to an OrganWaitlist patient
+      const waitlistPatient = await OrganWaitlist.findById(id);
+      if (waitlistPatient) {
+        const hospitalUser = await User.findById(waitlistPatient.hospitalId);
+        requestObj = new Request({
+          waitlistId: waitlistPatient._id,
+          patientName: waitlistPatient.fullName,
+          age: waitlistPatient.age,
+          gender: waitlistPatient.gender,
+          contactPhone: waitlistPatient.contact,
+          organType: waitlistPatient.requiredOrgan,
+          bloodGroup: waitlistPatient.bloodGroup,
+          urgency: waitlistPatient.urgency,
+          status: 'Waitlisted',
+          type: 'Organ',
+          registeredDate: waitlistPatient.createdAt,
+          requestedBy: waitlistPatient.hospitalId,
+          hospitalId: waitlistPatient.hospitalId,
+          facility: hospitalUser?.name || 'Coordinating Medical Center',
+        });
+      }
+    }
+
+    if (!requestObj) {
+      return next(new ApiError(404, 'Transplant request or waitlist patient not found.'));
     }
 
     // Check if donor already exists in matchedDonors
@@ -603,17 +737,16 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
     requestObj.targetDonorId = new Types.ObjectId(req.user.id) as any;
     
     // Find coordinating hospital ID
-    let hospitalId: any = null;
-    if (!requestObj.requestedBy) {
-      requestObj.requestedBy = requestObj.userId || new Types.ObjectId(req.user.id) as any;
-    }
-    const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
-    if (creator && creator.role === 'Hospital') {
-      hospitalId = creator._id;
-    } else if (requestObj.facility) {
-      const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
-      if (matchingHospital) {
-        hospitalId = matchingHospital._id;
+    let hospitalId: any = requestObj.hospitalId || null;
+    if (!hospitalId) {
+      const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
+      if (creator && creator.role === 'Hospital') {
+        hospitalId = creator._id;
+      } else if (requestObj.facility) {
+        const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
+        if (matchingHospital) {
+          hospitalId = matchingHospital._id;
+        }
       }
     }
     requestObj.hospitalId = hospitalId;
@@ -628,20 +761,7 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
       timestamp: new Date(),
     });
 
-    // Safeguard other required fields from failing Mongoose validation on old seed data
-    if (!requestObj.registeredDate) {
-      requestObj.registeredDate = new Date();
-    }
-    if (!requestObj.type) {
-      requestObj.type = 'Organ';
-    }
-    if (!requestObj.bloodGroup) {
-      requestObj.bloodGroup = 'O-';
-    }
-    if (!requestObj.urgency) {
-      requestObj.urgency = 'High';
-    }
-
+    sanitizeRequestForSave(requestObj, req.user?.id);
     await requestObj.save();
 
     res.status(200).json({ success: true, message: 'Interest expressed successfully.' });
