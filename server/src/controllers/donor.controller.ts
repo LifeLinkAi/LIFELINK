@@ -314,6 +314,7 @@ export const getMeProfile = async (req: AuthRequest, res: Response, next: NextFu
       details: profile!.details,
       organsWillingToDonate: profile!.organsWillingToDonate ?? [],
       isSetupComplete: profile!.isSetupComplete,
+      donorProfileId: profile!._id.toString(),
     });
   } catch (error) {
     next(error);
