@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Heart, Plus, RefreshCw, Search, Filter,
   ExternalLink, Loader2, AlertCircle,
-  TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical
+  TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical, ShieldCheck, MapPin
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import RegisterPatientModal from './RegisterPatientModal';
 import ReviewMatchModal, { OrganMatch } from './ReviewMatchModal';
 import ClinicalEvaluationModal from './ClinicalEvaluationModal';
+import LegalConsentModal from './LegalConsentModal';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -19,7 +20,7 @@ import ClinicalEvaluationModal from './ClinicalEvaluationModal';
 
 type UrgencyLevel   = 'Critical' | 'High' | 'Medium' | 'Low';
 type WaitlistStatus = 'Waitlisted' | 'Match Found' | 'Surgery Scheduled' | 'Completed' | 'Withdrawn';
-type ActiveTab      = 'waitlist' | 'matches' | 'clinical';
+type ActiveTab      = 'waitlist' | 'matches' | 'clinical' | 'legal';
 
 interface WaitlistPatient {
   id:                    string;
@@ -130,19 +131,38 @@ function MatchCard({ match, onReview }: { match: OrganMatch; onReview: () => voi
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#F0EDE3]">
-          <span className={cn(
-            'inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-full border',
-            urgCfg.text, urgCfg.bg, urgCfg.border,
-          )}>
-            <span className={cn('w-1.5 h-1.5 rounded-full', urgCfg.dot)} />
-            {urgCfg.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              'inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-full border',
+              urgCfg.text, urgCfg.bg, urgCfg.border,
+            )}>
+              <span className={cn('w-1.5 h-1.5 rounded-full', urgCfg.dot)} />
+              {urgCfg.label}
+            </span>
+
+            {match.distance && (
+              <span className={cn(
+                'inline-flex items-center gap-1 text-[11.5px] font-semibold px-2 py-1 rounded-full border',
+                parseFloat(match.distance) < 50 ? 'bg-green-50 text-green-700 border-green-200' :
+                parseFloat(match.distance) <= 200 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                'bg-red-50 text-red-700 border-red-200'
+              )}>
+                <MapPin size={11} />
+                {parseFloat(match.distance).toFixed(0)} mi
+              </span>
+            )}
+          </div>
 
           <button
             onClick={onReview}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-semibold transition-colors shadow-sm"
           >
-            {match.status === 'CLINICAL_TESTING' ? (
+            {match.status === 'PENDING_LEGAL_APPROVAL' ? (
+              <>
+                <ShieldCheck size={12} />
+                Legal Clearance
+              </>
+            ) : match.status === 'CLINICAL_TESTING' ? (
               <>
                 <FlaskConical size={12} />
                 Clinical Evaluation
@@ -169,12 +189,15 @@ export default function OrganManagementPage() {
   const [patients,     setPatients]     = useState<WaitlistPatient[]>([]);
   const [matches,      setMatches]      = useState<OrganMatch[]>([]);
   const [clinicalMatches, setClinicalMatches] = useState<OrganMatch[]>([]);
+  const [legalMatches, setLegalMatches] = useState<OrganMatch[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [matchLoading, setMatchLoading] = useState(true);
   const [clinicalLoading, setClinicalLoading] = useState(true);
+  const [legalLoading, setLegalLoading] = useState(true);
   const [modalOpen,    setModalOpen]    = useState(false);
   const [reviewMatch,  setReviewMatch]  = useState<OrganMatch | null>(null);
   const [reviewClinicalMatch, setReviewClinicalMatch] = useState<OrganMatch | null>(null);
+  const [reviewLegalMatch, setReviewLegalMatch] = useState<OrganMatch | null>(null);
   const [search,       setSearch]       = useState('');
   const [filterOrgan,  setFilterOrgan]  = useState('all');
   const [filterStatus, setFilterStatus] = useState<WaitlistStatus | 'all'>('all');
@@ -216,11 +239,24 @@ export default function OrganManagementPage() {
     }
   }, []);
 
+  const fetchLegalMatches = useCallback(async () => {
+    setLegalLoading(true);
+    try {
+      const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/legal-pending');
+      setLegalMatches(res.data.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to load legal matches');
+    } finally {
+      setLegalLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPatients();
     fetchMatches();
     fetchClinicalMatches();
-  }, [fetchPatients, fetchMatches, fetchClinicalMatches]);
+    fetchLegalMatches();
+  }, [fetchPatients, fetchMatches, fetchClinicalMatches, fetchLegalMatches]);
 
   const updateStatus = async (id: string, status: WaitlistStatus) => {
     setUpdatingId(id);
@@ -271,11 +307,11 @@ export default function OrganManagementPage() {
 
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <button
-            onClick={() => { fetchPatients(); fetchMatches(); fetchClinicalMatches(); }}
-            disabled={loading && matchLoading && clinicalLoading}
+            onClick={() => { fetchPatients(); fetchMatches(); fetchClinicalMatches(); fetchLegalMatches(); }}
+            disabled={loading && matchLoading && clinicalLoading && legalLoading}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={13} className={cn((loading || matchLoading || clinicalLoading) && 'animate-spin')} />
+            <RefreshCw size={13} className={cn((loading || matchLoading || clinicalLoading || legalLoading) && 'animate-spin')} />
             Refresh
           </button>
           <button
@@ -340,6 +376,22 @@ export default function OrganManagementPage() {
           {clinicalMatches.length > 0 && (
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600 text-white animate-pulse">
               {clinicalMatches.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('legal')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
+            activeTab === 'legal' ? 'bg-white text-[#1a2e0a] shadow-sm' : 'text-[#6B7A5A] hover:text-[#1a2e0a]',
+          )}
+        >
+          <ShieldCheck size={14} />
+          Legal & Ethics (Final)
+          {legalMatches.length > 0 && (
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white animate-pulse">
+              {legalMatches.length}
             </span>
           )}
         </button>
@@ -542,6 +594,33 @@ export default function OrganManagementPage() {
         </>
       )}
 
+      {/* TAB 4: LEGAL & ETHICS */}
+      {activeTab === 'legal' && (
+        <>
+          {legalLoading ? (
+            <div className="flex items-center justify-center gap-2 py-20 text-[#8A9A7A] text-[14px]">
+              <Loader2 size={16} className="animate-spin" /> Loading legal matches…
+            </div>
+          ) : legalMatches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-400">
+                <ShieldCheck size={28} />
+              </div>
+              <p className="text-[14px] font-semibold text-[#4A5A3A]">No matches pending legal review</p>
+              <p className="text-[12.5px] text-[#8A9A7A]">
+                Matches that pass clinical testing will appear here for final compliance clearance.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {legalMatches.map(match => (
+                <MatchCard key={match.id} match={match} onReview={() => setReviewLegalMatch(match)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       <RegisterPatientModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -560,7 +639,15 @@ export default function OrganManagementPage() {
         <ClinicalEvaluationModal
           match={reviewClinicalMatch}
           onClose={() => setReviewClinicalMatch(null)}
-          onEvaluated={() => { fetchClinicalMatches(); fetchPatients(); }}
+          onEvaluated={() => { fetchClinicalMatches(); fetchLegalMatches(); fetchPatients(); }}
+        />
+      )}
+
+      {reviewLegalMatch && (
+        <LegalConsentModal
+          match={reviewLegalMatch}
+          onClose={() => setReviewLegalMatch(null)}
+          onCompleted={() => { fetchLegalMatches(); fetchPatients(); }}
         />
       )}
     </div>
