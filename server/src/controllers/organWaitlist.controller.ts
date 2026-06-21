@@ -8,6 +8,19 @@ import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { logger } from '../utils/logger';
 
 // ==========================================
+// UNIVERSAL HELPERS
+// ==========================================
+
+function sanitizeGeoJSON(doc: any) {
+  if (doc && doc.location != null) {
+    const coords = (doc.location as any).coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) {
+      doc.location = undefined as any;
+    }
+  }
+}
+
+// ==========================================
 // CLOUDINARY SIGNATURE
 // ==========================================
 
@@ -136,8 +149,14 @@ export const getWaitlistPatients = async (
     };
 
     // Optional query filters
-    if (req.query.status) filter.status        = req.query.status;
-    if (req.query.organ)  filter.requiredOrgan = req.query.organ;
+    if (req.query.status) {
+      filter.status = req.query.status;
+    } else {
+      // By default, hide patients who have moved to the surgical/post-op pipeline
+      filter.status = { $nin: ['Surgery Scheduled', 'Completed'] };
+    }
+    
+    if (req.query.organ) filter.requiredOrgan = req.query.organ;
 
     const patients = await OrganWaitlist.find(filter)
       .sort({ createdAt: -1 })
@@ -353,15 +372,7 @@ export const evaluateOrganMatch = async (
       requestDoc.timeline.push({ event: 'hospital_declined_match', timestamp: now });
     }
 
-    // Sanitize location: unset it if coordinates are missing/malformed to avoid
-    // MongoServerError: "Can't extract geo keys" from the 2dsphere index.
-    if (requestDoc.location != null) {
-      const coords = (requestDoc.location as any).coordinates;
-      if (!Array.isArray(coords) || coords.length < 2) {
-        requestDoc.location = undefined as any;
-      }
-    }
-
+    sanitizeGeoJSON(requestDoc);
     await requestDoc.save();
 
     logger.info(`[evaluateOrganMatch] Request ${requestId} → ${action} by hospital ${req.user.id}`);
@@ -481,6 +492,7 @@ export const submitClinicalEvaluation = async (
       bloodCrossmatch,
       hlaMatchScore,
       serologyClear,
+      organFunctionStatus,
       notes,
       labReportUrl,
       decision,
@@ -514,6 +526,7 @@ export const submitClinicalEvaluation = async (
       bloodCrossmatch: bloodCrossmatch ?? 'PENDING',
       hlaMatchScore: Number(hlaMatchScore) || 0,
       serologyClear: Boolean(serologyClear),
+      organFunctionStatus: organFunctionStatus,
       notes: notes ?? '',
       labReportUrl: labReportUrl ?? '',
       evaluatedAt: now,
@@ -523,14 +536,9 @@ export const submitClinicalEvaluation = async (
     if (!requestDoc.timeline) requestDoc.timeline = [];
 
     if (decision === 'APPROVE_SURGERY') {
-      requestDoc.status = 'TRANSPLANT_SCHEDULED';
-      requestDoc.timeline.push({ event: 'clinical_evaluation_passed', timestamp: now });
-
-      if (requestDoc.waitlistId) {
-        await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
-          $set: { status: 'Transplant Scheduled' },
-        });
-      }
+      requestDoc.status = 'PENDING_LEGAL_APPROVAL';
+      requestDoc.timeline.push({ event: 'pending_ethics_review', timestamp: now });
+      // We don't update OrganWaitlist status here; it waits for legal clearance.
     } else if (decision === 'FAIL_CLINICAL_MATCH') {
       const acceptedIdStr = requestDoc.acceptedDonorId?.toString();
       if (acceptedIdStr && requestDoc.matchedDonors) {
@@ -561,6 +569,7 @@ export const submitClinicalEvaluation = async (
       }
     }
 
+    sanitizeGeoJSON(requestDoc);
     await requestDoc.save();
 
     logger.info(`[submitClinicalEvaluation] Request ${requestId} → ${decision} by hospital ${req.user.id}`);
@@ -568,7 +577,7 @@ export const submitClinicalEvaluation = async (
     res.status(200).json({
       success: true,
       message: decision === 'APPROVE_SURGERY'
-        ? 'Clinical testing passed. Transplant scheduled.'
+        ? 'Clinical testing passed. Awaiting Legal & Ethics clearance.'
         : 'Clinical testing failed. Match rejected and slot reopened.',
     });
   } catch (error: any) {
@@ -576,3 +585,336 @@ export const submitClinicalEvaluation = async (
     next(error);
   }
 };
+
+// ==========================================
+// GET MATCHES PENDING LEGAL APPROVAL
+// ==========================================
+
+export const getPendingLegalMatches = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const matches = await DonationRequest.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      type: 'Organ',
+      status: 'PENDING_LEGAL_APPROVAL',
+    })
+      .populate({
+        path: 'waitlistId',
+        model: 'OrganWaitlist',
+        select: 'fullName age gender contact requiredOrgan bloodGroup urgency medicalCertificateUrl medicalHistory comorbidities status',
+      })
+      .populate({
+        path: 'acceptedDonorId',
+        model: 'DonorProfile',
+        select: 'bloodType organsWillingToDonate status tier details',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'name email',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const mapped = matches.map((m: any) => ({
+      id: m._id,
+      status: m.status,
+      createdAt: m.createdAt,
+      distance: m.distance,
+      patient: m.waitlistId
+        ? {
+            id: m.waitlistId._id?.toString(),
+            fullName: m.waitlistId.fullName,
+            age: m.waitlistId.age,
+            gender: m.waitlistId.gender,
+            contact: m.waitlistId.contact,
+            requiredOrgan: m.waitlistId.requiredOrgan,
+            bloodGroup: m.waitlistId.bloodGroup,
+            urgency: m.waitlistId.urgency,
+            medicalCertificateUrl: m.waitlistId.medicalCertificateUrl,
+            medicalHistory: m.waitlistId.medicalHistory,
+            comorbidities: m.waitlistId.comorbidities,
+          }
+        : null,
+      donor: m.acceptedDonorId
+        ? {
+            id: m.acceptedDonorId._id?.toString(),
+            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: (m.acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: m.acceptedDonorId.bloodType,
+            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
+            status: m.acceptedDonorId.status,
+            tier: m.acceptedDonorId.tier,
+            details: m.acceptedDonorId.details,
+          }
+        : null,
+    }));
+
+    logger.info(`[getPendingLegalMatches] ${mapped.length} matches found for hospital ${req.user.id}`);
+
+    res.status(200).json({ success: true, count: mapped.length, data: mapped });
+  } catch (error: any) {
+    logger.error(`[getPendingLegalMatches] ${error.message}`);
+    next(error);
+  }
+};
+
+// ==========================================
+// SUBMIT LEGAL CONSENT
+// ==========================================
+
+export const submitLegalConsent = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { requestId } = req.params;
+    const { signatures, surgeryDetails } = req.body;
+
+    if (!signatures || !signatures.donor || !signatures.recipient || !signatures.hospitalRep || !signatures.ethicsCommittee) {
+      return next(new ApiError(400, 'Cannot approve surgery: all 4 signatures are required.'));
+    }
+    if (!surgeryDetails || !surgeryDetails.date || !surgeryDetails.operatingRoom || !surgeryDetails.leadSurgeon) {
+      return next(new ApiError(400, 'Cannot approve surgery: surgery details are incomplete.'));
+    }
+
+    const requestDoc = await DonationRequest.findOne({
+      _id: new Types.ObjectId(requestId),
+      hospitalId: new Types.ObjectId(req.user.id),
+      type: 'Organ',
+      status: 'PENDING_LEGAL_APPROVAL',
+    });
+
+    if (!requestDoc) {
+      return next(new ApiError(404, 'Match not found, not pending legal approval, or not owned by this hospital.'));
+    }
+
+    const now = new Date();
+
+    if (!requestDoc.timeline) requestDoc.timeline = [];
+
+    requestDoc.status = 'TRANSPLANT_SCHEDULED';
+    requestDoc.timeline.push({ event: 'legal_clearance_granted', timestamp: now });
+    requestDoc.timeline.push({ event: 'transplant_scheduled', timestamp: now });
+    
+    // We optionally save surgery details and signatures somewhere if our schema supports it,
+    // or just into timeline / notes. Since we don't have a specific field for it on Request,
+    // we'll append it to notes for audit purposes if needed, but the primary task is the state transition.
+    
+    // Sanitize location if needed
+    if (requestDoc.location != null) {
+      const coords = (requestDoc.location as any).coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) {
+        requestDoc.location = undefined as any;
+      }
+    }
+
+    sanitizeGeoJSON(requestDoc);
+    await requestDoc.save();
+
+    if (requestDoc.waitlistId) {
+      await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
+        $set: { status: 'Surgery Scheduled' },
+      });
+    }
+
+    logger.info(`[submitLegalConsent] Legal consent granted and surgery scheduled for Request ${requestId} by hospital ${req.user.id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Legal consent granted. Transplant successfully scheduled.',
+    });
+  } catch (error: any) {
+    logger.error(`[submitLegalConsent] ${error.message}`);
+    next(error);
+  }
+};
+
+// ==========================================
+// GET SURGICAL PIPELINE MATCHES
+// ==========================================
+
+export const getSurgicalPipelineMatches = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const matches = await DonationRequest.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      type: 'Organ',
+      status: { $in: ['TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS'] },
+    })
+      .populate({
+        path: 'waitlistId',
+        model: 'OrganWaitlist',
+        select: 'fullName age gender contact requiredOrgan bloodGroup urgency medicalCertificateUrl medicalHistory comorbidities status',
+      })
+      .populate({
+        path: 'acceptedDonorId',
+        model: 'DonorProfile',
+        select: 'bloodType organsWillingToDonate status tier details',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'name email',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const mapped = matches.map((m: any) => ({
+      id: m._id,
+      status: m.status,
+      createdAt: m.createdAt,
+      distance: m.distance,
+      patient: m.waitlistId
+        ? {
+            id: m.waitlistId._id?.toString(),
+            fullName: m.waitlistId.fullName,
+            age: m.waitlistId.age,
+            gender: m.waitlistId.gender,
+            contact: m.waitlistId.contact,
+            requiredOrgan: m.waitlistId.requiredOrgan,
+            bloodGroup: m.waitlistId.bloodGroup,
+            urgency: m.waitlistId.urgency,
+            medicalCertificateUrl: m.waitlistId.medicalCertificateUrl,
+            medicalHistory: m.waitlistId.medicalHistory,
+            comorbidities: m.waitlistId.comorbidities,
+          }
+        : null,
+      donor: m.acceptedDonorId
+        ? {
+            id: m.acceptedDonorId._id?.toString(),
+            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: (m.acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: m.acceptedDonorId.bloodType,
+            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
+            status: m.acceptedDonorId.status,
+            tier: m.acceptedDonorId.tier,
+            details: m.acceptedDonorId.details,
+          }
+        : null,
+    }));
+
+    res.status(200).json({ success: true, count: mapped.length, data: mapped });
+  } catch (error: any) {
+    logger.error(`[getSurgicalPipelineMatches] ${error.message}`);
+    next(error);
+  }
+};
+
+// ==========================================
+// UPDATE SURGERY STATUS
+// ==========================================
+
+export const updateSurgeryStatus = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { requestId } = req.params;
+    const { action, outcomeData } = req.body;
+
+    const requestDoc = await DonationRequest.findOne({
+      _id: new Types.ObjectId(requestId),
+      hospitalId: new Types.ObjectId(req.user.id),
+      type: 'Organ',
+    });
+
+    if (!requestDoc) {
+      return next(new ApiError(404, 'Match not found'));
+    }
+
+    if (action === 'COMMENCE_SURGERY') {
+      if (requestDoc.status !== 'TRANSPLANT_SCHEDULED') {
+        return next(new ApiError(400, 'Cannot commence surgery unless transplant is scheduled.'));
+      }
+      
+      requestDoc.status = 'SURGERY_IN_PROGRESS';
+      requestDoc.surgicalOutcome = {
+        ...requestDoc.surgicalOutcome,
+        surgeryStartedAt: new Date(),
+      };
+      requestDoc.timeline?.push({ event: 'surgery_commenced', timestamp: new Date() });
+      sanitizeGeoJSON(requestDoc);
+      await requestDoc.save();
+
+    } else if (action === 'LOG_OUTCOME') {
+      if (requestDoc.status !== 'SURGERY_IN_PROGRESS') {
+        return next(new ApiError(400, 'Cannot log outcome unless surgery is in progress.'));
+      }
+
+      if (!outcomeData || !outcomeData.outcome) {
+        return next(new ApiError(400, 'Outcome data is required.'));
+      }
+
+      const { outcome, complications, patientDischargeDate } = outcomeData;
+
+      requestDoc.status = outcome === 'SUCCESS' ? 'TRANSPLANT_SUCCESSFUL' : 'TRANSPLANT_FAILED';
+      requestDoc.surgicalOutcome = {
+        ...requestDoc.surgicalOutcome,
+        surgeryCompletedAt: new Date(),
+        outcome,
+        complications,
+        patientDischargeDate: patientDischargeDate ? new Date(patientDischargeDate) : undefined,
+      };
+
+      if (outcome === 'SUCCESS') {
+        requestDoc.timeline?.push({ event: 'transplant_surgery_successful', timestamp: new Date() });
+        sanitizeGeoJSON(requestDoc);
+        await requestDoc.save();
+
+        if (requestDoc.waitlistId) {
+          await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
+            $set: { status: 'Completed' },
+          });
+        }
+      } else {
+        requestDoc.timeline?.push({ event: 'transplant_surgery_failed', timestamp: new Date() });
+        requestDoc.acceptedDonorId = null; // Sever the lock
+        sanitizeGeoJSON(requestDoc);
+        await requestDoc.save();
+
+        if (requestDoc.waitlistId) {
+          await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
+            $set: { 
+              status: 'Searching',
+              urgency: 'Critical', // The ICU Bump
+            },
+          });
+        }
+      }
+
+    } else {
+      return next(new ApiError(400, 'Invalid action.'));
+    }
+
+    res.status(200).json({ success: true, message: 'Surgery status updated successfully.' });
+  } catch (error: any) {
+    logger.error(`[updateSurgeryStatus] ${error.message}`);
+    next(error);
+  }
+};
+

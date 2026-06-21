@@ -26,6 +26,9 @@ const schema = z.object({
   }),
   hlaMatchScore: z.coerce.number().min(0).max(6),
   serologyClear: z.boolean(),
+  organFunctionStatus: z.enum(['OPTIMAL', 'MARGINAL', 'UNSATISFACTORY'], {
+    required_error: 'Select organ function status',
+  }),
   notes: z.string().max(2000).default(''),
   labReport: z
     .custom<FileList>(v => v instanceof FileList, 'Please upload a lab report')
@@ -166,6 +169,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
         bloodCrossmatch: values.bloodCrossmatch,
         hlaMatchScore: values.hlaMatchScore,
         serologyClear: values.serologyClear,
+        organFunctionStatus: values.organFunctionStatus,
         notes: values.notes,
         labReportUrl: secure_url,
         decision: submitDecision,
@@ -273,6 +277,21 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                     className={cn(inputCls, errors.hlaMatchScore && 'border-red-400')}
                   />
                   <FieldError msg={errors.hlaMatchScore?.message} />
+                </div>
+
+                <div>
+                  <label htmlFor="organFunctionStatus" className={labelCls}>Organ Function Status *</label>
+                  <select
+                    id="organFunctionStatus"
+                    {...register('organFunctionStatus')}
+                    className={cn(inputCls, errors.organFunctionStatus && 'border-red-400')}
+                  >
+                    <option value="">Select status…</option>
+                    <option value="OPTIMAL">Optimal</option>
+                    <option value="MARGINAL">Marginal</option>
+                    <option value="UNSATISFACTORY">Unsatisfactory</option>
+                  </select>
+                  <FieldError msg={errors.organFunctionStatus?.message} />
                 </div>
 
                 <div className="flex flex-col justify-center pt-5">

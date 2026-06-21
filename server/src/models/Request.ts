@@ -44,10 +44,18 @@ export interface IRequest extends Document {
     bloodCrossmatch: 'COMPATIBLE_NEGATIVE' | 'INCOMPATIBLE_POSITIVE' | 'PENDING';
     hlaMatchScore: number;
     serologyClear: boolean;
+    organFunctionStatus?: 'OPTIMAL' | 'MARGINAL' | 'UNSATISFACTORY';
     notes: string;
     labReportUrl: string;
     evaluatedAt?: Date;
     evaluatedBy?: Schema.Types.ObjectId;
+  };
+  surgicalOutcome?: {
+    surgeryStartedAt?: Date;
+    surgeryCompletedAt?: Date;
+    outcome?: 'SUCCESS' | 'FAILED';
+    complications?: string;
+    patientDischargeDate?: Date;
   };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
@@ -234,10 +242,18 @@ const requestSchema = new Schema<IRequest>(
       bloodCrossmatch: { type: String, enum: ['COMPATIBLE_NEGATIVE', 'INCOMPATIBLE_POSITIVE', 'PENDING'], default: 'PENDING' },
       hlaMatchScore: { type: Number, min: 0, max: 6 },
       serologyClear: { type: Boolean, default: false },
+      organFunctionStatus: { type: String, enum: ['OPTIMAL', 'MARGINAL', 'UNSATISFACTORY'] },
       notes: { type: String },
       labReportUrl: { type: String },
       evaluatedAt: { type: Date },
       evaluatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+    },
+    surgicalOutcome: {
+      surgeryStartedAt: { type: Date },
+      surgeryCompletedAt: { type: Date },
+      outcome: { type: String, enum: ['SUCCESS', 'FAILED'] },
+      complications: { type: String },
+      patientDischargeDate: { type: Date }
     },
     donorName: {
       type: String,
