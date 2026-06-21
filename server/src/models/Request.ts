@@ -50,6 +50,13 @@ export interface IRequest extends Document {
     evaluatedAt?: Date;
     evaluatedBy?: Schema.Types.ObjectId;
   };
+  surgicalOutcome?: {
+    surgeryStartedAt?: Date;
+    surgeryCompletedAt?: Date;
+    outcome?: 'SUCCESS' | 'FAILED';
+    complications?: string;
+    patientDischargeDate?: Date;
+  };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
   donorId?: Schema.Types.ObjectId | null;
@@ -240,6 +247,13 @@ const requestSchema = new Schema<IRequest>(
       labReportUrl: { type: String },
       evaluatedAt: { type: Date },
       evaluatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+    },
+    surgicalOutcome: {
+      surgeryStartedAt: { type: Date },
+      surgeryCompletedAt: { type: Date },
+      outcome: { type: String, enum: ['SUCCESS', 'FAILED'] },
+      complications: { type: String },
+      patientDischargeDate: { type: Date }
     },
     donorName: {
       type: String,

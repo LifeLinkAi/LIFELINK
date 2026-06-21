@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Heart, Plus, RefreshCw, Search, Filter,
   ExternalLink, Loader2, AlertCircle,
-  TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical, ShieldCheck, MapPin
+  TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical, ShieldCheck, MapPin, Activity, HeartPulse
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -13,6 +13,7 @@ import RegisterPatientModal from './RegisterPatientModal';
 import ReviewMatchModal, { OrganMatch } from './ReviewMatchModal';
 import ClinicalEvaluationModal from './ClinicalEvaluationModal';
 import LegalConsentModal from './LegalConsentModal';
+import SurgicalOutcomeModal from './SurgicalOutcomeModal';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -20,7 +21,7 @@ import LegalConsentModal from './LegalConsentModal';
 
 type UrgencyLevel   = 'Critical' | 'High' | 'Medium' | 'Low';
 type WaitlistStatus = 'Waitlisted' | 'Match Found' | 'Surgery Scheduled' | 'Completed' | 'Withdrawn';
-type ActiveTab      = 'waitlist' | 'matches' | 'clinical' | 'legal';
+type ActiveTab      = 'waitlist' | 'matches' | 'clinical' | 'legal' | 'surgical';
 
 interface WaitlistPatient {
   id:                    string;
@@ -155,9 +156,24 @@ function MatchCard({ match, onReview }: { match: OrganMatch; onReview: () => voi
 
           <button
             onClick={onReview}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-semibold transition-colors shadow-sm"
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-white text-[12px] font-semibold transition-colors shadow-sm",
+              match.status === 'TRANSPLANT_SCHEDULED' ? 'bg-red-600 hover:bg-red-700' :
+              match.status === 'SURGERY_IN_PROGRESS' ? 'bg-red-600 hover:bg-red-700' :
+              'bg-purple-600 hover:bg-purple-700'
+            )}
           >
-            {match.status === 'PENDING_LEGAL_APPROVAL' ? (
+            {match.status === 'TRANSPLANT_SCHEDULED' ? (
+              <>
+                <HeartPulse size={12} />
+                Commence Surgery
+              </>
+            ) : match.status === 'SURGERY_IN_PROGRESS' ? (
+              <>
+                <Activity size={12} />
+                Log Outcome
+              </>
+            ) : match.status === 'PENDING_LEGAL_APPROVAL' ? (
               <>
                 <ShieldCheck size={12} />
                 Legal Clearance
@@ -190,14 +206,17 @@ export default function OrganManagementPage() {
   const [matches,      setMatches]      = useState<OrganMatch[]>([]);
   const [clinicalMatches, setClinicalMatches] = useState<OrganMatch[]>([]);
   const [legalMatches, setLegalMatches] = useState<OrganMatch[]>([]);
+  const [surgicalMatches, setSurgicalMatches] = useState<OrganMatch[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [matchLoading, setMatchLoading] = useState(true);
   const [clinicalLoading, setClinicalLoading] = useState(true);
   const [legalLoading, setLegalLoading] = useState(true);
+  const [surgicalLoading, setSurgicalLoading] = useState(true);
   const [modalOpen,    setModalOpen]    = useState(false);
   const [reviewMatch,  setReviewMatch]  = useState<OrganMatch | null>(null);
   const [reviewClinicalMatch, setReviewClinicalMatch] = useState<OrganMatch | null>(null);
   const [reviewLegalMatch, setReviewLegalMatch] = useState<OrganMatch | null>(null);
+  const [reviewSurgicalMatch, setReviewSurgicalMatch] = useState<OrganMatch | null>(null);
   const [search,       setSearch]       = useState('');
   const [filterOrgan,  setFilterOrgan]  = useState('all');
   const [filterStatus, setFilterStatus] = useState<WaitlistStatus | 'all'>('all');
@@ -251,12 +270,25 @@ export default function OrganManagementPage() {
     }
   }, []);
 
+  const fetchSurgicalMatches = useCallback(async () => {
+    setSurgicalLoading(true);
+    try {
+      const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/surgery-pipeline');
+      setSurgicalMatches(res.data.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to load surgical matches');
+    } finally {
+      setSurgicalLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPatients();
     fetchMatches();
     fetchClinicalMatches();
     fetchLegalMatches();
-  }, [fetchPatients, fetchMatches, fetchClinicalMatches, fetchLegalMatches]);
+    fetchSurgicalMatches();
+  }, [fetchPatients, fetchMatches, fetchClinicalMatches, fetchLegalMatches, fetchSurgicalMatches]);
 
   const updateStatus = async (id: string, status: WaitlistStatus) => {
     setUpdatingId(id);
@@ -307,11 +339,11 @@ export default function OrganManagementPage() {
 
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <button
-            onClick={() => { fetchPatients(); fetchMatches(); fetchClinicalMatches(); fetchLegalMatches(); }}
-            disabled={loading && matchLoading && clinicalLoading && legalLoading}
+            onClick={() => { fetchPatients(); fetchMatches(); fetchClinicalMatches(); fetchLegalMatches(); fetchSurgicalMatches(); }}
+            disabled={loading && matchLoading && clinicalLoading && legalLoading && surgicalLoading}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={13} className={cn((loading || matchLoading || clinicalLoading || legalLoading) && 'animate-spin')} />
+            <RefreshCw size={13} className={cn((loading || matchLoading || clinicalLoading || legalLoading || surgicalLoading) && 'animate-spin')} />
             Refresh
           </button>
           <button
@@ -392,6 +424,21 @@ export default function OrganManagementPage() {
           {legalMatches.length > 0 && (
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white animate-pulse">
               {legalMatches.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('surgical')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
+            activeTab === 'surgical' ? 'bg-white text-[#1a2e0a] shadow-sm' : 'text-[#6B7A5A] hover:text-[#1a2e0a]',
+          )}
+        >
+          <Activity size={14} />
+          Active Surgeries
+          {surgicalMatches.length > 0 && (
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+              {surgicalMatches.length}
             </span>
           )}
         </button>
@@ -621,6 +668,33 @@ export default function OrganManagementPage() {
         </>
       )}
 
+      {/* TAB 5: SURGICAL PIPELINE */}
+      {activeTab === 'surgical' && (
+        <>
+          {surgicalLoading ? (
+            <div className="flex items-center justify-center gap-2 py-20 text-[#8A9A7A] text-[14px]">
+              <Loader2 size={16} className="animate-spin" /> Loading surgical pipeline…
+            </div>
+          ) : surgicalMatches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-500">
+                <Activity size={28} />
+              </div>
+              <p className="text-[14px] font-semibold text-[#4A5A3A]">No active surgeries scheduled</p>
+              <p className="text-[12.5px] text-[#8A9A7A]">
+                Matches that have passed all compliance gates will appear here for operation.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {surgicalMatches.map(match => (
+                <MatchCard key={match.id} match={match} onReview={() => setReviewSurgicalMatch(match)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       <RegisterPatientModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -647,7 +721,15 @@ export default function OrganManagementPage() {
         <LegalConsentModal
           match={reviewLegalMatch}
           onClose={() => setReviewLegalMatch(null)}
-          onCompleted={() => { fetchLegalMatches(); fetchPatients(); }}
+          onCompleted={() => { fetchLegalMatches(); fetchSurgicalMatches(); fetchPatients(); }}
+        />
+      )}
+
+      {reviewSurgicalMatch && (
+        <SurgicalOutcomeModal
+          match={reviewSurgicalMatch}
+          onClose={() => setReviewSurgicalMatch(null)}
+          onUpdated={() => { fetchSurgicalMatches(); fetchPatients(); }}
         />
       )}
     </div>

@@ -10,6 +10,8 @@ import {
   submitClinicalEvaluation,
   getPendingLegalMatches,
   submitLegalConsent,
+  getSurgicalPipelineMatches,
+  updateSurgeryStatus,
 } from '../controllers/organWaitlist.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -32,6 +34,10 @@ router.post('/matches/:requestId/evaluation',   submitClinicalEvaluation);
 // Legal & Ethics Compliance
 router.get('/matches/legal-pending',            getPendingLegalMatches);
 router.post('/matches/:requestId/legal-consent',submitLegalConsent);
+
+// Surgical Pipeline
+router.get('/matches/surgery-pipeline',         getSurgicalPipelineMatches);
+router.patch('/matches/:requestId/surgery-status', updateSurgeryStatus);
 
 // Waitlist CRUD
 router.post('/',                  createWaitlistPatient);
