@@ -405,7 +405,6 @@ export default function RequestStatusPage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[
           { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
-          { label: 'Request Organ',     href: '/patient/request-organ',     icon: <Heart      size={16} />, color: '#5B21B6' },
         ].map(l => (
           <a key={l.label} href={l.href}
             className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E8E4D8] hover:border-[#7AB648] transition-colors text-center">

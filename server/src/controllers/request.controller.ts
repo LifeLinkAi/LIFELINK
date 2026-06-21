@@ -261,6 +261,10 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       return next(new ApiError(400, 'Missing required fields: Type, urgency, blood group, and patient name are mandatory.'));
     }
 
+    if (type === 'Organ' && req.user.role === 'Patient') {
+      return next(new ApiError(403, 'Patients cannot directly request organs. Please contact a registered hospital to be placed on the organ waitlist.'));
+    }
+
     const newReq = new Request({
       userId: req.user.id,
       requestedBy: req.user.id, // Support structural identity metrics across dashboards

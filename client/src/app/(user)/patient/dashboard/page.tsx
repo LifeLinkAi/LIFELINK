@@ -43,7 +43,6 @@ const STATUS_DOT: Record<RequestStatus, string> = {
 const QUICK_ACTIONS = [
   { label: 'SOS Emergency',     href: '/patient/sos',                icon: <Siren     size={22} />, color: '#CC0000', bg: '#FFE5E5', urgent: true  },
   { label: 'Request Blood',     href: '/patient/request-blood',      icon: <Droplets  size={22} />, color: '#CC0000', bg: '#FFF0F0', urgent: false },
-  { label: 'Request Organ',     href: '/patient/request-organ',      icon: <Heart     size={22} />, color: '#5B21B6', bg: '#F0EEFF', urgent: false },
   { label: 'My Requests',       href: '/patient/request-status',     icon: <Clock     size={22} />, color: '#1A5FAA', bg: '#EFF6FF', urgent: false },
   { label: 'Nearby Hospitals',  href: '/patient/nearby-hospitals',   icon: <MapPin    size={22} />, color: '#2B6B0A', bg: '#F0FDF4', urgent: false },
   { label: 'Medical History',   href: '/patient/medical-history',    icon: <FileHeart size={22} />, color: '#6B7A5A', bg: '#F5F2E8', urgent: false },
