@@ -40,6 +40,15 @@ export interface IRequest extends Document {
   targetDonorId?: Schema.Types.ObjectId | null;
   hospitalId?: Schema.Types.ObjectId | null;
   timeline?: Array<{ event: string; timestamp: Date }>;
+  clinicalEvaluation?: {
+    bloodCrossmatch: 'COMPATIBLE_NEGATIVE' | 'INCOMPATIBLE_POSITIVE' | 'PENDING';
+    hlaMatchScore: number;
+    serologyClear: boolean;
+    notes: string;
+    labReportUrl: string;
+    evaluatedAt?: Date;
+    evaluatedBy?: Schema.Types.ObjectId;
+  };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
   donorId?: Schema.Types.ObjectId | null;
@@ -220,6 +229,15 @@ const requestSchema = new Schema<IRequest>(
         timestamp: { type: Date, default: Date.now }
       }],
       default: []
+    },
+    clinicalEvaluation: {
+      bloodCrossmatch: { type: String, enum: ['COMPATIBLE_NEGATIVE', 'INCOMPATIBLE_POSITIVE', 'PENDING'], default: 'PENDING' },
+      hlaMatchScore: { type: Number, min: 0, max: 6 },
+      serologyClear: { type: Boolean, default: false },
+      notes: { type: String },
+      labReportUrl: { type: String },
+      evaluatedAt: { type: Date },
+      evaluatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
     },
     donorName: {
       type: String,

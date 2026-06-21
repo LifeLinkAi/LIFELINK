@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 const NAV = [
   { label: 'Dashboard',         href: '/patient/dashboard',          icon: LayoutDashboard },
   { label: 'Request Blood',     href: '/patient/request-blood',      icon: Droplets        },
-  { label: 'Request Organ',     href: '/patient/request-organ',      icon: Heart           },
   { label: 'My Requests',       href: '/patient/request-status',     icon: Clock           },
   { label: 'Medical History',   href: '/patient/medical-history',    icon: FileHeart       },
 ];
