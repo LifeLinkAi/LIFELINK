@@ -6,6 +6,8 @@ import {
   updateWaitlistStatus,
   getPendingOrganMatches,
   evaluateOrganMatch,
+  getClinicalTestingMatches,
+  submitClinicalEvaluation,
 } from '../controllers/organWaitlist.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -20,6 +22,10 @@ router.get('/upload-signature', getUploadSignature);
 // Incoming donor match review panel
 router.get('/matches',                          getPendingOrganMatches);
 router.patch('/matches/:requestId/evaluate',    evaluateOrganMatch);
+
+// Clinical Evaluation Workbench
+router.get('/matches/clinical-testing',         getClinicalTestingMatches);
+router.post('/matches/:requestId/evaluation',   submitClinicalEvaluation);
 
 // Waitlist CRUD
 router.post('/',                  createWaitlistPatient);

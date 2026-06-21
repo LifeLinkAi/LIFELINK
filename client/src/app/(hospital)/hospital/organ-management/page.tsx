@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Heart, Plus, RefreshCw, Search, Filter,
   ExternalLink, Loader2, AlertCircle,
-  TrendingUp, Clock, CheckCircle2, Users, GitMerge,
+  TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import RegisterPatientModal from './RegisterPatientModal';
 import ReviewMatchModal, { OrganMatch } from './ReviewMatchModal';
+import ClinicalEvaluationModal from './ClinicalEvaluationModal';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -18,7 +19,7 @@ import ReviewMatchModal, { OrganMatch } from './ReviewMatchModal';
 
 type UrgencyLevel   = 'Critical' | 'High' | 'Medium' | 'Low';
 type WaitlistStatus = 'Waitlisted' | 'Match Found' | 'Surgery Scheduled' | 'Completed' | 'Withdrawn';
-type ActiveTab      = 'waitlist' | 'matches';
+type ActiveTab      = 'waitlist' | 'matches' | 'clinical';
 
 interface WaitlistPatient {
   id:                    string;
@@ -141,8 +142,17 @@ function MatchCard({ match, onReview }: { match: OrganMatch; onReview: () => voi
             onClick={onReview}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[12px] font-semibold transition-colors shadow-sm"
           >
-            <GitMerge size={12} />
-            Review Match
+            {match.status === 'CLINICAL_TESTING' ? (
+              <>
+                <FlaskConical size={12} />
+                Clinical Evaluation
+              </>
+            ) : (
+              <>
+                <GitMerge size={12} />
+                Review Match
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -158,10 +168,13 @@ export default function OrganManagementPage() {
   const [activeTab,    setActiveTab]    = useState<ActiveTab>('waitlist');
   const [patients,     setPatients]     = useState<WaitlistPatient[]>([]);
   const [matches,      setMatches]      = useState<OrganMatch[]>([]);
+  const [clinicalMatches, setClinicalMatches] = useState<OrganMatch[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [matchLoading, setMatchLoading] = useState(true);
+  const [clinicalLoading, setClinicalLoading] = useState(true);
   const [modalOpen,    setModalOpen]    = useState(false);
   const [reviewMatch,  setReviewMatch]  = useState<OrganMatch | null>(null);
+  const [reviewClinicalMatch, setReviewClinicalMatch] = useState<OrganMatch | null>(null);
   const [search,       setSearch]       = useState('');
   const [filterOrgan,  setFilterOrgan]  = useState('all');
   const [filterStatus, setFilterStatus] = useState<WaitlistStatus | 'all'>('all');
@@ -191,10 +204,23 @@ export default function OrganManagementPage() {
     }
   }, []);
 
+  const fetchClinicalMatches = useCallback(async () => {
+    setClinicalLoading(true);
+    try {
+      const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/clinical-testing');
+      setClinicalMatches(res.data.data ?? []);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to load clinical matches');
+    } finally {
+      setClinicalLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPatients();
     fetchMatches();
-  }, [fetchPatients, fetchMatches]);
+    fetchClinicalMatches();
+  }, [fetchPatients, fetchMatches, fetchClinicalMatches]);
 
   const updateStatus = async (id: string, status: WaitlistStatus) => {
     setUpdatingId(id);
@@ -245,11 +271,11 @@ export default function OrganManagementPage() {
 
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <button
-            onClick={() => { fetchPatients(); fetchMatches(); }}
-            disabled={loading && matchLoading}
+            onClick={() => { fetchPatients(); fetchMatches(); fetchClinicalMatches(); }}
+            disabled={loading && matchLoading && clinicalLoading}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={13} className={cn((loading || matchLoading) && 'animate-spin')} />
+            <RefreshCw size={13} className={cn((loading || matchLoading || clinicalLoading) && 'animate-spin')} />
             Refresh
           </button>
           <button
@@ -298,6 +324,22 @@ export default function OrganManagementPage() {
           {matches.length > 0 && (
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-purple-600 text-white animate-pulse">
               {matches.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('clinical')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
+            activeTab === 'clinical' ? 'bg-white text-[#1a2e0a] shadow-sm' : 'text-[#6B7A5A] hover:text-[#1a2e0a]',
+          )}
+        >
+          <FlaskConical size={14} />
+          Clinical Lab (Testing)
+          {clinicalMatches.length > 0 && (
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600 text-white animate-pulse">
+              {clinicalMatches.length}
             </span>
           )}
         </button>
@@ -473,6 +515,33 @@ export default function OrganManagementPage() {
         </>
       )}
 
+      {/* TAB 3: CLINICAL LAB TESTING */}
+      {activeTab === 'clinical' && (
+        <>
+          {clinicalLoading ? (
+            <div className="flex items-center justify-center gap-2 py-20 text-[#8A9A7A] text-[14px]">
+              <Loader2 size={16} className="animate-spin" /> Loading clinical matches…
+            </div>
+          ) : clinicalMatches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-300">
+                <FlaskConical size={28} />
+              </div>
+              <p className="text-[14px] font-semibold text-[#4A5A3A]">No matches in clinical testing</p>
+              <p className="text-[12.5px] text-[#8A9A7A]">
+                Approve an incoming match to send it to the clinical lab.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {clinicalMatches.map(match => (
+                <MatchCard key={match.id} match={match} onReview={() => setReviewClinicalMatch(match)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       <RegisterPatientModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -483,7 +552,15 @@ export default function OrganManagementPage() {
         <ReviewMatchModal
           match={reviewMatch}
           onClose={() => setReviewMatch(null)}
-          onEvaluated={() => { fetchMatches(); fetchPatients(); }}
+          onEvaluated={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); }}
+        />
+      )}
+
+      {reviewClinicalMatch && (
+        <ClinicalEvaluationModal
+          match={reviewClinicalMatch}
+          onClose={() => setReviewClinicalMatch(null)}
+          onEvaluated={() => { fetchClinicalMatches(); fetchPatients(); }}
         />
       )}
     </div>
