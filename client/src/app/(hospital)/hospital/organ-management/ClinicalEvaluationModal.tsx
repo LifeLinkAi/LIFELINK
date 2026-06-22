@@ -64,28 +64,28 @@ interface Props {
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return (
-    <p className="mt-1 flex items-center gap-1 text-[11.5px] text-red-600">
-      <AlertCircle size={11} /> {msg}
+    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-rose-600">
+      <AlertCircle size={12} /> {msg}
     </p>
   );
 }
 
 function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#F0EDE3]">
-      <span className="text-[#7AB648]">{icon}</span>
-      <h3 className="text-[13px] font-semibold text-[#1a2e0a] uppercase tracking-wide">{title}</h3>
+    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200/80">
+      <span className="text-slate-400">{icon}</span>
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</h3>
     </div>
   );
 }
 
 const inputCls = `
-  w-full h-10 px-3 text-[13px] bg-white border border-[#D0CCBC] rounded-lg
-  outline-none transition-colors placeholder:text-[#C0CCBC]
-  focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/30
+  w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-md
+  outline-none transition-colors placeholder:text-slate-400
+  focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white
 `.trim();
 
-const labelCls = 'block text-[12px] font-semibold text-[#4A5A3A] mb-1';
+const labelCls = 'block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5';
 
 type UploadStep = 'idle' | 'signing' | 'uploading' | 'saving' | 'done' | 'error';
 
@@ -206,33 +206,33 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
   // ── RENDER ───────────────────────────────────────────────────
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-xl shadow-xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200/80 bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
-              <FlaskConical size={18} />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900">
+              <FlaskConical size={16} />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-[#1a2e0a]">
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight uppercase">
                 Clinical Lab Evaluation
               </h2>
-              <p className="text-[11.5px] text-[#8A9A7A]">Record lab results for {match.patient?.fullName}</p>
+              <p className="text-xs text-slate-500">Record lab results for {match.patient?.fullName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8A9A7A] hover:bg-[#F0EDE3] hover:text-[#1a2e0a] transition-colors disabled:opacity-40"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-40"
           >
             <X size={16} />
           </button>
@@ -244,7 +244,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
             id="clinical-evaluation-form"
             onSubmit={handleSubmit(onSubmit)}
             noValidate
-            className="p-6 flex flex-col gap-7"
+            className="p-5 flex flex-col gap-6"
           >
 
             {/* ── Section 1: Lab Results ── */}
@@ -257,7 +257,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                   <select
                     id="bloodCrossmatch"
                     {...register('bloodCrossmatch')}
-                    className={cn(inputCls, errors.bloodCrossmatch && 'border-red-400')}
+                    className={cn(inputCls, errors.bloodCrossmatch && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   >
                     <option value="PENDING">Pending</option>
                     <option value="COMPATIBLE_NEGATIVE">Compatible (Negative Crossmatch)</option>
@@ -274,7 +274,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                     min={0}
                     max={6}
                     {...register('hlaMatchScore')}
-                    className={cn(inputCls, errors.hlaMatchScore && 'border-red-400')}
+                    className={cn(inputCls, errors.hlaMatchScore && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   />
                   <FieldError msg={errors.hlaMatchScore?.message} />
                 </div>
@@ -284,7 +284,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                   <select
                     id="organFunctionStatus"
                     {...register('organFunctionStatus')}
-                    className={cn(inputCls, errors.organFunctionStatus && 'border-red-400')}
+                    className={cn(inputCls, errors.organFunctionStatus && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   >
                     <option value="">Select status…</option>
                     <option value="OPTIMAL">Optimal</option>
@@ -299,9 +299,9 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                     <input
                       type="checkbox"
                       {...register('serologyClear')}
-                      className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 rounded-sm border-slate-300 text-slate-900 focus:ring-slate-900"
                     />
-                    <span className="text-[13px] font-semibold text-[#1a2e0a]">Serology Clear</span>
+                    <span className="text-sm font-medium text-slate-900">Serology Clear</span>
                   </label>
                   <FieldError msg={errors.serologyClear?.message} />
                 </div>
@@ -318,29 +318,29 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                 control={control}
                 render={({ field: { onChange, ref } }) => (
                   <div>
-                    <label className={labelCls}>Upload Official Report * <span className="text-[#8A9A7A] font-normal">(PDF, JPG, PNG — max 10 MB)</span></label>
+                    <label className={labelCls}>Upload Official Report * <span className="text-slate-400 font-normal lowercase tracking-normal">(pdf, jpg, png — max 10 mb)</span></label>
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       className={cn(
-                        'relative flex flex-col items-center justify-center gap-2 h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors',
+                        'relative flex flex-col items-center justify-center gap-2 h-24 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
                         errors.labReport
-                          ? 'border-red-300 bg-red-50'
+                          ? 'border-rose-300 bg-rose-50'
                           : previewName
-                          ? 'border-[#7AB648] bg-[#F5FAF0]'
-                          : 'border-[#D0CCBC] bg-[#FAFAF7] hover:border-[#7AB648] hover:bg-[#F5FAF0]',
+                          ? 'border-slate-900 bg-slate-50'
+                          : 'border-slate-200 bg-slate-50 hover:border-slate-400 hover:bg-slate-100',
                       )}
                     >
                       {previewName ? (
                         <>
-                          <CheckCircle2 size={22} className="text-[#7AB648]" />
-                          <p className="text-[12.5px] font-medium text-[#2B6B0A] max-w-xs truncate px-4">{previewName}</p>
-                          <p className="text-[11px] text-[#8A9A7A]">Click to replace</p>
+                          <CheckCircle2 size={20} className="text-slate-900" />
+                          <p className="text-xs font-mono text-slate-900 max-w-xs truncate px-4">{previewName}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Click to replace</p>
                         </>
                       ) : (
                         <>
-                          <Upload size={22} className="text-[#8A9A7A]" />
-                          <p className="text-[12.5px] text-[#4A5A3A] font-medium">Click to upload report</p>
-                          <p className="text-[11px] text-[#8A9A7A]">PDF, JPG, PNG up to 10 MB</p>
+                          <Upload size={20} className="text-slate-400" />
+                          <p className="text-sm text-slate-700 font-medium">Click to upload report</p>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">PDF, JPG, PNG up to 10 MB</p>
                         </>
                       )}
                     </div>
@@ -372,8 +372,8 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
                   placeholder="Any extra observations or requirements for surgery…"
                   className={cn(
                     inputCls,
-                    'h-auto py-2.5 resize-none',
-                    errors.notes && 'border-red-400',
+                    'resize-none',
+                    errors.notes && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400',
                   )}
                 />
                 <FieldError msg={errors.notes?.message} />
@@ -384,17 +384,17 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200/80 bg-slate-50 flex-shrink-0 rounded-b-xl">
 
           {isSubmitting && (
-            <div className="flex items-center gap-2 text-[12px] text-[#6B7A5A]">
-              <Loader2 size={13} className="animate-spin text-[#7AB648]" />
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <Loader2 size={14} className="animate-spin text-slate-900" />
               <span>{STEP_LABELS[uploadStep]}</span>
             </div>
           )}
           {uploadStep === 'done' && (
-            <div className="flex items-center gap-2 text-[12px] text-green-700">
-              <CheckCircle2 size={13} /> Evaluation Saved!
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider">
+              <CheckCircle2 size={14} /> Evaluation Saved!
             </div>
           )}
           {!isSubmitting && uploadStep !== 'done' && <div />}
@@ -405,7 +405,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
               form="clinical-evaluation-form"
               onClick={() => setSubmitDecision('FAIL_CLINICAL_MATCH')}
               disabled={isSubmitting || uploadStep === 'done'}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-red-200 text-red-700 hover:bg-red-50 text-[13px] font-bold transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700 text-sm font-medium transition-colors disabled:opacity-40 shadow-sm"
             >
               Fail Match
             </button>
@@ -414,7 +414,7 @@ export default function ClinicalEvaluationModal({ match, onClose, onEvaluated }:
               form="clinical-evaluation-form"
               onClick={() => setSubmitDecision('APPROVE_SURGERY')}
               disabled={isSubmitting || uploadStep === 'done' || !canApprove}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#1a2e0a] hover:bg-[#2B4A18] text-[13px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               title={!canApprove ? "Requires Compatible crossmatch and clear serology" : ""}
             >
               Approve for Surgery

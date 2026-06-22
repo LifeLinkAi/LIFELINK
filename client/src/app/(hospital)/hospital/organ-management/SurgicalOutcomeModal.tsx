@@ -40,18 +40,18 @@ interface Props {
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return (
-    <p className="mt-1 flex items-center gap-1 text-[11.5px] text-red-600">
-      <AlertCircle size={11} /> {msg}
+    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-rose-600">
+      <AlertCircle size={12} /> {msg}
     </p>
   );
 }
 
 const inputCls = `
-  w-full px-3 py-2 text-[13px] bg-white border border-[#D0CCBC] rounded-lg
-  outline-none transition-colors placeholder:text-[#C0CCBC]
-  focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/30
-`;
-const labelCls = 'block text-[12px] font-semibold text-[#4A5A3A] mb-1';
+  w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-md
+  outline-none transition-colors placeholder:text-slate-400
+  focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white
+`.trim();
+const labelCls = 'block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5';
 
 // ─────────────────────────────────────────────
 // MAIN COMPONENT
@@ -119,25 +119,25 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg bg-white rounded-xl shadow-xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4D8] bg-[#FAFAF7]">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200/80 bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
-              <HeartPulse size={18} />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900">
+              <HeartPulse size={16} />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-[#1a2e0a]">
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight uppercase">
                 Surgical Pipeline
               </h2>
-              <p className="text-[11.5px] text-[#8A9A7A]">
+              <p className="text-xs text-slate-500">
                 Patient: {match.patient?.fullName}
               </p>
             </div>
@@ -145,41 +145,41 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8A9A7A] hover:bg-[#F0EDE3] transition-colors disabled:opacity-40"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors disabled:opacity-40"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* ── Body ── */}
-        <div className="p-6">
+        <div className="p-5">
           {match.status === 'TRANSPLANT_SCHEDULED' ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 mb-4 animate-pulse">
-                <Syringe size={32} />
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-900 mb-4 animate-pulse">
+                <Syringe size={24} />
               </div>
-              <h3 className="text-[18px] font-bold text-[#1a2e0a] mb-2">Ready for Operation</h3>
-              <p className="text-[13px] text-[#6B7A5A] mb-8 max-w-sm">
+              <h3 className="text-base font-semibold text-slate-900 mb-2 tracking-tight">Ready for Operation</h3>
+              <p className="text-sm text-slate-500 mb-8 max-w-sm">
                 Ensure all surgical prep is complete. Clicking commence will timestamp the start of the procedure.
               </p>
               
               <button
                 onClick={commenceSurgery}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-[15px] transition-colors disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-medium text-sm transition-colors shadow-sm disabled:opacity-50"
               >
-                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Activity size={18} />}
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} />}
                 COMMENCE SURGERY
               </button>
             </div>
           ) : (
-            <form id="post-op-form" onSubmit={handleSubmit(submitPostOp)} className="flex flex-col gap-5">
+            <form id="post-op-form" onSubmit={handleSubmit(submitPostOp)} className="flex flex-col gap-6">
               <div>
                 <label className={labelCls}>Surgical Outcome *</label>
                 <div className="grid grid-cols-2 gap-3 mt-1.5">
                   <label className={cn(
-                    'flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all',
-                    currentOutcome === 'SUCCESS' ? 'border-green-500 bg-green-50 text-green-700 font-bold' : 'border-[#E8E4D8] text-[#6B7A5A] hover:border-green-200'
+                    'flex items-center justify-center gap-2 p-2 rounded-md border cursor-pointer transition-all',
+                    currentOutcome === 'SUCCESS' ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-slate-200 text-slate-500 hover:border-emerald-300'
                   )}>
                     <input type="radio" value="SUCCESS" {...register('outcome')} className="hidden" />
                     <CheckCircle2 size={16} />
@@ -187,8 +187,8 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
                   </label>
                   
                   <label className={cn(
-                    'flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all',
-                    currentOutcome === 'FAILED' ? 'border-red-500 bg-red-50 text-red-700 font-bold' : 'border-[#E8E4D8] text-[#6B7A5A] hover:border-red-200'
+                    'flex items-center justify-center gap-2 p-2 rounded-md border cursor-pointer transition-all',
+                    currentOutcome === 'FAILED' ? 'border-rose-600 bg-rose-50 text-rose-700 font-bold' : 'border-slate-200 text-slate-500 hover:border-rose-300'
                   )}>
                     <input type="radio" value="FAILED" {...register('outcome')} className="hidden" />
                     <AlertCircle size={16} />
@@ -213,7 +213,7 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
                 <div>
                   <label htmlFor="patientDischargeDate" className={labelCls}>Expected Discharge Date</label>
                   <div className="relative">
-                    <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9A7A]" />
+                    <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       id="patientDischargeDate"
                       type="date"
@@ -229,15 +229,15 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
 
         {/* ── Footer (Only for Post-Op Form) ── */}
         {match.status === 'SURGERY_IN_PROGRESS' && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8E4D8] bg-[#FAFAF7]">
+          <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200/80 bg-slate-50 rounded-b-xl">
             {isSubmitting ? (
-              <div className="flex items-center gap-2 text-[12px] text-[#6B7A5A]">
-                <Loader2 size={13} className="animate-spin text-blue-600" />
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <Loader2 size={14} className="animate-spin text-slate-900" />
                 <span>Archiving record...</span>
               </div>
             ) : done ? (
-              <div className="flex items-center gap-2 text-[12px] text-green-700">
-                <CheckCircle2 size={13} /> Recorded
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                <CheckCircle2 size={14} /> Recorded
               </div>
             ) : <div />}
 
@@ -245,7 +245,7 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
               type="submit"
               form="post-op-form"
               disabled={isSubmitting || done}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1a2e0a] hover:bg-[#2B4A18] text-[13px] font-bold text-white transition-all disabled:opacity-60"
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-sm font-medium text-white shadow-sm transition-all disabled:opacity-50"
             >
               Finalize & Archive
             </button>

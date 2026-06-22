@@ -79,28 +79,28 @@ interface Props {
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return (
-    <p className="mt-1 flex items-center gap-1 text-[11.5px] text-red-600">
-      <AlertCircle size={11} /> {msg}
+    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-rose-600">
+      <AlertCircle size={12} /> {msg}
     </p>
   );
 }
 
 function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#F0EDE3]">
-      <span className="text-[#7AB648]">{icon}</span>
-      <h3 className="text-[13px] font-semibold text-[#1a2e0a] uppercase tracking-wide">{title}</h3>
+    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200/80">
+      <span className="text-slate-400">{icon}</span>
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</h3>
     </div>
   );
 }
 
 const inputCls = `
-  w-full h-10 px-3 text-[13px] bg-white border border-[#D0CCBC] rounded-lg
-  outline-none transition-colors placeholder:text-[#C0CCBC]
-  focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/30
+  w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-md
+  outline-none transition-colors placeholder:text-slate-400
+  focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white
 `.trim();
 
-const labelCls = 'block text-[12px] font-semibold text-[#4A5A3A] mb-1';
+const labelCls = 'block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5';
 
 // ─────────────────────────────────────────────
 // UPLOAD STEP INDICATOR
@@ -110,11 +110,11 @@ type UploadStep = 'idle' | 'signing' | 'uploading' | 'saving' | 'done' | 'error'
 
 const STEP_LABELS: Record<UploadStep, string> = {
   idle:      'Submit Registration',
-  signing:   'Getting upload credentials…',
+  signing:   'Getting credentials…',
   uploading: 'Uploading certificate…',
-  saving:    'Saving patient record…',
-  done:      'Patient Registered!',
-  error:     'Submission Failed — Retry',
+  saving:    'Saving record…',
+  done:      'Registered!',
+  error:     'Retry',
 };
 
 // ─────────────────────────────────────────────
@@ -232,30 +232,30 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
   // ── RENDER ───────────────────────────────────────────────────
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-xl shadow-xl overflow-hidden">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200/80 bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
-              <User size={18} />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900">
+              <User size={16} />
             </div>
             <div>
-              <h2 id="modal-title" className="text-[16px] font-bold text-[#1a2e0a]">
+              <h2 id="modal-title" className="text-sm font-semibold text-slate-900 tracking-tight uppercase">
                 Register Transplant Patient
               </h2>
-              <p className="text-[11.5px] text-[#8A9A7A]">Add patient to the organ waitlist</p>
+              <p className="text-xs text-slate-500">Add patient to the organ waitlist</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8A9A7A] hover:bg-[#F0EDE3] hover:text-[#1a2e0a] transition-colors disabled:opacity-40"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-40"
             aria-label="Close modal"
           >
             <X size={16} />
@@ -268,7 +268,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
             id="register-patient-form"
             onSubmit={handleSubmit(onSubmit)}
             noValidate
-            className="p-6 flex flex-col gap-7"
+            className="p-5 flex flex-col gap-6"
           >
 
             {/* ── Section 1: Patient Profile ── */}
@@ -283,7 +283,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                     id="fullName"
                     {...register('fullName')}
                     placeholder="e.g. Ravi Kumar"
-                    className={cn(inputCls, errors.fullName && 'border-red-400')}
+                    className={cn(inputCls, errors.fullName && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   />
                   <FieldError msg={errors.fullName?.message} />
                 </div>
@@ -298,7 +298,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                     max={120}
                     {...register('age')}
                     placeholder="35"
-                    className={cn(inputCls, errors.age && 'border-red-400')}
+                    className={cn(inputCls, errors.age && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   />
                   <FieldError msg={errors.age?.message} />
                 </div>
@@ -309,7 +309,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                   <select
                     id="gender"
                     {...register('gender')}
-                    className={cn(inputCls, errors.gender && 'border-red-400')}
+                    className={cn(inputCls, errors.gender && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   >
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -325,7 +325,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                     id="contact"
                     {...register('contact')}
                     placeholder="+91 98400 00000"
-                    className={cn(inputCls, errors.contact && 'border-red-400')}
+                    className={cn(inputCls, errors.contact && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   />
                   <FieldError msg={errors.contact?.message} />
                 </div>
@@ -343,7 +343,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                   <select
                     id="requiredOrgan"
                     {...register('requiredOrgan')}
-                    className={cn(inputCls, errors.requiredOrgan && 'border-red-400')}
+                    className={cn(inputCls, errors.requiredOrgan && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   >
                     <option value="">Select organ…</option>
                     {ORGAN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -357,7 +357,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                   <select
                     id="bloodGroup"
                     {...register('bloodGroup')}
-                    className={cn(inputCls, errors.bloodGroup && 'border-red-400')}
+                    className={cn(inputCls, errors.bloodGroup && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
                   >
                     <option value="">Select group…</option>
                     {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -376,29 +376,29 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                 control={control}
                 render={({ field: { onChange, ref } }) => (
                   <div>
-                    <label className={labelCls}>Medical Certificate * <span className="text-[#8A9A7A] font-normal">(PDF, JPG, PNG — max 10 MB)</span></label>
+                    <label className={labelCls}>Medical Certificate * <span className="text-slate-400 font-normal lowercase tracking-normal">(pdf, jpg, png — max 10 mb)</span></label>
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       className={cn(
-                        'relative flex flex-col items-center justify-center gap-2 h-28 rounded-xl border-2 border-dashed cursor-pointer transition-colors',
+                        'relative flex flex-col items-center justify-center gap-2 h-24 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
                         errors.medicalCertificate
-                          ? 'border-red-300 bg-red-50'
+                          ? 'border-rose-300 bg-rose-50'
                           : previewName
-                          ? 'border-[#7AB648] bg-[#F5FAF0]'
-                          : 'border-[#D0CCBC] bg-[#FAFAF7] hover:border-[#7AB648] hover:bg-[#F5FAF0]',
+                          ? 'border-slate-900 bg-slate-50'
+                          : 'border-slate-200 bg-slate-50 hover:border-slate-400 hover:bg-slate-100',
                       )}
                     >
                       {previewName ? (
                         <>
-                          <CheckCircle2 size={22} className="text-[#7AB648]" />
-                          <p className="text-[12.5px] font-medium text-[#2B6B0A] max-w-xs truncate px-4">{previewName}</p>
-                          <p className="text-[11px] text-[#8A9A7A]">Click to replace</p>
+                          <CheckCircle2 size={20} className="text-slate-900" />
+                          <p className="text-xs font-mono text-slate-900 max-w-xs truncate px-4">{previewName}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Click to replace</p>
                         </>
                       ) : (
                         <>
-                          <Upload size={22} className="text-[#8A9A7A]" />
-                          <p className="text-[12.5px] text-[#4A5A3A] font-medium">Click to upload certificate</p>
-                          <p className="text-[11px] text-[#8A9A7A]">PDF, JPG, PNG up to 10 MB</p>
+                          <Upload size={20} className="text-slate-400" />
+                          <p className="text-sm text-slate-700 font-medium">Click to upload certificate</p>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">PDF, JPG, PNG up to 10 MB</p>
                         </>
                       )}
                     </div>
@@ -432,8 +432,8 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                     placeholder="Summarize the patient's relevant medical history…"
                     className={cn(
                       inputCls,
-                      'h-auto py-2.5 resize-none',
-                      errors.medicalHistory && 'border-red-400',
+                      'resize-none',
+                      errors.medicalHistory && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400',
                     )}
                   />
                   <FieldError msg={errors.medicalHistory?.message} />
@@ -448,8 +448,8 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                     placeholder="List any comorbid conditions (e.g. Diabetes Type 2, Hypertension)…"
                     className={cn(
                       inputCls,
-                      'h-auto py-2.5 resize-none',
-                      errors.comorbidities && 'border-red-400',
+                      'resize-none',
+                      errors.comorbidities && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400',
                     )}
                   />
                   <FieldError msg={errors.comorbidities?.message} />
@@ -467,10 +467,10 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                   <div className="grid grid-cols-4 gap-2">
                     {URGENCY_LEVELS.map(level => {
                       const config = {
-                        Critical: { bg: 'bg-red-50',    border: 'border-red-400',   text: 'text-red-700',    activeBg: 'bg-red-100'    },
-                        High:     { bg: 'bg-orange-50', border: 'border-orange-400', text: 'text-orange-700', activeBg: 'bg-orange-100' },
-                        Medium:   { bg: 'bg-amber-50',  border: 'border-amber-400',  text: 'text-amber-700',  activeBg: 'bg-amber-100'  },
-                        Low:      { bg: 'bg-green-50',  border: 'border-green-400',  text: 'text-green-700',  activeBg: 'bg-green-100'  },
+                        Critical: { bg: 'bg-rose-50',    border: 'border-rose-300',   text: 'text-rose-700'    },
+                        High:     { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' },
+                        Medium:   { bg: 'bg-amber-50',  border: 'border-amber-300',  text: 'text-amber-700'  },
+                        Low:      { bg: 'bg-emerald-50',  border: 'border-emerald-300',  text: 'text-emerald-700'  },
                       }[level];
                       const isSelected = field.value === level;
                       return (
@@ -479,10 +479,10 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
                           type="button"
                           onClick={() => field.onChange(level)}
                           className={cn(
-                            'py-2.5 rounded-xl border-2 text-[12.5px] font-semibold transition-all',
+                            'py-2 rounded-md border text-xs font-semibold transition-all',
                             isSelected
-                              ? `${config.activeBg} ${config.border} ${config.text} shadow-sm scale-[1.02]`
-                              : 'bg-white border-[#E8E4D8] text-[#6B7A5A] hover:border-[#D0CCBC]',
+                              ? `${config.bg} ${config.border} ${config.text} shadow-sm ring-1 ring-inset ring-${config.border.split('-')[1]}-200`
+                              : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50',
                           )}
                         >
                           {level}
@@ -499,18 +499,18 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200/80 bg-slate-50 flex-shrink-0 rounded-b-xl">
 
           {/* Upload progress indicator */}
           {isSubmitting && (
-            <div className="flex items-center gap-2 text-[12px] text-[#6B7A5A]">
-              <Loader2 size={13} className="animate-spin text-[#7AB648]" />
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <Loader2 size={14} className="animate-spin text-slate-900" />
               <span>{STEP_LABELS[uploadStep]}</span>
             </div>
           )}
           {uploadStep === 'done' && (
-            <div className="flex items-center gap-2 text-[12px] text-green-700">
-              <CheckCircle2 size={13} /> Registered successfully!
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider">
+              <CheckCircle2 size={14} /> Registered successfully!
             </div>
           )}
           {!isSubmitting && uploadStep !== 'done' && <div />}
@@ -520,7 +520,7 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg border border-[#D0CCBC] bg-white text-[13px] font-medium text-[#3A4A2A] hover:border-[#7AB648] transition-colors disabled:opacity-40"
+              className="px-4 py-2 rounded-md border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-40"
             >
               Cancel
             </button>
@@ -529,13 +529,13 @@ export default function RegisterPatientModal({ open, onClose, onCreated }: Props
               form="register-patient-form"
               disabled={isSubmitting || uploadStep === 'done'}
               className={cn(
-                'flex items-center gap-2 px-5 py-2 rounded-lg text-[13px] font-semibold text-white transition-all',
+                'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white transition-all shadow-sm',
                 uploadStep === 'error'
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-[#1a2e0a] hover:bg-[#2B4A18] disabled:opacity-60',
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : 'bg-slate-900 hover:bg-slate-800 disabled:opacity-50',
               )}
             >
-              {isSubmitting && <Loader2 size={13} className="animate-spin" />}
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
               {STEP_LABELS[uploadStep]}
             </button>
           </div>

@@ -198,7 +198,7 @@ export const updateWaitlistStatus = async (
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowed = ['Waitlisted', 'Match Found', 'Surgery Scheduled', 'Completed', 'Withdrawn'];
+    const allowed = ['Waitlisted', 'Match Found', 'Surgery Scheduled', 'Completed', 'Withdrawn', 'Cancelled'];
     if (!allowed.includes(status)) {
       return next(new ApiError(400, 'Invalid status value.'));
     }
@@ -918,3 +918,163 @@ export const updateSurgeryStatus = async (
   }
 };
 
+// ==========================================
+// GET ARCHIVE
+// ==========================================
+
+export const getArchiveMatches = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const archiveStatuses = ['Completed', 'Withdrawn', 'Cancelled'];
+
+    const patients = await OrganWaitlist.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      status: { $in: archiveStatuses },
+    })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Now for these patients, find any corresponding completed DonationRequest 
+    // to map the donor information if available.
+    const waitlistIds = patients.map(p => p._id);
+    const completedRequests = await DonationRequest.find({
+      waitlistId: { $in: waitlistIds },
+      status: 'TRANSPLANT_SUCCESSFUL'
+    })
+      .populate({
+        path: 'acceptedDonorId',
+        model: 'DonorProfile',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'name email',
+        },
+      })
+      .lean();
+
+    const requestMap = new Map();
+    completedRequests.forEach((reqDoc: any) => {
+      requestMap.set(reqDoc.waitlistId.toString(), reqDoc);
+    });
+
+    const mapped = patients.map((p: any) => {
+      const matchDoc = requestMap.get(p._id.toString());
+      return {
+        id: p._id.toString(),
+        fullName: p.fullName,
+        requiredOrgan: p.requiredOrgan,
+        bloodGroup: p.bloodGroup,
+        status: p.status,
+        cancellationReason: p.cancellationReason,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        donor: matchDoc?.acceptedDonorId
+          ? {
+              id: matchDoc.acceptedDonorId._id?.toString(),
+              name: (matchDoc.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+              bloodType: matchDoc.acceptedDonorId.bloodType,
+            }
+          : null,
+      };
+    });
+
+    res.status(200).json({ success: true, count: mapped.length, data: mapped });
+  } catch (error: any) {
+    logger.error(`[getArchiveMatches] ${error.message}`);
+    next(error);
+  }
+};
+
+// ==========================================
+// EDIT WAITLIST PATIENT
+// ==========================================
+
+export const editWaitlistPatient = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { id } = req.params;
+    const { urgency, medicalHistory } = req.body;
+
+    const patient = await OrganWaitlist.findOneAndUpdate(
+      { _id: id, hospitalId: new Types.ObjectId(req.user.id) },
+      { $set: { urgency, medicalHistory } },
+      { new: true },
+    );
+
+    if (!patient) {
+      return next(new ApiError(404, 'Patient not found or not owned by this hospital.'));
+    }
+
+    logger.info(`[editWaitlistPatient] Patient ${id} updated by hospital ${req.user.id}`);
+    res.status(200).json({ success: true, data: patient });
+  } catch (error: any) {
+    logger.error(`[editWaitlistPatient] ${error.message}`);
+    next(error);
+  }
+};
+
+// ==========================================
+// CANCEL WAITLIST REQUEST
+// ==========================================
+
+export const cancelWaitlistRequest = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      return next(new ApiError(403, 'Access denied. Hospital role required.'));
+    }
+
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return next(new ApiError(400, 'Cancellation reason is required.'));
+    }
+
+    const patient = await OrganWaitlist.findOneAndUpdate(
+      { _id: id, hospitalId: new Types.ObjectId(req.user.id) },
+      { $set: { status: 'Cancelled', cancellationReason: reason } },
+      { new: true },
+    );
+
+    if (!patient) {
+      return next(new ApiError(404, 'Patient not found or not owned by this hospital.'));
+    }
+
+    // Sever any active requests tied to this patient
+    const activeRequest = await DonationRequest.findOne({
+      waitlistId: new Types.ObjectId(id),
+      status: { $nin: ['TRANSPLANT_SUCCESSFUL', 'TRANSPLANT_FAILED', 'CANCELLED'] }
+    });
+
+    if (activeRequest) {
+      activeRequest.status = 'CANCELLED';
+      if (!activeRequest.timeline) activeRequest.timeline = [];
+      activeRequest.timeline.push({ event: 'request_cancelled', timestamp: new Date() });
+      await activeRequest.save();
+    }
+
+    logger.info(`[cancelWaitlistRequest] Patient ${id} cancelled by hospital ${req.user.id} - Reason: ${reason}`);
+    res.status(200).json({ success: true, data: patient });
+  } catch (error: any) {
+    logger.error(`[cancelWaitlistRequest] ${error.message}`);
+    next(error);
+  }
+};
