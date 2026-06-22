@@ -87,7 +87,7 @@ const organWaitlistSchema = new Schema<IOrganWaitlist>(
     // --- Clinical Data ---
     requiredOrgan: {
       type: String,
-      enum: ['Kidney', 'Liver Segment', 'Cornea', 'Heart', 'Lung', 'Pancreas', 'Bone Marrow'],
+      enum: ['Kidney', 'Liver', 'Cornea', 'Pancreas', 'Bone Marrow', 'Heart', 'Lung'],
       required: true,
     },
     bloodGroup: {
