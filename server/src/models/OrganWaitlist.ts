@@ -16,10 +16,12 @@ export type OrganType =
 export type UrgencyLevel = 'Critical' | 'High' | 'Medium' | 'Low';
 export type WaitlistStatus =
   | 'Waitlisted'
+  | 'Searching'
   | 'Match Found'
   | 'Surgery Scheduled'
   | 'Completed'
-  | 'Withdrawn';
+  | 'Withdrawn'
+  | 'Cancelled';
 
 export interface IOrganWaitlist extends Document {
   // Links
@@ -43,6 +45,7 @@ export interface IOrganWaitlist extends Document {
 
   // Lifecycle
   status: WaitlistStatus;
+  cancellationReason?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -122,8 +125,12 @@ const organWaitlistSchema = new Schema<IOrganWaitlist>(
     // --- Lifecycle ---
     status: {
       type: String,
-      enum: ['Waitlisted', 'Match Found', 'Surgery Scheduled', 'Completed', 'Withdrawn'],
+      enum: ['Waitlisted', 'Searching', 'Match Found', 'Surgery Scheduled', 'Completed', 'Withdrawn', 'Cancelled'],
       default: 'Waitlisted',
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
     },
   },
   {

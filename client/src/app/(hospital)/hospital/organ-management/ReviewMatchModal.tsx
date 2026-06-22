@@ -59,27 +59,17 @@ interface Props {
 // ─────────────────────────────────────────────
 
 const URGENCY_CONFIG = {
-  Critical: { text: 'text-red-700',    bg: 'bg-red-50',    border: 'border-red-200',    dot: 'bg-red-500'    },
+  Critical: { text: 'text-rose-700',    bg: 'bg-rose-50',    border: 'border-rose-200',    dot: 'bg-rose-500'    },
   High:     { text: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', dot: 'bg-orange-400' },
   Medium:   { text: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200',  dot: 'bg-amber-400'  },
-  Low:      { text: 'text-green-700',  bg: 'bg-green-50',  border: 'border-green-200',  dot: 'bg-green-500'  },
-};
-
-const ORGAN_ICONS: Record<string, string> = {
-  'Kidney':        '🫘',
-  'Liver Segment': '🫀',
-  'Cornea':        '👁️',
-  'Heart':         '❤️',
-  'Lung':          '🫁',
-  'Pancreas':      '🧬',
-  'Bone Marrow':   '🦴',
+  Low:      { text: 'text-emerald-700',  bg: 'bg-emerald-50',  border: 'border-emerald-200',  dot: 'bg-emerald-500'  },
 };
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10.5px] font-semibold text-[#8A9A7A] uppercase tracking-wide">{label}</span>
-      <span className="text-[13px] font-medium text-[#1a2e0a]">{value || '—'}</span>
+      <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{label}</span>
+      <span className="text-sm font-mono text-slate-900">{value || '—'}</span>
     </div>
   );
 }
@@ -116,32 +106,32 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="relative bg-white rounded-xl shadow-sm w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-[#F0EDE3] px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+        <div className="sticky top-0 bg-white border-b border-slate-200/80 px-5 pt-4 pb-3 flex items-center justify-between rounded-t-xl z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
-              <Heart size={18} />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900 flex-shrink-0">
+              <Heart size={16} />
             </div>
             <div>
-              <p className="text-[15px] font-bold text-[#1a2e0a]">Match Review</p>
-              <p className="text-[11.5px] text-[#8A9A7A]">Evaluate this donor–patient match</p>
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight uppercase">Match Review</h2>
+              <p className="text-xs text-slate-500">Evaluate this donor–patient match</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8A9A7A] hover:bg-[#F5F2E8] transition-colors"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-5 flex flex-col gap-5">
+        <div className="p-5 pt-2 flex flex-col gap-5">
           {/* Urgency banner */}
           {patient && (
-            <div className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[12.5px] font-semibold', urgCfg.text, urgCfg.bg, urgCfg.border)}>
+            <div className={cn('flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium', urgCfg.text, urgCfg.bg, urgCfg.border)}>
               <span className={cn('w-2 h-2 rounded-full flex-shrink-0', urgCfg.dot)} />
               {patient.urgency} — {patient.requiredOrgan} transplant required
             </div>
@@ -151,39 +141,37 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
             {/* ── Patient Card ── */}
-            <div className="bg-[#FAFAF7] rounded-xl border border-[#E8E4D8] p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDE9DF]">
-                <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
-                  <User size={14} />
-                </div>
-                <p className="text-[12px] font-bold text-[#1a2e0a] uppercase tracking-wide">Patient</p>
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 flex flex-col gap-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
+                <User size={14} className="text-slate-500" />
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient</p>
               </div>
 
               {patient ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-full bg-purple-200 flex items-center justify-center text-[13px] font-bold text-purple-700 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-700 flex-shrink-0">
                       {patient.fullName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-[13.5px] font-semibold text-[#1a2e0a]">{patient.fullName}</p>
-                      <p className="text-[11.5px] text-[#8A9A7A]">{patient.age}y · {patient.gender}</p>
+                      <p className="text-sm font-medium text-slate-900">{patient.fullName}</p>
+                      <p className="text-xs text-slate-500">{patient.age}y · {patient.gender}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-3">
                     <InfoRow
                       label="Required Organ"
-                      value={<span>{ORGAN_ICONS[patient.requiredOrgan] ?? '🫀'} {patient.requiredOrgan}</span>}
+                      value={<span className="flex items-center gap-1"><Heart size={12} className="text-slate-400" /> {patient.requiredOrgan}</span>}
                     />
-                    <InfoRow label="Blood Group" value={<span className="font-bold text-purple-700">{patient.bloodGroup}</span>} />
+                    <InfoRow label="Blood Group" value={<span className="font-bold text-rose-700">{patient.bloodGroup}</span>} />
                     <InfoRow label="Contact" value={patient.contact} />
                   </div>
 
                   {patient.medicalHistory && (
-                    <div className="bg-white rounded-lg border border-[#E8E4D8] p-3">
-                      <p className="text-[10.5px] font-semibold text-[#8A9A7A] uppercase tracking-wide mb-1">Medical History</p>
-                      <p className="text-[12px] text-[#3A4A2A] leading-relaxed line-clamp-3">{patient.medicalHistory}</p>
+                    <div className="bg-white rounded-md border border-slate-200 p-3">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Medical History</p>
+                      <p className="text-xs text-slate-700 leading-relaxed line-clamp-3">{patient.medicalHistory}</p>
                     </div>
                   )}
 
@@ -191,52 +179,50 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
                     href={patient.medicalCertificateUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 text-[12px] font-semibold hover:bg-purple-100 transition-colors w-full justify-center"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors w-full justify-center"
                   >
-                    <FileText size={13} />
-                    View Patient Certificate
-                    <ExternalLink size={11} />
+                    <FileText size={13} className="text-slate-400" />
+                    Patient Certificate
+                    <ExternalLink size={11} className="text-slate-400" />
                   </a>
                 </>
               ) : (
-                <p className="text-[12.5px] text-[#8A9A7A]">Patient record not found.</p>
+                <p className="text-sm text-slate-500">Patient record not found.</p>
               )}
             </div>
 
             {/* ── Donor Card ── */}
-            <div className="bg-[#FAFAF7] rounded-xl border border-[#E8E4D8] p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#EDE9DF]">
-                <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center text-green-700">
-                  <Heart size={14} />
-                </div>
-                <p className="text-[12px] font-bold text-[#1a2e0a] uppercase tracking-wide">Matched Donor</p>
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 flex flex-col gap-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
+                <Heart size={14} className="text-slate-500" />
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Matched Donor</p>
               </div>
 
               {donor ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-[13px] font-bold text-green-700 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-700 flex-shrink-0">
                       {donor.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-[13.5px] font-semibold text-[#1a2e0a]">{donor.name}</p>
-                      <p className="text-[11.5px] text-[#8A9A7A]">{donor.email ?? 'No email'}</p>
+                      <p className="text-sm font-medium text-slate-900">{donor.name}</p>
+                      <p className="text-xs text-slate-500">{donor.email ?? 'No email'}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <InfoRow label="Blood Type" value={<span className="font-bold text-green-700">{donor.bloodType}</span>} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <InfoRow label="Blood Type" value={<span className="font-bold text-rose-700">{donor.bloodType}</span>} />
                     <InfoRow label="Donor Tier" value={donor.tier} />
                     <InfoRow label="Status" value={donor.status} />
                   </div>
 
                   {donor.organsWillingToDonate?.length > 0 && (
                     <div>
-                      <p className="text-[10.5px] font-semibold text-[#8A9A7A] uppercase tracking-wide mb-1.5">Willing to Donate</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Willing to Donate</p>
                       <div className="flex flex-wrap gap-1.5">
                         {donor.organsWillingToDonate.map(o => (
-                          <span key={o} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-                            {ORGAN_ICONS[o] ?? '🫀'} {o}
+                          <span key={o} className="flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                            <Heart size={10} className="text-slate-400" /> {o}
                           </span>
                         ))}
                       </div>
@@ -244,9 +230,8 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
                   )}
 
                   {donor.details && (() => {
-                    // Try to parse as structured JSON (e.g. { certificateUrl, certificateName })
                     let parsed: { certificateUrl?: string; certificateName?: string } | null = null;
-                    try { parsed = JSON.parse(donor.details); } catch { /* not JSON — render as text */ }
+                    try { parsed = JSON.parse(donor.details); } catch { /* not JSON */ }
 
                     if (parsed?.certificateUrl) {
                       return (
@@ -254,33 +239,33 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
                           href={parsed.certificateUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 text-[12px] font-semibold hover:bg-green-100 transition-colors w-full justify-center"
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors w-full justify-center"
                         >
-                          <FileText size={13} />
-                          {parsed.certificateName ? `View: ${parsed.certificateName}` : 'View Donor Certificate'}
-                          <ExternalLink size={11} />
+                          <FileText size={13} className="text-slate-400" />
+                          {parsed.certificateName ? `View: ${parsed.certificateName}` : 'Donor Certificate'}
+                          <ExternalLink size={11} className="text-slate-400" />
                         </a>
                       );
                     }
 
                     return (
-                      <div className="bg-white rounded-lg border border-[#E8E4D8] p-3">
-                        <p className="text-[10.5px] font-semibold text-[#8A9A7A] uppercase tracking-wide mb-1">Donor Notes</p>
-                        <p className="text-[12px] text-[#3A4A2A] leading-relaxed line-clamp-3">{donor.details}</p>
+                      <div className="bg-white rounded-md border border-slate-200 p-3">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Donor Notes</p>
+                        <p className="text-xs text-slate-700 leading-relaxed line-clamp-3">{donor.details}</p>
                       </div>
                     );
                   })()}
                 </>
               ) : (
-                <p className="text-[12.5px] text-[#8A9A7A]">Donor profile not found.</p>
+                <p className="text-sm text-slate-500">Donor profile not found.</p>
               )}
             </div>
           </div>
 
           {/* Warning notice */}
-          <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <AlertTriangle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
-            <p className="text-[12px] text-amber-700">
+          <div className="flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+            <AlertTriangle size={14} className="text-slate-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-slate-700 leading-relaxed">
               Approving this match will schedule the donor for clinical evaluation and update the
               patient&apos;s waitlist status to <strong>Match Found</strong>. Declining will re-open
               this case for another donor.
@@ -288,32 +273,32 @@ export default function ReviewMatchModal({ match, onClose, onEvaluated }: Props)
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col gap-2.5 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row mt-2">
             <button
               onClick={() => evaluate('APPROVE_FOR_TESTING')}
               disabled={busy !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[13.5px] transition-all',
+                'flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-all shadow-sm',
                 busy
-                  ? 'bg-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed'
-                  : 'bg-[#1a2e0a] hover:bg-[#2B4A18] text-white shadow-sm',
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700',
               )}
             >
-              {busy === 'approve' ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-              {busy === 'approve' ? 'Approving…' : 'Accept for Clinical Evaluation'}
+              {busy === 'approve' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              {busy === 'approve' ? 'Approving…' : 'Approve for Clinical Evaluation'}
             </button>
 
             <button
               onClick={() => evaluate('DECLINE')}
               disabled={busy !== null}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[13.5px] border-2 transition-all',
+                'flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-all shadow-sm',
                 busy
-                  ? 'border-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed'
-                  : 'border-red-200 text-red-700 hover:bg-red-50',
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-rose-600 text-white hover:bg-rose-700',
               )}
             >
-              {busy === 'decline' ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}
+              {busy === 'decline' ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
               {busy === 'decline' ? 'Declining…' : 'Decline Match'}
             </button>
           </div>

@@ -12,6 +12,9 @@ import {
   submitLegalConsent,
   getSurgicalPipelineMatches,
   updateSurgeryStatus,
+  getArchiveMatches,
+  editWaitlistPatient,
+  cancelWaitlistRequest,
 } from '../controllers/organWaitlist.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -43,6 +46,11 @@ router.patch('/matches/:requestId/surgery-status', updateSurgeryStatus);
 router.post('/',                  createWaitlistPatient);
 router.get('/',                   getWaitlistPatients);
 router.patch('/:id/status',       updateWaitlistStatus);
+router.patch('/:id/edit',         editWaitlistPatient);
+router.patch('/:id/cancel',       cancelWaitlistRequest);
+
+// Archival
+router.get('/archive',            getArchiveMatches);
 
 export default router;
 
