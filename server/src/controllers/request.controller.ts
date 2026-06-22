@@ -114,7 +114,7 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
         const waitlistFilter = {
           requiredOrgan: { $in: organs },
           bloodGroup: { $in: compatibleBloodGroups },
-          status: { $in: ['Waitlisted', 'Waitlist', 'WAITLISTED', 'WAITLIST'] },
+          status: { $in: ['Waitlisted', 'Waitlist', 'WAITLISTED', 'WAITLIST', 'Searching', 'SEARCHING'] },
         };
 
         const waitlistedPatients = await OrganWaitlist.find(waitlistFilter)

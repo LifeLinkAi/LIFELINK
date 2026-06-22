@@ -46,6 +46,11 @@ export interface OrganMatch {
   patient: OrganMatchPatient | null;
   donor: OrganMatchDonor | null;
   distance?: string;
+  clinicalEvaluation?: {
+    scheduledTestDate?: string;
+    testingFacility?: string;
+    donorInstructions?: string;
+  };
 }
 
 interface Props {

@@ -94,6 +94,7 @@ export default function BulkAddModal({ isOpen, onClose, onSuccess, type }: BulkA
 
     try {
       const res = await api.post('/upload/parse-bulk', formData, {
+        timeout: 60000,
         headers: {
           'Content-Type': 'multipart/form-data',
         },

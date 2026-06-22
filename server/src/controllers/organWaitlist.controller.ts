@@ -300,6 +300,7 @@ export const getPendingOrganMatches = async (
             details: m.acceptedDonorId.details,
           }
         : null,
+      clinicalEvaluation: m.clinicalEvaluation,
     }));
 
     logger.info(`[getPendingOrganMatches] ${mapped.length} matches found for hospital ${req.user.id}`);
@@ -333,7 +334,12 @@ export const evaluateOrganMatch = async (
     }
 
     const { requestId } = req.params;
-    const { action } = req.body as { action?: 'APPROVE_FOR_TESTING' | 'DECLINE' };
+    const { action, scheduledTestDate, testingFacility, donorInstructions } = req.body as { 
+      action?: 'APPROVE_FOR_TESTING' | 'DECLINE';
+      scheduledTestDate?: string;
+      testingFacility?: string;
+      donorInstructions?: string;
+    };
 
     if (!action || !['APPROVE_FOR_TESTING', 'DECLINE'].includes(action)) {
       return next(new ApiError(400, "action must be 'APPROVE_FOR_TESTING' or 'DECLINE'."));
@@ -353,9 +359,26 @@ export const evaluateOrganMatch = async (
     const now = new Date();
 
     if (action === 'APPROVE_FOR_TESTING') {
+      if (!scheduledTestDate || !testingFacility) {
+        return next(new ApiError(400, 'scheduledTestDate and testingFacility are required to approve a match.'));
+      }
+
       requestDoc.status = 'CLINICAL_TESTING';
+      
+      // Save scheduling details
+      requestDoc.clinicalEvaluation = {
+        ...requestDoc.clinicalEvaluation,
+        bloodCrossmatch: 'PENDING',
+        hlaMatchScore: 0,
+        serologyClear: false,
+        scheduledTestDate: new Date(scheduledTestDate),
+        testingFacility,
+        donorInstructions: donorInstructions || '',
+      };
+
       if (!requestDoc.timeline) requestDoc.timeline = [];
       requestDoc.timeline.push({ event: 'hospital_approved_testing', timestamp: now });
+      requestDoc.timeline.push({ event: 'lab_test_scheduled', timestamp: now });
 
       // Also promote the OrganWaitlist patient to 'Match Found'
       if (requestDoc.waitlistId) {
@@ -655,6 +678,7 @@ export const getPendingLegalMatches = async (
             details: m.acceptedDonorId.details,
           }
         : null,
+      clinicalEvaluation: m.clinicalEvaluation,
     }));
 
     logger.info(`[getPendingLegalMatches] ${mapped.length} matches found for hospital ${req.user.id}`);
