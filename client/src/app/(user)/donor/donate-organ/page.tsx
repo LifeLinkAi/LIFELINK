@@ -89,7 +89,7 @@ export default function OrganDonation() {
         if (r.type !== "Organ") return false;
         
         // Active match-finding states
-        const activeStates = ["PENDING", "Pending", "Matching", "Awaiting Match", "PENDING_DONOR_ACCEPT", "Waitlisted", "Waitlist", "WAITLISTED", "WAITLIST"];
+        const activeStates = ["PENDING", "Pending", "Matching", "Awaiting Match", "PENDING_DONOR_ACCEPT", "Waitlisted", "Waitlist", "WAITLISTED", "WAITLIST", "Searching", "SEARCHING"];
         if (!activeStates.includes(r.status)) return false;
         
         // Match organ type
@@ -178,12 +178,15 @@ export default function OrganDonation() {
 
     try {
       const res = await api.post("/upload", formData, {
+        timeout: 60000,
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
       setCertificateUrl(res.data.url);
     } catch (err: any) {
+      setCertificateName("");
+      setCertificateUrl("");
       setUploadError("Failed to upload document. Please upload a valid image/PDF.");
     } finally {
       setIsUploading(false);

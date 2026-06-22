@@ -6,7 +6,7 @@ import { Schema, model, Document } from 'mongoose';
 
 export type OrganType =
   | 'Kidney'
-  | 'Liver Segment'
+  | 'Liver'
   | 'Cornea'
   | 'Heart'
   | 'Lung'

@@ -5,7 +5,7 @@ import {
   Heart, Plus, RefreshCw, Search, Filter,
   ExternalLink, Loader2, AlertCircle,
   TrendingUp, Clock, CheckCircle2, Users, GitMerge, FlaskConical, ShieldCheck, MapPin, Activity, HeartPulse,
-  Eye, Wind, Dna, Droplet, MoreVertical, Archive
+  Eye, Wind, Dna, Droplet, MoreVertical, Archive, Calendar as CalendarIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
@@ -17,6 +17,7 @@ import LegalConsentModal from './LegalConsentModal';
 import SurgicalOutcomeModal from './SurgicalOutcomeModal';
 import EditPatientModal from './EditPatientModal';
 import CancelRequestModal from './CancelRequestModal';
+import ScheduleLabTestModal from './ScheduleLabTestModal';
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -163,11 +164,26 @@ function MatchCard({ match, onReview }: { match: OrganMatch; onReview: () => voi
             ) : (
               <>
                 <GitMerge size={14} />
-                Review Match
+                {match.status === 'PENDING_HOSPITAL' ? 'Accept for Clinical Evaluation' : 'Review Match'}
               </>
             )}
           </button>
         </div>
+
+        {/* Lab Schedule Strip */}
+        {match.status === 'CLINICAL_TESTING' && match.clinicalEvaluation?.scheduledTestDate && (
+          <div className="bg-slate-900 text-white p-3 rounded-lg flex items-center justify-between shadow-inner mt-2 -mx-1">
+            <div className="flex items-center gap-2">
+              <CalendarIcon size={14} className="text-emerald-400" />
+              <span className="text-xs font-semibold">Lab Test Scheduled</span>
+            </div>
+            <div className="text-xs font-mono text-slate-300 text-right">
+              <div>{new Date(match.clinicalEvaluation.scheduledTestDate).toLocaleString()}</div>
+              <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{match.clinicalEvaluation.testingFacility}</div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -196,6 +212,8 @@ export default function OrganManagementPage() {
   const [reviewClinicalMatch, setReviewClinicalMatch] = useState<OrganMatch | null>(null);
   const [reviewLegalMatch, setReviewLegalMatch] = useState<OrganMatch | null>(null);
   const [reviewSurgicalMatch, setReviewSurgicalMatch] = useState<OrganMatch | null>(null);
+  
+  const [scheduleLabMatch, setScheduleLabMatch] = useState<OrganMatch | null>(null);
   const [editPatient, setEditPatient] = useState<WaitlistPatient | null>(null);
   const [cancelPatient, setCancelPatient] = useState<WaitlistPatient | null>(null);
   const [search,       setSearch]       = useState('');
@@ -387,7 +405,7 @@ export default function OrganManagementPage() {
           <Users size={16} />
           Active Waitlist
           <span className={cn('text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md border', activeTab === 'waitlist' ? 'bg-slate-100 text-slate-900 border-slate-200' : 'bg-transparent text-slate-500 border-transparent')}>
-            {patients.length}
+            {patients.filter(p => ['Waitlisted', 'Searching', 'Match Found'].includes(p.status)).length}
           </span>
         </button>
 
@@ -640,7 +658,7 @@ export default function OrganManagementPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {matches.map(match => (
-                <MatchCard key={match.id} match={match} onReview={() => setReviewMatch(match)} />
+                <MatchCard key={match.id} match={match} onReview={() => setScheduleLabMatch(match)} />
               ))}
             </div>
           )}
@@ -811,6 +829,14 @@ export default function OrganManagementPage() {
         onClose={() => setModalOpen(false)}
         onCreated={fetchPatients}
       />
+
+      {scheduleLabMatch && (
+        <ScheduleLabTestModal
+          match={scheduleLabMatch}
+          onClose={() => setScheduleLabMatch(null)}
+          onScheduled={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); }}
+        />
+      )}
 
       {reviewMatch && (
         <ReviewMatchModal
