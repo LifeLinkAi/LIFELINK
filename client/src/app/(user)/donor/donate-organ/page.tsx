@@ -60,6 +60,11 @@ export default function OrganDonation() {
   const [interestedRequestIds, setInterestedRequestIds] = useState<string[]>([]);
   const [expandedPatientId, setExpandedPatientId] = useState<string | null>(null);
 
+  // Active Match Journey states
+  const [activeRequest, setActiveRequest] = useState<any | null>(null);
+  const [loadingActiveRequest, setLoadingActiveRequest] = useState(true);
+  const [activeDrawerStage, setActiveDrawerStage] = useState<number | null>(null);
+
   const showToast = (message: string) => {
     setToastMsg(message);
     setTimeout(() => setToastMsg(null), 3500);
@@ -144,9 +149,34 @@ export default function OrganDonation() {
     }).catch(() => {});
   };
 
+  const fetchActiveRequest = useCallback(() => {
+    setLoadingActiveRequest(true);
+    api.get("/donor/organ/active-request")
+      .then((res) => {
+        if (res.data.success && res.data.data) {
+          const reqDoc = res.data.data;
+          const acceptedStatuses = ['CLINICAL_TESTING', 'PENDING_LEGAL_APPROVAL', 'SURGERY_SCHEDULED', 'COMPLETED'];
+          if (acceptedStatuses.includes(reqDoc.status)) {
+            setActiveRequest(reqDoc);
+          } else {
+            setActiveRequest(null);
+          }
+        } else {
+          setActiveRequest(null);
+        }
+      })
+      .catch(() => {
+        setActiveRequest(null);
+      })
+      .finally(() => {
+        setLoadingActiveRequest(false);
+      });
+  }, []);
+
   useEffect(() => {
     loadProfile();
-  }, []);
+    fetchActiveRequest();
+  }, [fetchActiveRequest]);
 
   const handleSavePreferences = async () => {
     const result = await update({ organsWillingToDonate: draftOrgans });
@@ -282,6 +312,718 @@ export default function OrganDonation() {
   };
 
   const isUserAvailable = profile && profile.isAvailable && profile.organsWillingToDonate.length > 0;
+
+  const formatDate = (dateString?: string | Date) => {
+    if (!dateString) return "Not scheduled yet";
+    return new Date(dateString).toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getStepIndex = (status: string): number => {
+    switch (status) {
+      case "CLINICAL_TESTING":
+        return 1;
+      case "PENDING_LEGAL_APPROVAL":
+        return 2;
+      case "SURGERY_SCHEDULED":
+        return 3;
+      case "COMPLETED":
+        return 4;
+      default:
+        return 0;
+    }
+  };
+
+  if (loadingActiveRequest) {
+    return (
+      <main className="p-6 lg:p-8 max-w-6xl mx-auto flex flex-col justify-center items-center min-h-[60vh] gap-4">
+        <div className="w-12 h-12 border-4 border-[#3b5e2b] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-semibold text-gray-500">Loading your transplant journey...</p>
+      </main>
+    );
+  }
+
+  if (activeRequest) {
+    const currentStep = getStepIndex(activeRequest.status);
+    const hospital = activeRequest.hospitalId || {};
+    const waitlist = activeRequest.waitlistId || {};
+
+    const getDrawerContent = (stageNum: number) => {
+      switch (stageNum) {
+        case 1:
+          return {
+            title: "Step 1: Match Verified & Initiated",
+            badge: "Verification Phase",
+            badgeColor: "bg-[#eef4e2] text-[#3b5e2b]",
+            overview: "In this initial stage, the transplant coordination committee matches your registered tissue typing and blood profile with a patient on the national organ transplant waitlist.",
+            details: [
+              {
+                title: "HLA & Blood Compatibility",
+                desc: "Medical teams verify that blood groups are fully compatible and analyze human leukocyte antigen (HLA) profiles to maximize the likelihood of long-term graft survival."
+              },
+              {
+                title: "Transplant Case Manager Allocation",
+                desc: "A dedicated Clinical Transplant Coordinator is assigned to manage your donor dossier, coordinate laboratory tests, and assist you with legal approvals."
+              },
+              {
+                title: "Recipient Anonymity Protocols",
+                desc: "To protect the privacy of both parties, the recipient's personal identity is kept confidential during initial matching stages, using waitlist identifiers."
+              }
+            ],
+            faqs: [
+              {
+                q: "Can I know who the recipient is?",
+                a: "During the initial phases, recipient details remain confidential. General compatibility information is shared, but full identifying details are protected."
+              },
+              {
+                q: "What is my role at this stage?",
+                a: "Your main role is to review matched parameters and confirm your interest in proceeding to clinical evaluation."
+              }
+            ]
+          };
+        case 2:
+          return {
+            title: "Step 2: Clinical & Laboratory Testing",
+            badge: "Active Testing Phase",
+            badgeColor: "bg-amber-100 text-amber-800",
+            overview: "Comprehensive laboratory testing and physiological screening to ensure the transplant procedure is fully compatible and entirely safe for you.",
+            details: [
+              {
+                title: "HLA Crossmatching & Tissue Matching",
+                desc: "Your blood is mixed directly with the recipient's cells in a laboratory test to detect pre-existing antibodies that could cause immediate organ rejection."
+              },
+              {
+                title: "Organ Specific Viability Screens",
+                desc: "Includes imaging studies (ultrasound, MRI, CT scans) and functional indicators (e.g. kidney GFR, liver enzymes) to verify the donor organ is functioning optimally."
+              },
+              {
+                title: "Cardiopulmonary & General Clearance",
+                desc: "ECG, chest X-rays, and physical examinations are performed by independent medical experts to assure you are fit to undergo surgical procedures."
+              }
+            ],
+            faqs: [
+              {
+                q: "Where do my clinical tests take place?",
+                a: "All evaluations are scheduled at certified transplant centers or affiliated laboratories coordinated by your medical coordinator."
+              },
+              {
+                q: "Who covers the cost of medical testing?",
+                a: "All clinical test costs, checkups, and administrative evaluations are fully covered by the recipient's transplant fund or coordinating insurance."
+              }
+            ]
+          };
+        case 3:
+          return {
+            title: "Step 3: Ethical Board & Legal Approval",
+            badge: "Regulatory Review Phase",
+            badgeColor: "bg-purple-100 text-purple-800",
+            overview: "Review by the State Authorization Committee and hospital ethics board to verify ethical compliance, altruistic intent, and legal consent directives.",
+            details: [
+              {
+                title: "Independent Donor Advocacy",
+                desc: "An independent advocate represents your interests during review panels to verify your decisions are made freely, with full knowledge, and without coercion."
+              },
+              {
+                title: "Altruism & Voluntary Intent Verification",
+                desc: "Ensures compliance with national laws. Organ donation must be entirely voluntary and altruistic; any commercial trade or financial exchange is strictly illegal."
+              },
+              {
+                title: "Notarization of Final Documentation",
+                desc: "All legal consent forms, medical release authorizations, and next-of-kin acknowledgments are notarized for regulatory clearance."
+              }
+            ],
+            faqs: [
+              {
+                q: "Is a panel interview required?",
+                a: "Yes, a brief interview is conducted by the ethics board to confirm that you fully understand the procedure and are proceeding voluntarily."
+              },
+              {
+                q: "Can I withdraw my consent during this stage?",
+                a: "Absolutely. You retain the unconditional legal right to withdraw your consent at any time prior to the actual surgery."
+              }
+            ]
+          };
+        case 4:
+          return {
+            title: "Step 4: Surgical Scheduling",
+            badge: "Surgical Procurement Phase",
+            badgeColor: "bg-blue-100 text-blue-800",
+            overview: "Coordination of hospital operating rooms, procurement teams, transplant surgical units, and pre-surgical admission schedules.",
+            details: [
+              {
+                title: "Admissions & Pre-op Instructions",
+                desc: "Coordination of hospital room reservations, pre-operative dietary/fasting instructions, and isolation requirements to minimize infection risks."
+              },
+              {
+                title: "Surgical Team Assembly",
+                desc: "Coordinating separate surgical teams for organ procurement (donor) and transplantation (recipient) to ensure focus and medical safety."
+              },
+              {
+                title: "Anesthesia Consultations",
+                desc: "Final pre-surgical consultations with the anesthesiology team to review anesthesia choices and surgical pain-management plans."
+              }
+            ],
+            faqs: [
+              {
+                q: "How long will I be hospitalized for the procedure?",
+                a: "Donor hospital stays usually range from 2 to 5 days depending on the organ and surgical method (e.g. laparoscopic vs. open surgery)."
+              },
+              {
+                q: "Can I bring a support person to the hospital?",
+                a: "Yes, coordinating hospitals provide guest lodging and support services for a designated family member or support person."
+              }
+            ]
+          };
+        case 5:
+          return {
+            title: "Step 5: Post-Operative Care & Recovery",
+            badge: "Recovery & Checkup Phase",
+            badgeColor: "bg-emerald-100 text-emerald-800",
+            overview: "Long-term monitoring of donor health, recovery milestone tracking, and hospital follow-up visits to ensure donor health remains excellent.",
+            details: [
+              {
+                title: "Pain Management & Healing",
+                desc: "Comprehensive outpatient follow-up care to manage post-surgical healing, surgical wound care, and physical recovery tracking."
+              },
+              {
+                title: "Scheduled Recovery Checkups",
+                desc: "Required clinical follow-ups scheduled at 1 month, 6 months, and 1 year to evaluate long-term physiological adaptation and donor wellness."
+              },
+              {
+                title: "Independent Clinical Support",
+                desc: "Continuous access to donor support networks, nutrition counseling, and physical therapy coordinates provided by LifeLink."
+              }
+            ],
+            faqs: [
+              {
+                q: "How long does full recovery take?",
+                a: "Most donors return to light desk activities within 2 weeks, and resume full physical activities and sports within 6 weeks."
+              },
+              {
+                q: "Are there long-term health risks?",
+                a: "Clinical statistics show that donor life expectancy is equivalent to the general population, but regular follow-ups are crucial to monitor adaptation."
+              }
+            ]
+          };
+        default:
+          return null;
+      }
+    };
+
+    const steps = [
+      {
+        title: "Match Verified & Initiated",
+        desc: "Coordinating medical center verified matching criteria and initiated the transplantation path.",
+        icon: "handshake",
+        renderDetail: () => (
+          <div className="text-[11px] text-gray-500 mt-1">
+            Confirmed on {formatDate(activeRequest.createdAt || activeRequest.acceptedAt)}
+          </div>
+        )
+      },
+      {
+        title: "Clinical & Laboratory Testing",
+        desc: "Comprehensive cross-matching, HLA compatibility typing, and donor fitness evaluations.",
+        icon: "biotech",
+        renderDetail: () => {
+          if (activeRequest.status === "CLINICAL_TESTING") {
+            return (
+              <div className="mt-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Scheduled Test Date</span>
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5 mt-0.5">
+                      <span className="material-symbols-outlined text-[16px] text-[#3b5e2b]">calendar_today</span>
+                      {formatDate(activeRequest.clinicalEvaluation?.scheduledTestDate)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Testing Facility</span>
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5 mt-0.5">
+                      <span className="material-symbols-outlined text-[16px] text-[#3b5e2b]">home_work</span>
+                      {activeRequest.clinicalEvaluation?.testingFacility || hospital.name || "Coordinating Facility"}
+                    </span>
+                  </div>
+                </div>
+                {activeRequest.clinicalEvaluation?.donorInstructions && (
+                  <div className="border-t border-slate-200/60 pt-3">
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Special Instructions</span>
+                    <p className="text-xs text-gray-700 leading-relaxed font-semibold mt-1 bg-white p-3 rounded-xl border border-slate-100">
+                      {activeRequest.clinicalEvaluation.donorInstructions}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          } else {
+            return (
+              <div className="mt-2 p-4 bg-[#f1f7e8]/40 border border-[#e1ead2] rounded-2xl space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">HLA Match Score</span>
+                    <span className="text-sm font-black text-[#3b5e2b] mt-0.5 block">
+                      {activeRequest.clinicalEvaluation?.hlaMatchScore !== undefined ? `${activeRequest.clinicalEvaluation.hlaMatchScore} / 6` : "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Crossmatch Compatibility</span>
+                    <span className={`text-xs font-bold mt-0.5 flex items-center gap-1 ${
+                      activeRequest.clinicalEvaluation?.bloodCrossmatch === 'COMPATIBLE_NEGATIVE' ? 'text-green-600' : 'text-amber-600'
+                    }`}>
+                      <span className="material-symbols-outlined text-[14px]">
+                        {activeRequest.clinicalEvaluation?.bloodCrossmatch === 'COMPATIBLE_NEGATIVE' ? 'check_circle' : 'pending'}
+                      </span>
+                      {activeRequest.clinicalEvaluation?.bloodCrossmatch === 'COMPATIBLE_NEGATIVE' ? 'Compatible Negative' : 'Pending/Incompatible'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Serology Clearance</span>
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1 mt-0.5">
+                      <span className="material-symbols-outlined text-[14px] text-green-600">verified</span>
+                      {activeRequest.clinicalEvaluation?.serologyClear ? 'Cleared' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        }
+      },
+      {
+        title: "Ethical Board & Legal Approval",
+        desc: "Regulatory evaluation to verify voluntary altruistic intent and legal compliance.",
+        icon: "gavel",
+        renderDetail: () => {
+          if (activeRequest.status === "PENDING_LEGAL_APPROVAL") {
+            return (
+              <div className="mt-2 p-4 bg-amber-50/40 border border-amber-100 rounded-2xl flex items-start gap-3">
+                <span className="material-symbols-outlined text-amber-600 mt-0.5">info</span>
+                <div>
+                  <h5 className="text-xs font-bold text-amber-900">Ethics Panel Review in Progress</h5>
+                  <p className="text-[11px] text-amber-800 leading-normal mt-0.5">
+                    The legal committee is validating donor consent, clinical clearance, and ethical standards to prevent any non-altruistic donation forms.
+                  </p>
+                </div>
+              </div>
+            );
+          } else if (currentStep > 2) {
+            return (
+              <div className="mt-2 p-4 bg-[#f1f7e8]/40 border border-[#e1ead2] rounded-2xl flex items-start gap-3">
+                <span className="material-symbols-outlined text-green-600 mt-0.5">verified_user</span>
+                <div>
+                  <h5 className="text-xs font-bold text-green-900">Legal Clearance Approved</h5>
+                  <p className="text-[11px] text-green-800 leading-normal mt-0.5">
+                    The donor-recipient matching profile has been legally notarized and approved by the State Ethics Review Board.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        }
+      },
+      {
+        title: "Surgical Scheduling",
+        desc: "Procurement surgery timeline scheduling and coordination of the transplant operating room.",
+        icon: "calendar_month",
+        renderDetail: () => {
+          if (activeRequest.status === "SURGERY_SCHEDULED") {
+            return (
+              <div className="mt-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Scheduled Surgery Date</span>
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5 mt-0.5">
+                      <span className="material-symbols-outlined text-[16px] text-[#3b5e2b]">calendar_today</span>
+                      {formatDate(activeRequest.surgicalOutcome?.surgeryStartedAt || activeRequest.time)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Transplant Facility</span>
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5 mt-0.5">
+                      <span className="material-symbols-outlined text-[16px] text-[#3b5e2b]">home_work</span>
+                      {activeRequest.facility || hospital.name || "Coordinating Facility"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          } else if (currentStep > 3) {
+            return (
+              <div className="mt-2 p-4 bg-[#f1f7e8]/40 border border-[#e1ead2] rounded-2xl flex items-start gap-3">
+                <span className="material-symbols-outlined text-green-600 mt-0.5">check_circle</span>
+                <div>
+                  <h5 className="text-xs font-bold text-green-900">Procedure Completed</h5>
+                  <p className="text-[11px] text-green-800 leading-normal mt-0.5">
+                    Surgical procedures for organ procurement and transplantation have been successfully performed at {activeRequest.facility || "the designated medical center"}.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        }
+      },
+      {
+        title: "Post-Operative Care & Recovery",
+        desc: "Monitoring recovery stats and hospital follow-ups after transplant procedures.",
+        icon: "healing",
+        renderDetail: () => {
+          if (activeRequest.status === "COMPLETED") {
+            return (
+              <div className="mt-2 p-4 bg-emerald-50/40 border border-emerald-100 rounded-2xl space-y-2">
+                <h5 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-600 animate-pulse">favorite</span>
+                  Successful Transplant Procedure
+                </h5>
+                <p className="text-[11px] text-emerald-900 leading-normal">
+                  We express our deepest gratitude for your life-saving organ donation. The coordinating hospital will track your recovery checkups. Please contact your coordinator for discharge notes and physical therapy guidelines.
+                </p>
+                {activeRequest.surgicalOutcome?.complications && (
+                  <div className="border-t border-emerald-100/60 pt-2 mt-2">
+                    <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Clinical Notes</span>
+                    <p className="text-xs text-emerald-950 font-semibold leading-relaxed mt-0.5">
+                      {activeRequest.surgicalOutcome.complications}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return null;
+        }
+      }
+    ];
+
+    return (
+      <main className="p-6 lg:p-8 max-w-6xl mx-auto relative">
+        <Toaster position="top-right" />
+        
+        {/* Banner header */}
+        <div className="bg-gradient-to-br from-[#3b5e2b] to-[#5b8a3e] border border-[#3b5e2b] rounded-[2rem] p-8 shadow-md relative overflow-hidden mb-8 text-white">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#cbf275] opacity-15 blur-3xl rounded-full translate-x-1/4 -translate-y-1/4 pointer-events-none" />
+          <div className="relative z-10">
+            <div className="flex items-center gap-3.5 mb-4 flex-wrap">
+              <div className="w-12 h-12 rounded-2xl bg-[#cbf275] flex items-center justify-center shadow-md border border-[#bce366]">
+                <span className="material-symbols-outlined text-[#2d3a24] text-[24px]">volunteer_activism</span>
+              </div>
+              <div>
+                <span className="bg-[#cbf275] text-[#2d3a24] text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider inline-block">
+                  Active Transplant Journey
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight mt-0.5">
+                  Transplant Progress Telemetry
+                </h2>
+              </div>
+            </div>
+            <p className="text-sm text-green-50 max-w-2xl leading-relaxed">
+              Your interest in organ donation has been accepted by the hospital. Follow the real-time clinical milestones below as we coordinate the transplant procedure.
+            </p>
+          </div>
+        </div>
+
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Timeline Milestones */}
+          <div className="lg:col-span-7 bg-white border border-[#e1ead2] rounded-[2rem] p-8 shadow-sm">
+            <h3 className="text-xl font-serif font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#3b5e2b]">insights</span>
+              <span>Clinical Journey Milestones</span>
+            </h3>
+
+            <div className="relative pl-8 border-l-2 border-slate-100 space-y-8 ml-3">
+              {steps.map((step, idx) => {
+                const isCompleted = currentStep > idx;
+                const isActive = currentStep === idx;
+                const isUpcoming = currentStep < idx;
+
+                return (
+                  <div key={idx} className="relative group">
+                    
+                    {/* Circle Indicator */}
+                    <div className={`absolute -left-[45px] top-0 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center shadow-sm z-10 transition-all ${
+                      isCompleted ? "bg-[#5b8a3e]" :
+                      isActive ? "bg-amber-500 animate-pulse animate-duration-1000" :
+                      "bg-slate-100"
+                    }`}>
+                      <span className={`material-symbols-outlined text-[16px] ${
+                        isCompleted ? "text-white" :
+                        isActive ? "text-white font-bold" :
+                        "text-slate-400"
+                      }`}>
+                        {isCompleted ? "check" : step.icon}
+                      </span>
+                    </div>
+
+                    {/* Step Content Card */}
+                    <div 
+                      onClick={() => setActiveDrawerStage(idx + 1)}
+                      className={`border rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-[#5b8a3e]/40 transition-all duration-200 bg-white ${
+                        isActive ? "border-amber-400 bg-amber-50/5 shadow-sm" :
+                        isCompleted ? "border-[#e1ead2] bg-[#f1f7e8]/10" :
+                        "border-slate-100 opacity-60 bg-slate-50/50"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className={`text-sm font-bold ${
+                              isActive ? "text-amber-700 font-bold" :
+                              isCompleted ? "text-[#3b5e2b]" :
+                              "text-slate-500 font-bold"
+                            }`}>
+                              Step {idx + 1}: {step.title}
+                            </h4>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                              isCompleted ? "bg-[#eef4e2] text-[#3b5e2b]" :
+                              isActive ? "bg-amber-100 text-amber-800" :
+                              "bg-slate-100 text-slate-400"
+                            }`}>
+                              {isCompleted ? "Completed" : isActive ? "Active Phase" : "Upcoming"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 leading-normal">
+                            {step.desc}
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-slate-300 group-hover:text-[#5b8a3e] transition-colors text-[20px] select-none">
+                          info
+                        </span>
+                      </div>
+
+                      {/* Detail Render */}
+                      {(isCompleted || isActive) && step.renderDetail()}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right side Info Cards */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* Recipient info */}
+            <div className="bg-[#fcfdfa] border border-[#e1ead2] rounded-[2rem] p-6 shadow-sm">
+              <h3 className="text-sm font-black uppercase tracking-wider text-[#3b5e2b] mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">person</span>
+                <span>Recipient Compatibility Info</span>
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Recipient Initials</span>
+                      <span className="text-xs font-bold text-gray-800 mt-0.5 block">
+                        {waitlist.fullName || activeRequest.patientName || "Confidential Match"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Requested Organ</span>
+                      <span className="text-xs font-bold text-gray-800 mt-0.5 block">
+                        {waitlist.requiredOrgan || activeRequest.organType || "Organ"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Blood Group</span>
+                      <span className="text-xs font-bold text-gray-800 mt-0.5 block bg-[#eef4e2]/60 border border-[#d2e4c0] px-2 py-0.5 rounded inline-block">
+                        {waitlist.bloodGroup || activeRequest.bloodType || "N/A"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Urgency Status</span>
+                      <span className={`text-[10px] font-bold mt-0.5 inline-block px-2 py-0.5 rounded uppercase tracking-wider ${
+                        (waitlist.urgency || activeRequest.urgency) === "Critical" ? "bg-red-50 text-red-600 border border-red-100" :
+                        (waitlist.urgency || activeRequest.urgency) === "High" ? "bg-orange-50 text-orange-600 border border-orange-100" :
+                        "bg-green-50 text-green-600 border border-green-100"
+                      }`}>
+                        {(waitlist.urgency || activeRequest.urgency) || "Medium"} Urgency
+                      </span>
+                    </div>
+                  </div>
+                  {waitlist.medicalCertificateUrl && (
+                    <div className="border-t border-slate-100 pt-3 mt-2">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1.5">Medical Documentation</span>
+                      <a
+                        href={waitlist.medicalCertificateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-xs font-bold text-[#3b5e2b] bg-[#eef4e2]/60 hover:bg-[#eef4e2] border border-[#d2e4c0] rounded-xl px-4 py-2 transition-all shadow-sm cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">description</span>
+                        View Patient Health Certificate
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                  * LifeLink encrypts full patient demographics prior to clinical approval stages to protect donor-recipient confidentiality.
+                </p>
+              </div>
+            </div>
+
+            {/* Hospital Contact Info */}
+            <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+              <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">local_hospital</span>
+                <span>Coordinating Hospital</span>
+              </h3>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Medical Facility</span>
+                  <span className="font-bold text-gray-800 mt-0.5 block">{hospital.name || activeRequest.facility || "Coordinating Facility"}</span>
+                </div>
+                {hospital.address && (
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Location Address</span>
+                    <span className="font-semibold text-gray-600 mt-0.5 block leading-normal">{hospital.address}</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  {hospital.phone && (
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Phone Contact</span>
+                      <span className="font-bold text-[#3b5e2b] mt-0.5 block">{hospital.phone}</span>
+                    </div>
+                  )}
+                  {hospital.email && (
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Email Address</span>
+                      <span className="font-bold text-[#3b5e2b] mt-0.5 block break-all">{hospital.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Donor Support & Assistance FAQs */}
+            <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6 shadow-sm">
+              <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                <span>Donor Assistance</span>
+              </h3>
+
+              <div className="space-y-4 text-xs">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-gray-900">What are the dietary prep rules for lab test evaluations?</h4>
+                  <p className="text-gray-500 leading-normal">Fast for 8 hours before the blood crossmatching tests. Stay hydrated and avoid strenuous exercises.</p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-gray-950 font-sans">Can I withdraw my donation intent later?</h4>
+                  <p className="text-gray-500 leading-normal">Yes. You retain the absolute legal right to withdraw consent anytime prior to surgery. Please notify your coordinator immediately if you wish to withdraw.</p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-gray-900">Who covers medical testing and surgery costs?</h4>
+                  <p className="text-gray-500 leading-normal">All clinical screenings, evaluations, surgeries, and recovery checkups are fully covered by the recipient's transplant insurance and coordinating hospital funding.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Side Drawer Panel */}
+        {activeDrawerStage !== null && (() => {
+          const content = getDrawerContent(activeDrawerStage);
+          if (!content) return null;
+          return (
+            <div className="fixed inset-0 z-50 flex justify-end">
+              {/* Backdrop */}
+              <div 
+                onClick={() => setActiveDrawerStage(null)}
+                className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm transition-opacity duration-300"
+              />
+              
+              {/* Drawer Body */}
+              <div className="relative w-full max-w-lg bg-white h-full shadow-2xl p-8 flex flex-col z-10 animate-in slide-in-from-right duration-300 overflow-y-auto">
+                
+                {/* Background Image / Overlay */}
+                <div 
+                  className="absolute inset-0 bg-cover bg-no-repeat bg-center opacity-[0.09] pointer-events-none z-0"
+                  style={{ backgroundImage: `url('/images/sidepage_mesh_bg.png')` }}
+                />
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setActiveDrawerStage(null)}
+                  className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-50 border border-slate-100 z-10"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+
+                {/* Content Wrapper */}
+                <div className="relative z-10 flex flex-col flex-1">
+                  {/* Header */}
+                  <div className="mt-4">
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded uppercase tracking-wider ${content.badgeColor}`}>
+                      {content.badge}
+                    </span>
+                    <h3 className="text-2xl font-serif font-black text-slate-900 mt-3 leading-tight">
+                      {content.title}
+                    </h3>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-[1px] bg-slate-100 my-6" />
+
+                  {/* Stage Overview */}
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Stage Overview</h4>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium font-sans">
+                        {content.overview}
+                      </p>
+                    </div>
+
+                    {/* Stage Details */}
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Key Stage Milestones</h4>
+                      {content.details.map((detail, dIdx) => (
+                        <div key={dIdx} className="bg-slate-50/50 border border-slate-100 p-4 rounded-2xl flex gap-3">
+                          <div className="w-6 h-6 rounded-full bg-[#eef4e2] border border-[#d2e4c0] flex items-center justify-center flex-shrink-0 text-[#3b5e2b] font-bold text-xs">
+                            {dIdx + 1}
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-bold text-slate-900 leading-none mb-1.5">{detail.title}</h5>
+                            <p className="text-xs text-slate-500 leading-relaxed">{detail.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* FAQs */}
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Frequently Asked Questions</h4>
+                      {content.faqs.map((faq, fIdx) => (
+                        <div key={fIdx} className="border-b border-slate-100 pb-4 last:border-0">
+                          <h5 className="text-xs font-bold text-slate-900 mb-1 flex items-start gap-1">
+                            <span className="text-[#5b8a3e]">Q:</span>
+                            <span>{faq.q}</span>
+                          </h5>
+                          <p className="text-xs text-slate-500 leading-relaxed pl-3 border-l-2 border-[#eef4e2]">
+                            {faq.a}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </main>
+    );
+  }
 
   return (
     <main className="p-6 lg:p-8 max-w-6xl mx-auto relative">
@@ -546,6 +1288,10 @@ export default function OrganDonation() {
                               <div>
                                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Contact Phone</span>
                                 <span className="font-semibold text-gray-700">{patient.contactPhone || "Available on match confirmation"}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Hospital Contact</span>
+                                <span className="font-bold text-[#3b5e2b]">{patient.hospitalPhone || "N/A"}</span>
                               </div>
                               <div>
                                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">Registered Date</span>
