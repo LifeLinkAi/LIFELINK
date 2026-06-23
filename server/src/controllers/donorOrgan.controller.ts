@@ -6,6 +6,7 @@ import { DonorProfile } from '../models/DonorProfile';
 import { OrganWaitlist } from '../models/OrganWaitlist';
 import { Request as DonationRequest } from '../models/Request';
 import { User } from '../models/User';
+import { HospitalProfile } from '../models/HospitalProfile';
 
 /**
  * @desc    Upsert donor organ profile (Intake)
@@ -188,8 +189,16 @@ export const getActiveOrganRequest = async (
       select: 'name email phone address'
     }).populate({
       path: 'waitlistId',
-      select: 'requiredOrgan fullName bloodGroup urgency status'
-    }).lean();
+      select: 'requiredOrgan fullName bloodGroup urgency status medicalCertificateUrl'
+    }).lean() as any;
+
+    if (requestDoc && requestDoc.hospitalId) {
+      const hospProfile = await HospitalProfile.findOne({ userId: requestDoc.hospitalId._id });
+      if (hospProfile) {
+        requestDoc.hospitalId.phone = hospProfile.phone || hospProfile.contactPerson?.phone || '';
+        requestDoc.hospitalId.address = hospProfile.location || hospProfile.city || '';
+      }
+    }
 
     res.status(200).json({
       success: true,
