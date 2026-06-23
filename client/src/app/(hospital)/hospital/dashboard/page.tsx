@@ -284,6 +284,7 @@ export default function HospitalDashboard() {
         formData.append('file', file);
 
         const res = await api.post('/upload', formData, {
+          timeout: 60000,
           headers: {
             'Content-Type': 'multipart/form-data',
           },

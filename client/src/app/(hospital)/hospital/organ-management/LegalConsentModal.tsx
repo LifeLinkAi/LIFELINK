@@ -45,29 +45,29 @@ interface Props {
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return (
-    <p className="mt-1 flex items-center gap-1 text-[11.5px] text-red-600">
-      <AlertCircle size={11} /> {msg}
+    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-rose-600">
+      <AlertCircle size={12} /> {msg}
     </p>
   );
 }
 
 function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#F0EDE3]">
-      <span className="text-[#7AB648]">{icon}</span>
-      <h3 className="text-[13px] font-semibold text-[#1a2e0a] uppercase tracking-wide">{title}</h3>
+    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200/80">
+      <span className="text-slate-400">{icon}</span>
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{title}</h3>
     </div>
   );
 }
 
 const inputCls = `
-  w-full h-10 px-3 text-[13px] bg-white border border-[#D0CCBC] rounded-lg
-  outline-none transition-colors placeholder:text-[#C0CCBC]
-  focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/30
-  disabled:opacity-50 disabled:bg-[#FAFAF7] disabled:cursor-not-allowed
+  w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-md
+  outline-none transition-colors placeholder:text-slate-400
+  focus:border-slate-900 focus:ring-1 focus:ring-slate-900 focus:bg-white
+  disabled:opacity-50 disabled:bg-slate-100 disabled:cursor-not-allowed
 `.trim();
 
-const labelCls = 'block text-[12px] font-semibold text-[#4A5A3A] mb-1';
+const labelCls = 'block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5';
 
 // ─────────────────────────────────────────────
 // MAIN COMPONENT
@@ -118,32 +118,32 @@ export default function LegalConsentModal({ match, onClose, onCompleted }: Props
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-xl shadow-xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200/80 bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-              <ShieldCheck size={18} />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900">
+              <ShieldCheck size={16} />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-[#1a2e0a]">
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight uppercase">
                 Legal & Ethics Clearance
               </h2>
-              <p className="text-[11.5px] text-[#8A9A7A]">Final approval for {match.patient?.fullName}</p>
+              <p className="text-xs text-slate-500">Final approval for {match.patient?.fullName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8A9A7A] hover:bg-[#F0EDE3] hover:text-[#1a2e0a] transition-colors disabled:opacity-40"
+            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-40"
           >
             <X size={16} />
           </button>
@@ -155,57 +155,57 @@ export default function LegalConsentModal({ match, onClose, onCompleted }: Props
             id="legal-consent-form"
             onSubmit={handleSubmit(onSubmit)}
             noValidate
-            className="p-6 flex flex-col gap-7"
+            className="p-5 flex flex-col gap-6"
           >
             {/* ── Section 1: Digital Signatures ── */}
             <section>
               <SectionHeading icon={<FileSignature size={14} />} title="Mandatory Signatures" />
               <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-start gap-3 p-3 rounded-lg border border-[#E8E4D8] hover:border-[#7AB648] transition-colors cursor-pointer">
+                <label className="flex items-start gap-3 p-3 rounded-md border border-slate-200 bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer">
                   <input
                     type="checkbox"
                     {...register('signatures.donor')}
-                    className="mt-0.5 w-4 h-4 rounded text-[#7AB648] focus:ring-[#7AB648]"
+                    className="mt-0.5 w-4 h-4 text-slate-900 border-slate-300 rounded-sm focus:ring-slate-900"
                   />
                   <div>
-                    <span className="block text-[13px] font-semibold text-[#1a2e0a]">Donor Consent Signed</span>
-                    <span className="block text-[11px] text-[#8A9A7A]">Donor has agreed to proceed</span>
+                    <span className="block text-sm font-medium text-slate-900">Donor Consent Signed</span>
+                    <span className="block text-xs text-slate-500">Donor has agreed to proceed</span>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 rounded-lg border border-[#E8E4D8] hover:border-[#7AB648] transition-colors cursor-pointer">
+                <label className="flex items-start gap-3 p-3 rounded-md border border-slate-200 bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer">
                   <input
                     type="checkbox"
                     {...register('signatures.recipient')}
-                    className="mt-0.5 w-4 h-4 rounded text-[#7AB648] focus:ring-[#7AB648]"
+                    className="mt-0.5 w-4 h-4 text-slate-900 border-slate-300 rounded-sm focus:ring-slate-900"
                   />
                   <div>
-                    <span className="block text-[13px] font-semibold text-[#1a2e0a]">Recipient Waiver Signed</span>
-                    <span className="block text-[11px] text-[#8A9A7A]">Recipient has accepted risks</span>
+                    <span className="block text-sm font-medium text-slate-900">Recipient Waiver Signed</span>
+                    <span className="block text-xs text-slate-500">Recipient has accepted risks</span>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 rounded-lg border border-[#E8E4D8] hover:border-[#7AB648] transition-colors cursor-pointer">
+                <label className="flex items-start gap-3 p-3 rounded-md border border-slate-200 bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer">
                   <input
                     type="checkbox"
                     {...register('signatures.hospitalRep')}
-                    className="mt-0.5 w-4 h-4 rounded text-[#7AB648] focus:ring-[#7AB648]"
+                    className="mt-0.5 w-4 h-4 text-slate-900 border-slate-300 rounded-sm focus:ring-slate-900"
                   />
                   <div>
-                    <span className="block text-[13px] font-semibold text-[#1a2e0a]">Hospital Rep Signed</span>
-                    <span className="block text-[11px] text-[#8A9A7A]">Hospital administrative clearance</span>
+                    <span className="block text-sm font-medium text-slate-900">Hospital Rep Signed</span>
+                    <span className="block text-xs text-slate-500">Hospital administrative clearance</span>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 rounded-lg border border-[#E8E4D8] hover:border-[#7AB648] transition-colors cursor-pointer">
+                <label className="flex items-start gap-3 p-3 rounded-md border border-slate-200 bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer">
                   <input
                     type="checkbox"
                     {...register('signatures.ethicsCommittee')}
-                    className="mt-0.5 w-4 h-4 rounded text-[#7AB648] focus:ring-[#7AB648]"
+                    className="mt-0.5 w-4 h-4 text-slate-900 border-slate-300 rounded-sm focus:ring-slate-900"
                   />
                   <div>
-                    <span className="block text-[13px] font-semibold text-[#1a2e0a]">Ethics Committee Cleared</span>
-                    <span className="block text-[11px] text-[#8A9A7A]">Independent board approval</span>
+                    <span className="block text-sm font-medium text-slate-900">Ethics Committee Cleared</span>
+                    <span className="block text-xs text-slate-500">Independent board approval</span>
                   </div>
                 </label>
               </div>
@@ -220,54 +220,56 @@ export default function LegalConsentModal({ match, onClose, onCompleted }: Props
             </section>
 
             {/* ── Section 2: Surgery Scheduling ── */}
-            <section className={cn('transition-opacity duration-300', !allSigned ? 'opacity-40 pointer-events-none' : 'opacity-100')}>
-              <SectionHeading icon={<Calendar size={14} />} title="Surgery Scheduling Block" />
-              
-              {!allSigned && (
-                <div className="mb-4 text-[12px] font-medium text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-100 flex items-center gap-2">
-                  <AlertCircle size={14} />
-                  You must collect all 4 signatures before scheduling the surgery.
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label htmlFor="date" className={labelCls}>Surgery Date & Time *</label>
-                  <input
-                    id="date"
-                    type="datetime-local"
-                    disabled={!allSigned}
-                    {...register('surgeryDetails.date')}
-                    className={cn(inputCls, errors.surgeryDetails?.date && 'border-red-400')}
-                  />
-                  <FieldError msg={errors.surgeryDetails?.date?.message} />
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <label htmlFor="operatingRoom" className={labelCls}>Operating Room *</label>
-                  <input
-                    id="operatingRoom"
-                    placeholder="e.g. OR-4"
-                    disabled={!allSigned}
-                    {...register('surgeryDetails.operatingRoom')}
-                    className={cn(inputCls, errors.surgeryDetails?.operatingRoom && 'border-red-400')}
-                  />
-                  <FieldError msg={errors.surgeryDetails?.operatingRoom?.message} />
-                </div>
-
-                <div className="col-span-2">
-                  <label htmlFor="leadSurgeon" className={labelCls}>Lead Surgeon *</label>
-                  <div className="relative">
-                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9A7A]" />
-                    <input
-                      id="leadSurgeon"
-                      placeholder="e.g. Dr. Sarah Jenkins"
-                      disabled={!allSigned}
-                      {...register('surgeryDetails.leadSurgeon')}
-                      className={cn(inputCls, 'pl-9', errors.surgeryDetails?.leadSurgeon && 'border-red-400')}
-                    />
+            <section className={cn('transition-opacity duration-300', !allSigned ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
+              <div className={cn(!allSigned ? 'bg-slate-100/50 border border-slate-200 rounded-lg p-4' : '')}>
+                <SectionHeading icon={<Calendar size={14} />} title="Surgery Scheduling Block" />
+                
+                {!allSigned && (
+                  <div className="mb-4 text-xs font-medium text-rose-600 bg-rose-50 px-3 py-2 rounded-md border border-rose-100 flex items-center gap-2">
+                    <AlertCircle size={14} />
+                    You must collect all 4 signatures before scheduling the surgery.
                   </div>
-                  <FieldError msg={errors.surgeryDetails?.leadSurgeon?.message} />
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label htmlFor="date" className={labelCls}>Surgery Date & Time *</label>
+                    <input
+                      id="date"
+                      type="datetime-local"
+                      disabled={!allSigned}
+                      {...register('surgeryDetails.date')}
+                      className={cn(inputCls, errors.surgeryDetails?.date && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
+                    />
+                    <FieldError msg={errors.surgeryDetails?.date?.message} />
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <label htmlFor="operatingRoom" className={labelCls}>Operating Room *</label>
+                    <input
+                      id="operatingRoom"
+                      placeholder="e.g. OR-4"
+                      disabled={!allSigned}
+                      {...register('surgeryDetails.operatingRoom')}
+                      className={cn(inputCls, errors.surgeryDetails?.operatingRoom && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
+                    />
+                    <FieldError msg={errors.surgeryDetails?.operatingRoom?.message} />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label htmlFor="leadSurgeon" className={labelCls}>Lead Surgeon *</label>
+                    <div className="relative">
+                      <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        id="leadSurgeon"
+                        placeholder="e.g. Dr. Sarah Jenkins"
+                        disabled={!allSigned}
+                        {...register('surgeryDetails.leadSurgeon')}
+                        className={cn(inputCls, 'pl-9', errors.surgeryDetails?.leadSurgeon && 'border-rose-400 focus:border-rose-400 focus:ring-rose-400')}
+                      />
+                    </div>
+                    <FieldError msg={errors.surgeryDetails?.leadSurgeon?.message} />
+                  </div>
                 </div>
               </div>
             </section>
@@ -275,15 +277,15 @@ export default function LegalConsentModal({ match, onClose, onCompleted }: Props
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[#E8E4D8] bg-[#FAFAF7] flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200/80 bg-slate-50 flex-shrink-0 rounded-b-xl">
           {isSubmitting ? (
-            <div className="flex items-center gap-2 text-[12px] text-[#6B7A5A]">
-              <Loader2 size={13} className="animate-spin text-[#7AB648]" />
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <Loader2 size={14} className="animate-spin text-slate-900" />
               <span>Submitting final approval...</span>
             </div>
           ) : done ? (
-            <div className="flex items-center gap-2 text-[12px] text-green-700">
-              <CheckCircle2 size={13} /> Clearance Granted!
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider">
+              <CheckCircle2 size={14} /> Clearance Granted!
             </div>
           ) : <div />}
 
@@ -291,7 +293,7 @@ export default function LegalConsentModal({ match, onClose, onCompleted }: Props
             type="submit"
             form="legal-consent-form"
             disabled={isSubmitting || done || !allSigned}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#1a2e0a] hover:bg-[#2B4A18] text-[13px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-slate-900 hover:bg-slate-800 text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             Schedule Surgery
           </button>

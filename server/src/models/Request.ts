@@ -45,10 +45,13 @@ export interface IRequest extends Document {
     hlaMatchScore: number;
     serologyClear: boolean;
     organFunctionStatus?: 'OPTIMAL' | 'MARGINAL' | 'UNSATISFACTORY';
-    notes: string;
-    labReportUrl: string;
+    notes?: string;
+    labReportUrl?: string;
     evaluatedAt?: Date;
     evaluatedBy?: Schema.Types.ObjectId;
+    scheduledTestDate?: Date;
+    testingFacility?: string;
+    donorInstructions?: string;
   };
   surgicalOutcome?: {
     surgeryStartedAt?: Date;
@@ -246,7 +249,10 @@ const requestSchema = new Schema<IRequest>(
       notes: { type: String },
       labReportUrl: { type: String },
       evaluatedAt: { type: Date },
-      evaluatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+      evaluatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+      scheduledTestDate: { type: Date },
+      testingFacility: { type: String },
+      donorInstructions: { type: String }
     },
     surgicalOutcome: {
       surgeryStartedAt: { type: Date },
