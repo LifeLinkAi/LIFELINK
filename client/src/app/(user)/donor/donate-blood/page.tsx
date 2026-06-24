@@ -53,8 +53,8 @@ export default function BloodManagement() {
 
   useEffect(() => {
     fetchPledges();
-    const interval = setInterval(fetchPledges, 10000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(fetchPledges, 10000);
+    // return () => clearInterval(interval);
   }, [fetchPledges]);
 
   const handleRespond = useCallback(
