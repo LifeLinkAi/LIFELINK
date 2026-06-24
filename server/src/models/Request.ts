@@ -4,12 +4,10 @@ import { Schema, model, Document } from 'mongoose';
 // TYPE DEFINITIONS
 // ==========================================
 
-export interface IMatchedDonor {
+export interface IPledgedDonor {
   donorId: Schema.Types.ObjectId;
-  status: 'NOTIFIED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
-  inviteToken: string;
-  tokenExpiresAt: Date;
-  respondedAt?: Date;
+  status: 'PLEDGED' | 'ARRIVED' | 'BLEEDING' | 'COMPLETED' | 'REJECTED';
+  pledgedAt: Date;
 }
 
 export interface IRequest extends Document {
@@ -23,6 +21,7 @@ export interface IRequest extends Document {
   organType?: string;
   bloodGroup: string;
   units?: number;
+  unitsFulfilled?: number;
   urgency: string;
   status: string;
   matchPercentage?: number;
@@ -33,10 +32,9 @@ export interface IRequest extends Document {
   notes?: string;
   contactPhone?: string; // Added to interface
   type: 'Organ' | 'Blood';
-  matchedDonors: IMatchedDonor[];
+  pledgedDonors: IPledgedDonor[];
   notifiedDonors: Schema.Types.ObjectId[];
   assignedDonorId?: Schema.Types.ObjectId | null;
-  acceptedDonorId?: Schema.Types.ObjectId | null;
   targetDonorId?: Schema.Types.ObjectId | null;
   hospitalId?: Schema.Types.ObjectId | null;
   timeline?: Array<{ event: string; timestamp: Date }>;
@@ -60,6 +58,12 @@ export interface IRequest extends Document {
     complications?: string;
     patientDischargeDate?: Date;
   };
+  bloodLogistics?: {
+    componentType: 'WHOLE_BLOOD' | 'RBC' | 'PLASMA' | 'PLATELETS';
+    unitsRequested: number;
+    unitsFulfilled: number;
+    fulfilledBagIds: Schema.Types.ObjectId[];
+  };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
   donorId?: Schema.Types.ObjectId | null;
@@ -77,32 +81,17 @@ export interface IRequest extends Document {
 // SCHEMA DEFINITION
 // ==========================================
 
-const matchedDonorSchema = new Schema<IMatchedDonor>(
+const pledgedDonorSchema = new Schema(
   {
-    donorId: {
-      type: Schema.Types.ObjectId,
-      ref: 'DonorProfile',
-      required: true,
-    },
+    donorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
       type: String,
-      enum: ['NOTIFIED', 'ACCEPTED', 'DECLINED', 'EXPIRED'],
-      default: 'NOTIFIED',
+      enum: ['PLEDGED', 'ARRIVED', 'BLEEDING', 'COMPLETED', 'REJECTED'],
+      default: 'PLEDGED',
     },
-    inviteToken: {
-      type: String,
-      required: true,
-    },
-    tokenExpiresAt: {
-      type: Date,
-      required: true,
-    },
-    respondedAt: {
-      type: Date,
-      default: null,
-    },
+    pledgedAt: { type: Date, default: Date.now },
   },
-  { _id: true }
+  { _id: false }
 );
 
 const requestSchema = new Schema<IRequest>(
@@ -143,6 +132,11 @@ const requestSchema = new Schema<IRequest>(
     },
     units: {
       type: Number,
+      min: [1, 'Must request at least 1 unit']
+    },
+    unitsFulfilled: {
+      type: Number,
+      default: 0
     },
     urgency: {
       type: String,
@@ -151,6 +145,23 @@ const requestSchema = new Schema<IRequest>(
     status: {
       type: String,
       required: true,
+      validate: {
+        validator: function(this: any, v: string) {
+          if (this.type === 'Blood') {
+            return [
+              'PENDING',           
+              'DONOR_NOTIFIED',    
+              'PENDING_HOSPITAL',  
+              'APPROVED',          
+              'IN_PROGRESS',       
+              'FULFILLED',         
+              'CANCELLED'          
+            ].includes(v);
+          }
+          return true;
+        },
+        message: 'Invalid status for Blood request.'
+      }
     },
     matchPercentage: {
       type: Number,
@@ -186,8 +197,8 @@ const requestSchema = new Schema<IRequest>(
       enum: ['Organ', 'Blood'],
       required: true,
     },
-    matchedDonors: {
-      type: [matchedDonorSchema],
+    pledgedDonors: {
+      type: [pledgedDonorSchema],
       default: [],
     },
     notifiedDonors: {
@@ -196,11 +207,6 @@ const requestSchema = new Schema<IRequest>(
       default: [],
     },
     assignedDonorId: {
-      type: Schema.Types.ObjectId,
-      ref: 'DonorProfile',
-      default: null,
-    },
-    acceptedDonorId: {
       type: Schema.Types.ObjectId,
       ref: 'DonorProfile',
       default: null,
@@ -260,6 +266,16 @@ const requestSchema = new Schema<IRequest>(
       outcome: { type: String, enum: ['SUCCESS', 'FAILED'] },
       complications: { type: String },
       patientDischargeDate: { type: Date }
+    },
+    bloodLogistics: {
+      componentType: { 
+        type: String, 
+        enum: ['WHOLE_BLOOD', 'RBC', 'PLASMA', 'PLATELETS'],
+        default: 'WHOLE_BLOOD'
+      },
+      unitsRequested: { type: Number, min: 1 },
+      unitsFulfilled: { type: Number, default: 0 },
+      fulfilledBagIds: [{ type: Schema.Types.ObjectId, ref: 'BloodBag' }]
     },
     donorName: {
       type: String,

@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/axios';
@@ -874,7 +875,7 @@ export default function HospitalDashboard() {
               <Droplets size={16} />
               <span className="text-[14px] font-semibold text-[#1a2e0a]">Blood Bank Levels</span>
             </div>
-            <a href="/hospital/blood-stock" className="text-[12px] font-medium text-[#3d6b1e] hover:underline">Manage stock →</a>
+            <Link href="/hospital/blood-management" className="text-[12px] font-medium text-[#3d6b1e] hover:underline">Manage stock →</Link>
           </div>
           <div className="grid grid-cols-4 gap-5">
             {dashboardData.bloodLevels.map(b => <BloodLevelBar key={b.type} item={b} />)}

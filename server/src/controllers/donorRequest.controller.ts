@@ -36,7 +36,7 @@ export const getDonorRequests = async (req: AuthRequest, res: Response, next: Ne
     if (!req.user) return next(new ApiError(401, 'Not authenticated.'));
 
     // Fetch this donor's profile
-    const donorProfile = await DonorProfile.findOne({ userId: req.user.id });
+    const donorProfile = await DonorProfile.findOne({ userId: req.user!.id });
     if (!donorProfile) {
       res.status(200).json({ success: true, data: [] });
       return;
@@ -68,7 +68,7 @@ export const getDonorRequests = async (req: AuthRequest, res: Response, next: Ne
     // Fetch all donor responses for this donor in one query
     const requestIds = requests.map((r: any) => r._id);
     const responses = await DonorResponse.find({
-      donorId: req.user.id,
+      donorId: req.user!.id,
       requestId: { $in: requestIds },
     }).lean();
 
@@ -119,7 +119,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
     const request = await RequestModel.findById(id);
     if (!request) return next(new ApiError(404, 'Request not found.'));
 
-    const profile = await DonorProfile.findOne({ userId: req.user.id });
+    const profile = await DonorProfile.findOne({ userId: req.user!.id });
     if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
 
     // Check if the request is exclusively assigned to this donor, or if they were notified/dispatched
@@ -143,7 +143,7 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
 
     // Upsert the donor response
     const donorResponse = await DonorResponse.findOneAndUpdate(
-      { donorId: req.user.id, requestId: id },
+      { donorId: req.user!.id, requestId: id },
       {
         $set: {
           status: action,
@@ -153,10 +153,10 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       { upsert: true, new: true }
     );
 
-    logger.info(`Donor ${req.user.id} responded ${action} to request ${id}`);
+    logger.info(`Donor ${req.user!.id} responded ${action} to request ${id}`);
 
     // If there is a matchedDonors entry, update its status as well
-    const matchedDonorEntry = request.matchedDonors && request.matchedDonors.find(
+    const matchedDonorEntry = (request as any).matchedDonors && (request as any).matchedDonors.find(
       (m: any) => m.donorId && m.donorId.toString() === profile._id.toString()
     );
     if (matchedDonorEntry) {
@@ -165,55 +165,34 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
     }
 
     if (action === 'ACCEPTED') {
-      // Lock the request
-      if (request.status === 'Accepted' || request.acceptedDonorId) {
-        return next(new ApiError(400, 'This request has already been accepted.'));
-      }
-
-      const donorUser = await User.findById(req.user.id).select('name email');
+      const donorUser = await User.findById(req.user!.id).select('name email');
       if (!donorUser) return next(new ApiError(404, 'Donor user account not found.'));
 
-      let hospitalId = null;
-      const creator = await User.findById(request.requestedBy).select('role');
-      if (creator && creator.role === 'Hospital') {
-        hospitalId = creator._id;
-      } else if (request.facility) {
-        const matchingHospital = await User.findOne({ name: request.facility, role: 'Hospital' }).select('_id');
-        if (matchingHospital) {
-          hospitalId = matchingHospital._id;
-        }
+      const alreadyPledged = request.pledgedDonors?.some((pd: any) => pd.donorId.toString() === req.user!.id.toString());
+      if (alreadyPledged) {
+        return next(new ApiError(400, 'You have already pledged to this request.'));
       }
 
-      if (isNotified) {
-        request.status = 'PENDING_HOSPITAL';
-        request.acceptedDonorId = profile._id as any;
-        request.targetDonorId = donorUser._id as any;
-        request.hospitalId = hospitalId as any;
-        if (!request.timeline) request.timeline = [];
-        request.timeline.push({
-          event: 'donor_accepted',
-          timestamp: new Date()
-        });
-      } else {
-        request.status = 'Accepted';
-        request.acceptedDonorId = profile._id as any;
-      }
+      request.pledgedDonors.push({
+        donorId: req.user!.id as any,
+        status: 'PLEDGED',
+        pledgedAt: new Date()
+      });
 
-      request.acceptedBy = donorUser.name;
-      request.acceptedAt = new Date();
-      request.donorId = donorUser._id as any;
-      request.donorName = donorUser.name;
-      request.donorEmail = donorUser.email;
-      request.donorBloodType = profile.bloodType ?? '';
+      if (!request.timeline) request.timeline = [];
+      request.timeline.push({
+        event: 'donor_pledged',
+        timestamp: new Date()
+      });
 
       await request.save();
 
       // Create a donation record (Pending until physically completed)
       await DonationRecord.findOneAndUpdate(
-        { donorId: req.user.id, requestId: id },
+        { donorId: req.user!.id, requestId: id },
         {
           $setOnInsert: {
-            donorId: req.user.id,
+            donorId: req.user!.id,
             requestId: id,
             donationType: (request as any).type === 'Organ' ? 'Organ' : 'Blood',
             bloodType: profile?.bloodType ?? '',
@@ -258,8 +237,8 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         // ==========================================
         // ADDED SAFETY CHECK HERE
         // ==========================================
-        if (recipient && recipient._id.toString() === req.user.id.toString()) {
-          logger.warn(`Safety Check: Prevented sending Acceptance email to the donor themselves (${req.user.id}).`);
+        if (recipient && recipient._id.toString() === req.user!.id.toString()) {
+          logger.warn(`Safety Check: Prevented sending Acceptance email to the donor themselves (${req.user!.id}).`);
           recipient = null; // Clear recipient so email doesn't send
         }
 
@@ -294,8 +273,9 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       }
       request.rejectedAt = new Date();
 
-if (isAssigned) {
-        request.status = 'Pending';
+      if (isAssigned) {
+        // Reset request status
+        request.status = 'PENDING';
         // Find the next best compatible donor
         const nextDonor = await findBestCompatibleDonorForRequest(request);
         if (nextDonor) {
@@ -345,7 +325,7 @@ if (isAssigned) {
           }).select('name email role');
         }
 
-        const donorUserForDecline = await User.findById(req.user.id).select('name email');
+        const donorUserForDecline = await User.findById(req.user!.id).select('name email');
 
         if (!recipient) {
           const targetUserId = request.userId || request.requestedBy;
@@ -357,8 +337,8 @@ if (isAssigned) {
         // ==========================================
         // ADDED SAFETY CHECK HERE
         // ==========================================
-        if (recipient && recipient._id.toString() === req.user.id.toString()) {
-          logger.warn(`Safety Check: Prevented sending Decline email to the donor themselves (${req.user.id}).`);
+        if (recipient && recipient._id.toString() === req.user!.id.toString()) {
+          logger.warn(`Safety Check: Prevented sending Decline email to the donor themselves (${req.user!.id}).`);
           recipient = null; // Clear recipient so email doesn't send
         }
 
