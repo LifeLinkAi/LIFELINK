@@ -10,6 +10,7 @@ import uploadRouter from './upload.routes';
 import donationRouter from './donation.routes';
 import organWaitlistRouter from './organWaitlist.routes';
 import donorOrganRouter from './donorOrgan.routes';
+import donorWellnessRouter from './donorWellness.routes';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use('/upload', uploadRouter);
 router.use('/donations', donationRouter);
 router.use('/organ-waitlist', organWaitlistRouter);
 router.use('/donor/organ', donorOrganRouter);
+router.use('/donor/wellness', donorWellnessRouter);
 
 export default router;
 
