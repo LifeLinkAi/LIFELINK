@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { store } from '@/store';
 import { useAppDispatch } from '@/store/hooks';
-import { setUser, setLoading } from '@/features/auth/authSlice';
+import { setUser, setLoading, clearUser } from '@/features/auth/authSlice';
 import { Toaster } from 'react-hot-toast';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -21,9 +21,11 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
       } catch (e) {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        dispatch(clearUser());
         dispatch(setLoading(false));
       }
     } else {
+      dispatch(clearUser());
       dispatch(setLoading(false));
     }
   }, [dispatch]);
