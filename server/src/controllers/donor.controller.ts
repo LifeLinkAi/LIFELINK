@@ -39,6 +39,7 @@ export const getDonors = async (req: AuthRequest, res: Response, next: NextFunct
         totalDonated: profile!.totalDonated,
         details: profile!.details,
         isSetupComplete: profile!.isSetupComplete,
+        organsWillingToDonate: profile!.organsWillingToDonate,
       });
     }
     res.status(200).json(result);
