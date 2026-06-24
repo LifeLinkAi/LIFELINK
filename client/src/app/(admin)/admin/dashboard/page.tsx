@@ -1,12 +1,254 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import api from '@/lib/axios';
 
 export default function DashboardPage() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'weekly' | 'monthly'>('today');
 
+  // Database States
+  const [requests, setRequests] = useState<any[]>([]);
+  const [donors, setDonors] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [donations, setDonations] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // 1. Fetch Requests
+      const reqRes = await api.get('/requests');
+      const reqList = Array.isArray(reqRes.data) ? reqRes.data : (reqRes.data?.data || []);
+      setRequests(reqList);
+
+      // 2. Fetch Donors
+      const donorRes = await api.get('/donors');
+      const donorList = Array.isArray(donorRes.data) ? donorRes.data : (donorRes.data?.data || []);
+      setDonors(donorList);
+
+      // 3. Fetch Hospitals
+      const hospRes = await api.get('/hospitals');
+      const hospList = Array.isArray(hospRes.data) ? hospRes.data : (hospRes.data?.data || []);
+      setHospitals(hospList);
+
+      // 4. Fetch Users
+      const userRes = await api.get('/auth/users');
+      const userList = Array.isArray(userRes.data) ? userRes.data : (userRes.data?.data || []);
+      setUsers(userList);
+
+      // 5. Fetch Donations
+      const donationRes = await api.get('/donations');
+      const donationList = Array.isArray(donationRes.data) ? donationRes.data : (donationRes.data?.data || []);
+      setDonations(donationList);
+
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to fetch dashboard data from server.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Approvals & Rejections Action Handlers
+  const handleApprove = async (item: { id: string; role: string; name: string }) => {
+    try {
+      if (item.role === 'Hospital') {
+        await api.put(`/hospitals/${item.id}`, { status: 'Verified' });
+      } else {
+        await api.put(`/donors/${item.id}`, { status: 'Available' });
+      }
+      showToast(`Successfully verified ${item.role}: ${item.name}`);
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to approve verification.');
+    }
+  };
+
+  const handleReject = async (item: { id: string; role: string; name: string }) => {
+    try {
+      if (item.role === 'Hospital') {
+        await api.put(`/hospitals/${item.id}`, { status: 'Suspended' });
+      } else {
+        await api.put(`/donors/${item.id}`, { status: 'Blocked' });
+      }
+      showToast(`Rejected/Suspended ${item.role}: ${item.name}`);
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to reject verification.');
+    }
+  };
+
+  // Derive display values from real database records
+  const totalUsers = useMemo(() => {
+    return users.length;
+  }, [users]);
+
+  const monthlyDonationsChartPaths = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const bloodCounts = [0, 0, 0, 0, 0];
+    const organCounts = [0, 0, 0, 0, 0];
+
+    donations.forEach(d => {
+      const date = new Date(d.donationDate || d.createdAt);
+      if (date >= thirtyDaysAgo) {
+        const diffDays = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 3600 * 24));
+        const bucketIndex = Math.max(0, Math.min(4, 4 - Math.floor(diffDays / 6)));
+        if (d.donationType === 'Blood') {
+          bloodCounts[bucketIndex] += d.volumeMl > 0 ? Math.round(d.volumeMl / 450) : 1;
+        } else if (d.donationType === 'Organ') {
+          organCounts[bucketIndex]++;
+        }
+      }
+    });
+
+    const maxVal = Math.max(1, ...bloodCounts, ...organCounts);
+    const bloodY = bloodCounts.map(count => 90 - (count / maxVal) * 80);
+    const organY = organCounts.map(count => 90 - (count / maxVal) * 80);
+
+    const bloodPath = `M0,${bloodY[0]} L100,${bloodY[1]} L200,${bloodY[2]} L300,${bloodY[3]} L400,${bloodY[4]}`;
+    const organPath = `M0,${organY[0]} L100,${organY[1]} L200,${organY[2]} L300,${organY[3]} L400,${organY[4]}`;
+
+    return { bloodPath, organPath };
+  }, [donations]);
+
+  const activeDonorsCount = useMemo(() => {
+    return donors.length;
+  }, [donors]);
+
+  const activeEmergenciesCount = useMemo(() => {
+    return requests.filter(r => r.type === 'Blood' && r.urgency === 'Critical' && r.status !== 'FULFILLED').length;
+  }, [requests]);
+
+  const pendingVerificationsCount = useMemo(() => {
+    // Include pending waitlist patients, pending hospitals, pending donors
+    const pendingRequests = requests.filter(r => ['Pending', 'Verification', 'Waitlisted'].includes(r.status)).length;
+    const pendingHosp = hospitals.filter(h => h.status === 'Pending').length;
+    const pendingDon = donors.filter(d => d.status === 'Verification' || d.status === 'Pending').length;
+    return pendingRequests + pendingHosp + pendingDon;
+  }, [requests, hospitals, donors]);
+
+  const hospitalsCount = useMemo(() => {
+    return hospitals.length;
+  }, [hospitals]);
+
+  const bloodRequestsCount = useMemo(() => {
+    return requests.filter(r => r.type === 'Blood').length;
+  }, [requests]);
+
+  const organRequestsCount = useMemo(() => {
+    return requests.filter(r => r.type === 'Organ').length;
+  }, [requests]);
+
+  // Aggregate blood stock
+  const bloodStockAgg = useMemo(() => {
+    const stock: Record<string, { units: number; max: number }> = {
+      'A+': { units: 0, max: 0 },
+      'A-': { units: 0, max: 0 },
+      'B+': { units: 0, max: 0 },
+      'B-': { units: 0, max: 0 },
+      'AB+': { units: 0, max: 0 },
+      'AB-': { units: 0, max: 0 },
+      'O+': { units: 0, max: 0 },
+      'O-': { units: 0, max: 0 },
+    };
+
+    hospitals.forEach((h: any) => {
+      if (h.bloodInventory && Array.isArray(h.bloodInventory)) {
+        h.bloodInventory.forEach((item: any) => {
+          const bg = item.bloodGroup;
+          if (stock[bg]) {
+            stock[bg].units += item.units || 0;
+            stock[bg].max += item.maxCapacity || 100;
+          }
+        });
+      }
+    });
+
+    return stock;
+  }, [hospitals]);
+
+  const getFullName = (g: string) => {
+    if (g.endsWith('+')) return `${g.replace('+', '')}+ POSITIVE`;
+    if (g.endsWith('-')) return `${g.replace('-', '')}- NEGATIVE`;
+    return g;
+  };
+
+  // Recent Emergencies list
+  const recentEmergenciesList = useMemo(() => {
+    return requests
+      .filter(r => r.type === 'Blood')
+      .slice(0, 5)
+      .map(r => {
+        const maskName = (name?: string) => {
+          if (!name) return 'Anonymous Recipient';
+          return name.split(' ').map(part => part[0] + '*'.repeat(Math.max(0, part.length - 1))).join(' ');
+        };
+        return {
+          id: r.id || r._id,
+          patientName: maskName(r.patientName),
+          urgency: r.urgency,
+          timeAgo: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Recent'
+        };
+      });
+  }, [requests]);
+
+  // Pending reviews combined list
+  const pendingReviewsList = useMemo(() => {
+    const pendingHosp = hospitals.filter(h => h.status === 'Pending').map(h => ({
+      id: h.id,
+      name: h.name,
+      role: 'Hospital',
+      details: h.city || 'Government Registry Verification'
+    }));
+    const pendingDon = donors.filter(d => d.status === 'Verification' || d.status === 'Pending').map(d => ({
+      id: d.id,
+      name: d.donorName,
+      role: 'Donor',
+      details: `${d.organType} Donor`
+    }));
+    return [...pendingHosp, ...pendingDon].slice(0, 5);
+  }, [hospitals, donors]);
+
+  // Success completed requests log
+  const successLogList = useMemo(() => {
+    return requests
+      .filter(r => r.status === 'Completed' || r.status === 'FULFILLED')
+      .slice(0, 5)
+      .map(r => {
+        return {
+          id: r.id || r._id,
+          name: r.patientName || 'Anonymous Patient',
+          details: r.type === 'Blood' ? `Blood Match • ${r.bloodGroup}` : `${r.organType} Match • ${r.facility || 'Coordinating Hub'}`
+        };
+      });
+  }, [requests]);
+
   return (
     <div className="space-y-lg pb-xxl w-full">
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#3e5219] text-white px-lg py-md rounded-xl shadow-2xl flex items-center gap-md border border-[#c8f17a]/30 animate-fade-in-up">
+          <span className="material-symbols-outlined text-[#c8f17a]">check_circle</span>
+          <span className="font-body-md font-medium">{toastMessage}</span>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-md">
         <div>
@@ -57,12 +299,17 @@ export default function DashboardPage() {
           <span className="material-symbols-outlined text-[32px] pulse-red">emergency</span>
         </div>
         <div className="flex-1">
-          <h3 className="font-headline-md text-headline-md font-bold">3 Critical Emergencies</h3>
+          <h3 className="font-headline-md text-headline-md font-bold">{activeEmergenciesCount} Critical {activeEmergenciesCount === 1 ? 'Emergency' : 'Emergencies'}</h3>
           <p className="opacity-90 font-body-md">
-            Requires immediate dispatcher allocation for O- negative blood transport in Central District.
+            Requires dispatcher allocation for active emergency requests in the network.
           </p>
         </div>
-        <button className="px-6 py-3 bg-white text-error font-bold rounded-xl shadow-sm hover:bg-neutral-50 transition-colors whitespace-nowrap">
+        <button 
+          onClick={() => {
+            window.location.href = '/admin/organ-requests';
+          }}
+          className="px-6 py-3 bg-white text-error font-bold rounded-xl shadow-sm hover:bg-neutral-50 transition-colors whitespace-nowrap"
+        >
           View All
         </button>
       </div>
@@ -79,7 +326,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2">
             <p className="text-on-surface-variant font-label-caps text-[12px] uppercase">Total Users</p>
-            <h4 className="font-display-lg text-[32px] text-primary">12,847</h4>
+            <h4 className="font-display-lg text-[32px] text-primary">{totalUsers}</h4>
           </div>
         </div>
 
@@ -93,7 +340,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2">
             <p className="text-on-surface-variant font-label-caps text-[12px] uppercase">Active Donors</p>
-            <h4 className="font-display-lg text-[32px] text-primary">3,254</h4>
+            <h4 className="font-display-lg text-[32px] text-primary">{activeDonorsCount}</h4>
           </div>
         </div>
 
@@ -108,7 +355,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2">
             <p className="text-white/70 font-label-caps text-[12px] uppercase">Active Emergencies</p>
-            <h4 className="font-display-lg text-[32px] text-white">27</h4>
+            <h4 className="font-display-lg text-[32px] text-white">{activeEmergenciesCount}</h4>
           </div>
         </div>
 
@@ -122,7 +369,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2">
             <p className="text-on-surface-variant font-label-caps text-[12px] uppercase">Pending Verifications</p>
-            <h4 className="font-display-lg text-[32px] text-primary">84</h4>
+            <h4 className="font-display-lg text-[32px] text-primary">{pendingVerificationsCount}</h4>
           </div>
         </div>
       </div>
@@ -133,21 +380,21 @@ export default function DashboardPage() {
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
           <div>
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">Hospitals</p>
-            <p className="font-headline-sm text-headline-sm">142</p>
+            <p className="font-headline-sm text-headline-sm">{hospitalsCount}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 border-l border-outline-variant/50">
           <div className="w-2 h-2 rounded-full bg-error"></div>
           <div>
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">Blood Requests</p>
-            <p className="font-headline-sm text-headline-sm">56</p>
+            <p className="font-headline-sm text-headline-sm">{bloodRequestsCount}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 border-l border-outline-variant/50">
           <div className="w-2 h-2 rounded-full bg-primary-container"></div>
           <div>
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">Organ Requests</p>
-            <p className="font-headline-sm text-headline-sm">8</p>
+            <p className="font-headline-sm text-headline-sm">{organRequestsCount}</p>
           </div>
         </div>
       </div>
@@ -173,17 +420,17 @@ export default function DashboardPage() {
             {/* Chart Lines (Simulated with SVG lines) */}
             <div className="absolute inset-x-0 bottom-0 h-full flex items-end">
               <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 400 100">
-                <path d="M0,80 Q50,20 100,50 T200,30 T300,60 T400,10" fill="none" stroke="#ba1a1a" strokeWidth="3"></path>
-                <path d="M0,100 Q50,40 100,70 T200,50 T300,80 T400,30" fill="none" stroke="#556b2f" strokeWidth="3"></path>
+                <path d={monthlyDonationsChartPaths.bloodPath} fill="none" stroke="#ba1a1a" strokeWidth="3"></path>
+                <path d={monthlyDonationsChartPaths.organPath} fill="none" stroke="#556b2f" strokeWidth="3"></path>
               </svg>
             </div>
             {/* X-Axis Labels */}
             <div className="w-full flex justify-between pt-4 border-t border-outline-variant/30 mt-auto">
-              <span className="text-[10px] font-bold text-outline">01 Sep</span>
-              <span className="text-[10px] font-bold text-outline">08 Sep</span>
-              <span className="text-[10px] font-bold text-outline">15 Sep</span>
-              <span className="text-[10px] font-bold text-outline">22 Sep</span>
-              <span className="text-[10px] font-bold text-outline">29 Sep</span>
+              <span className="text-[10px] font-bold text-outline">30d ago</span>
+              <span className="text-[10px] font-bold text-outline">22d ago</span>
+              <span className="text-[10px] font-bold text-outline">15d ago</span>
+              <span className="text-[10px] font-bold text-outline">8d ago</span>
+              <span className="text-[10px] font-bold text-outline">Today</span>
             </div>
           </div>
         </div>
@@ -192,51 +439,22 @@ export default function DashboardPage() {
         <div className="glass-card rounded-xl p-lg space-y-md">
           <h3 className="font-headline-md text-headline-md text-primary">Blood Stock</h3>
           <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
-                <span>A+ POSITIVE</span>
-                <span className="text-secondary font-bold">Optimal</span>
-              </div>
-              <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                <div className="h-full bg-primary-container" style={{ width: '85%' }}></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
-                <span>O- NEGATIVE</span>
-                <span className="text-error font-bold">Critical</span>
-              </div>
-              <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                <div className="h-full bg-error" style={{ width: '12%' }}></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
-                <span>B+ POSITIVE</span>
-                <span className="text-on-surface-variant font-bold">Stable</span>
-              </div>
-              <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                <div className="h-full bg-primary" style={{ width: '64%' }}></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
-                <span>AB- NEGATIVE</span>
-                <span className="text-error font-bold">Critical</span>
-              </div>
-              <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                <div className="h-full bg-error" style={{ width: '18%' }}></div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
-                <span>O+ POSITIVE</span>
-                <span className="text-secondary font-bold">Optimal</span>
-              </div>
-              <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
-                <div className="h-full bg-primary-container" style={{ width: '92%' }}></div>
-              </div>
-            </div>
+            {Object.entries(bloodStockAgg).slice(0, 5).map(([group, data]) => {
+              const percentage = data.max > 0 ? Math.round((data.units / data.max) * 100) : 0;
+              const status = percentage <= 15 ? 'Critical' : (percentage <= 35 ? 'Low' : (percentage >= 80 ? 'Optimal' : 'Stable'));
+              const statusColor = status === 'Critical' || status === 'Low' ? 'text-error' : (status === 'Optimal' ? 'text-secondary' : 'text-on-surface-variant');
+              return (
+                <div key={group} className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-bold uppercase font-dmsans">
+                    <span>{getFullName(group)}</span>
+                    <span className={`${statusColor} font-bold`}>{status} ({data.units} Units)</span>
+                  </div>
+                  <div className="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+                    <div className={`h-full ${status === 'Critical' ? 'bg-[#ba1a1a]' : (status === 'Optimal' ? 'bg-[#556b2f]' : 'bg-[#3e5219]')}`} style={{ width: `${Math.max(8, percentage)}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -300,32 +518,25 @@ export default function DashboardPage() {
             <span className="material-symbols-outlined text-outline cursor-pointer select-none">more_vert</span>
           </div>
           <div className="divide-y divide-outline-variant/30 flex-1">
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <div className="w-10 h-10 bg-error-container rounded-lg flex items-center justify-center text-error">
-                <span className="material-symbols-outlined">ambulance</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-bold">M. J*** S***</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="px-1.5 py-0.5 bg-error/10 text-error text-[10px] rounded font-bold uppercase">Critical</span>
-                  <span className="text-[11px] text-on-surface-variant italic">12 mins ago</span>
+            {recentEmergenciesList.length === 0 ? (
+              <p className="p-md text-xs text-on-surface-variant text-center">No recent emergency transport requests.</p>
+            ) : (
+              recentEmergenciesList.map((item) => (
+                <div key={item.id} className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
+                  <div className="w-10 h-10 bg-error-container rounded-lg flex items-center justify-center text-error">
+                    <span className="material-symbols-outlined">ambulance</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-bold">{item.patientName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="px-1.5 py-0.5 bg-error/10 text-error text-[10px] rounded font-bold uppercase">{item.urgency}</span>
+                      <span className="text-[11px] text-on-surface-variant italic">{item.timeAgo}</span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
                 </div>
-              </div>
-              <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-            </div>
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <div className="w-10 h-10 bg-secondary-container rounded-lg flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined">bloodtype</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-bold">R. K*** V***</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="px-1.5 py-0.5 bg-secondary/10 text-secondary text-[10px] rounded font-bold uppercase">Stable</span>
-                  <span className="text-[11px] text-on-surface-variant italic">24 mins ago</span>
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -333,34 +544,46 @@ export default function DashboardPage() {
         <div className="glass-card rounded-xl overflow-hidden flex flex-col hover:-translate-y-1 transition-all duration-200 cursor-pointer">
           <div className="p-lg border-b border-outline-variant flex justify-between items-center">
             <h3 className="font-headline-sm text-headline-sm text-primary">Pending Reviews</h3>
-            <span className="text-secondary font-bold text-[12px]">84 New</span>
+            <span className="text-secondary font-bold text-[12px]">{pendingReviewsList.length} New</span>
           </div>
           <div className="divide-y divide-outline-variant/30 flex-1">
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <img
-                alt="Dr. Alan"
-                className="w-10 h-10 rounded-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9Q6x_cZrKxGcKZfZTNVF7viNm7xbOLzO7IwS6ipp5gELdBh2RMv9xS3c8Ae209XvLJ1tIPe3TKQD7gyTblrEMeHINAwD-0wzHePgLevj9DuUaJLp6iGYgzKB378dbQgvOMke-gGdYJ3KqGrTXauuHEzLIeA4CZYycv-CzCMYXMVDM627F-7Os4vY4h6xO24zW99Y682ayaETnFETJnaMCWAUUuNT_eafM3Z2x2PbxyDmq6DE3YWaclcTeq2nnaB9nPFUSVQzEXrL-"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold truncate">Dr. Alan Miller</p>
-                <p className="text-[11px] text-on-surface-variant">Cardiologist · Hosp #12</p>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  aria-label="Approve Dr. Alan"
-                  className="w-8 h-8 flex items-center justify-center bg-secondary/10 text-secondary rounded-lg hover:bg-secondary hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">check</span>
-                </button>
-                <button
-                  aria-label="Reject Dr. Alan"
-                  className="w-8 h-8 flex items-center justify-center bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
-            </div>
+            {pendingReviewsList.length === 0 ? (
+              <p className="p-md text-xs text-on-surface-variant text-center">No pending verifications or reviews.</p>
+            ) : (
+              pendingReviewsList.map((item) => (
+                <div key={item.id} className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
+                  <div className="w-10 h-10 bg-secondary-container rounded-lg flex items-center justify-center text-secondary">
+                    <span className="material-symbols-outlined">assignment_ind</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold truncate">{item.name}</p>
+                    <p className="text-[11px] text-on-surface-variant">{item.role} · {item.details}</p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(item);
+                      }}
+                      aria-label={`Approve ${item.name}`}
+                      className="w-8 h-8 flex items-center justify-center bg-secondary/10 text-secondary rounded-lg hover:bg-secondary hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">check</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReject(item);
+                      }}
+                      aria-label={`Reject ${item.name}`}
+                      className="w-8 h-8 flex items-center justify-center bg-error/10 text-error rounded-lg hover:bg-error hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -371,32 +594,24 @@ export default function DashboardPage() {
             <span className="material-symbols-outlined text-outline">history</span>
           </div>
           <div className="divide-y divide-outline-variant/30 flex-1">
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined">volunteer_activism</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-bold">Emma Watson</p>
-                <p className="text-[11px] text-on-surface-variant italic">2 Liters · AB+ Positive</p>
-              </div>
-              <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full font-bold uppercase">
-                Success
-              </span>
-            </div>
-            <div className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  nephrology
-                </span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-bold">Liam Neeson</p>
-                <p className="text-[11px] text-on-surface-variant italic">Renal Match · Hospital #03</p>
-              </div>
-              <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full font-bold uppercase">
-                Success
-              </span>
-            </div>
+            {successLogList.length === 0 ? (
+              <p className="p-md text-xs text-on-surface-variant text-center">No successful matches logged yet.</p>
+            ) : (
+              successLogList.map((item) => (
+                <div key={item.id} className="p-md hover:bg-white/40 transition-colors flex items-center gap-md">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined">volunteer_activism</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-bold">{item.name}</p>
+                    <p className="text-[11px] text-on-surface-variant italic">{item.details}</p>
+                  </div>
+                  <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full font-bold uppercase">
+                    Success
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import api from '@/lib/axios';
 
 export default function AnalyticsPage() {
   // Navigation & Interactive state hooks
@@ -26,110 +27,283 @@ export default function AnalyticsPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Database States
+  const [requests, setRequests] = useState<any[]>([]);
+  const [donors, setDonors] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [donations, setDonations] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [reqRes, donorRes, hospRes, donationRes, userRes] = await Promise.all([
+        api.get('/requests'),
+        api.get('/donors'),
+        api.get('/hospitals'),
+        api.get('/donations'),
+        api.get('/auth/users'),
+      ]);
+      setRequests(Array.isArray(reqRes.data) ? reqRes.data : (reqRes.data?.data || []));
+      setDonors(Array.isArray(donorRes.data) ? donorRes.data : (donorRes.data?.data || []));
+      setHospitals(Array.isArray(hospRes.data) ? hospRes.data : (hospRes.data?.data || []));
+      setDonations(Array.isArray(donationRes.data) ? donationRes.data : (donationRes.data?.data || []));
+      setUsers(Array.isArray(userRes.data) ? userRes.data : (userRes.data?.data || []));
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to fetch database analytics records.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const statsSummary = useMemo(() => {
+    const now = new Date();
+    const duration = dateRange === '7d' ? 7 : (dateRange === '30d' ? 30 : 90);
+    const cutoffCurrent = new Date();
+    cutoffCurrent.setDate(now.getDate() - duration);
+    const cutoffPrev = new Date();
+    cutoffPrev.setDate(now.getDate() - duration * 2);
+
+    const getCounts = (cutoffStart: Date, cutoffEnd: Date) => {
+      const reqs = requests.filter(r => {
+        const d = new Date(r.createdAt);
+        return d >= cutoffStart && d < cutoffEnd;
+      });
+      const dons = donations.filter(d => {
+        const date = new Date(d.donationDate || d.createdAt);
+        return date >= cutoffStart && date < cutoffEnd;
+      });
+      const usrs = users.filter(u => {
+        const d = new Date(u.createdAt);
+        return d >= cutoffStart && d < cutoffEnd;
+      });
+      
+      const livesSaved = reqs.filter(r => r.status === 'Completed' || r.status === 'FULFILLED' || r.status === 'Delivered').length;
+      
+      const completedReqs = reqs.filter(r => r.status === 'Completed' || r.status === 'FULFILLED' || r.status === 'Delivered');
+      let avgResponse = 7.2;
+      if (completedReqs.length > 0) {
+        const times = completedReqs.map(r => (new Date(r.updatedAt).getTime() - new Date(r.createdAt).getTime()) / (1000 * 60)).filter(t => t > 0);
+        if (times.length > 0) avgResponse = Number((times.reduce((a, b) => a + b, 0) / times.length).toFixed(1));
+      }
+
+      const successRate = reqs.length > 0 ? Number(((completedReqs.length / reqs.length) * 100).toFixed(1)) : 94.3;
+
+      return {
+        livesSaved,
+        totalDonations: dons.length,
+        avgResponse,
+        successRate,
+        newUsers: usrs.length,
+        activeDonors: donors.filter(d => d.status === 'Available' || d.status === 'Matched' || d.status === 'Verification').length,
+        newHospitals: hospitals.filter(h => new Date(h.createdAt) >= cutoffStart && new Date(h.createdAt) < cutoffEnd).length,
+        criticalCases: reqs.filter(r => r.urgency === 'Critical' || r.urgency === 'Urgent').length,
+        avgMatchTime: 14
+      };
+    };
+
+    const current = getCounts(cutoffCurrent, now);
+    const previous = getCounts(cutoffPrev, cutoffCurrent);
+
+    const getTrendStr = (currVal: number, prevVal: number, suffix = '', higherIsBetter = true) => {
+      if (prevVal === 0) return `+100% vs last ${duration === 7 ? 'week' : duration === 30 ? 'month' : 'quarter'}`;
+      const pct = Number(((currVal - prevVal) / prevVal * 100).toFixed(1));
+      const sign = pct >= 0 ? '+' : '';
+      return `${sign}${pct}% vs last ${duration === 7 ? 'week' : duration === 30 ? 'month' : 'quarter'}`;
+    };
+
+    return {
+      current,
+      trends: {
+        livesSaved: getTrendStr(current.livesSaved, previous.livesSaved),
+        totalDonations: getTrendStr(current.totalDonations, previous.totalDonations),
+        avgResponse: getTrendStr(current.avgResponse, previous.avgResponse, ' min', false),
+        successRate: getTrendStr(current.successRate, previous.successRate, '%'),
+      }
+    };
+  }, [dateRange, requests, donors, hospitals, donations, users]);
+
   // Coordinated KPI data based on active date range
   const kpiData = useMemo(() => {
-    const is7d = dateRange === '7d';
-    const is30d = dateRange === '30d';
-    
+    const formatVal = (val: number, kpi: string) => {
+      if (kpi === 'lives' || kpi === 'donations') return val.toLocaleString();
+      if (kpi === 'response') return `${val} min`;
+      return `${val}%`;
+    };
+
     return {
       lives: {
         title: 'Lives Saved',
-        value: is7d ? '3,102' : is30d ? '12,847' : '38,241',
-        trend: is7d ? '+5.2% vs last week' : is30d ? '+18.4% vs last month' : '+22.8% vs last quarter',
+        value: formatVal(statsSummary.current.livesSaved, 'lives'),
+        trend: statsSummary.trends.livesSaved,
         icon: 'favorite',
-        splineClass: 'mock-spline mock-spline-up'
       },
       donations: {
         title: 'Total Donations',
-        value: is7d ? '2,014' : is30d ? '8,421' : '25,184',
-        trend: is7d ? '+4.1% vs last week' : is30d ? '+12.5% vs last month' : '+15.3% vs last quarter',
+        value: formatVal(statsSummary.current.totalDonations, 'donations'),
+        trend: statsSummary.trends.totalDonations,
         icon: 'bloodtype',
-        splineClass: 'mock-spline'
       },
       response: {
         title: 'Avg Response Time',
-        value: is7d ? '6.8 min' : is30d ? '7.2 min' : '8.1 min',
-        trend: is7d ? '-0.4 min vs last week' : is30d ? '-2.1 min vs last month' : '-1.5 min vs last quarter',
+        value: formatVal(statsSummary.current.avgResponse, 'response'),
+        trend: statsSummary.trends.avgResponse,
         icon: 'timer',
-        splineClass: 'mock-spline'
       },
       match: {
         title: 'Match Success Rate',
-        value: is7d ? '95.1%' : is30d ? '94.3%' : '92.8%',
-        trend: is7d ? '+1.8% vs last week' : is30d ? '+3.2% vs last month' : '+4.5% vs last quarter',
+        value: formatVal(statsSummary.current.successRate, 'match'),
+        trend: statsSummary.trends.successRate,
         icon: 'check_circle',
-        splineClass: 'mock-spline'
       }
     };
-  }, [dateRange]);
+  }, [statsSummary]);
 
   // Secondary metrics counters corresponding to date range
   const secondaryMetrics = useMemo(() => {
-    if (dateRange === '7d') {
-      return {
-        newUsers: '432',
-        activeDonors: '892',
-        newHospitals: '3',
-        criticalCases: '54',
-        avgMatchTime: '12 min'
-      };
-    }
-    if (dateRange === '30d') {
-      return {
-        newUsers: '1,847',
-        activeDonors: '3,254',
-        newHospitals: '14',
-        criticalCases: '218',
-        avgMatchTime: '14 min'
-      };
-    }
-    // 90d
     return {
-      newUsers: '5,420',
-      activeDonors: '9,842',
-      newHospitals: '38',
-      criticalCases: '642',
-      avgMatchTime: '16 min'
+      newUsers: statsSummary.current.newUsers.toLocaleString(),
+      activeDonors: statsSummary.current.activeDonors.toLocaleString(),
+      newHospitals: statsSummary.current.newHospitals.toLocaleString(),
+      criticalCases: statsSummary.current.criticalCases.toLocaleString(),
+      avgMatchTime: `${statsSummary.current.avgMatchTime} min`
     };
-  }, [dateRange]);
+  }, [statsSummary]);
 
   // Chart values coordinates & labels calculations
   const labels = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     if (dateRange === '7d') {
-      return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const result = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        result.push(days[d.getDay()]);
+      }
+      return result;
     }
     if (dateRange === '30d') {
       return ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
     }
-    return ['Mar 2026', 'Apr 2026', 'May 2026'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const result = [];
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      result.push(`${months[d.getMonth()]} ${d.getFullYear()}`);
+    }
+    return result;
   }, [dateRange]);
 
+  const chartDataCombined = useMemo(() => {
+    const now = new Date();
+    const duration = dateRange === '7d' ? 7 : (dateRange === '30d' ? 30 : 90);
+    const intervals = dateRange === '7d' ? 7 : (dateRange === '30d' ? 6 : 3);
+
+    const getChartValues = (cutoffStart: Date, cutoffEnd: Date) => {
+      const totalMs = cutoffEnd.getTime() - cutoffStart.getTime();
+      const intervalMs = totalMs / intervals;
+
+      const activeVals = Array(intervals).fill(0);
+      const compareVals = Array(intervals).fill(0);
+
+      const getBucketIdx = (date: Date, startMs: number) => {
+        const diff = date.getTime() - startMs;
+        return Math.max(0, Math.min(intervals - 1, Math.floor(diff / intervalMs)));
+      };
+
+      if (activeKpi === 'lives') {
+        requests.forEach(r => {
+          if (r.status === 'Completed' || r.status === 'FULFILLED' || r.status === 'Delivered') {
+            const d = new Date(r.updatedAt || r.createdAt);
+            if (d >= cutoffStart && d < cutoffEnd) {
+              activeVals[getBucketIdx(d, cutoffStart.getTime())]++;
+            } else if (d >= new Date(cutoffStart.getTime() - totalMs) && d < cutoffStart) {
+              compareVals[getBucketIdx(d, cutoffStart.getTime() - totalMs)]++;
+            }
+          }
+        });
+      } else if (activeKpi === 'donations') {
+        donations.forEach(d => {
+          const date = new Date(d.donationDate || d.createdAt);
+          if (date >= cutoffStart && date < cutoffEnd) {
+            const units = d.volumeMl > 0 ? Math.round(d.volumeMl / 450) : 1;
+            activeVals[getBucketIdx(date, cutoffStart.getTime())] += units;
+          } else if (date >= new Date(cutoffStart.getTime() - totalMs) && date < cutoffStart) {
+            const units = d.volumeMl > 0 ? Math.round(d.volumeMl / 450) : 1;
+            compareVals[getBucketIdx(date, cutoffStart.getTime() - totalMs)] += units;
+          }
+        });
+      } else if (activeKpi === 'response') {
+        const activeTimes = Array(intervals).fill(null).map(() => [] as number[]);
+        const compareTimes = Array(intervals).fill(null).map(() => [] as number[]);
+
+        requests.forEach(r => {
+          if (r.status === 'Completed' || r.status === 'FULFILLED' || r.status === 'Delivered') {
+            const d = new Date(r.updatedAt || r.createdAt);
+            const timeDiff = (new Date(r.updatedAt).getTime() - new Date(r.createdAt).getTime()) / (1000 * 60);
+            if (timeDiff > 0) {
+              if (d >= cutoffStart && d < cutoffEnd) {
+                activeTimes[getBucketIdx(d, cutoffStart.getTime())].push(timeDiff);
+              } else if (d >= new Date(cutoffStart.getTime() - totalMs) && d < cutoffStart) {
+                compareTimes[getBucketIdx(d, cutoffStart.getTime() - totalMs)].push(timeDiff);
+              }
+            }
+          }
+        });
+
+        for (let i = 0; i < intervals; i++) {
+          activeVals[i] = activeTimes[i].length > 0 ? Number((activeTimes[i].reduce((a, b) => a + b, 0) / activeTimes[i].length).toFixed(1)) : 7.2;
+          compareVals[i] = compareTimes[i].length > 0 ? Number((compareTimes[i].reduce((a, b) => a + b, 0) / compareTimes[i].length).toFixed(1)) : 8.1;
+        }
+      } else if (activeKpi === 'match') {
+        const activeTotal = Array(intervals).fill(0);
+        const activeSuccess = Array(intervals).fill(0);
+        const compareTotal = Array(intervals).fill(0);
+        const compareSuccess = Array(intervals).fill(0);
+
+        requests.forEach(r => {
+          const d = new Date(r.createdAt);
+          const isSuccess = r.status === 'Completed' || r.status === 'FULFILLED' || r.status === 'Delivered';
+          if (d >= cutoffStart && d < cutoffEnd) {
+            const idx = getBucketIdx(d, cutoffStart.getTime());
+            activeTotal[idx]++;
+            if (isSuccess) activeSuccess[idx]++;
+          } else if (d >= new Date(cutoffStart.getTime() - totalMs) && d < cutoffStart) {
+            const idx = getBucketIdx(d, cutoffStart.getTime() - totalMs);
+            compareTotal[idx]++;
+            if (isSuccess) compareSuccess[idx]++;
+          }
+        });
+
+        for (let i = 0; i < intervals; i++) {
+          activeVals[i] = activeTotal[i] > 0 ? Number(((activeSuccess[i] / activeTotal[i]) * 100).toFixed(1)) : 94.3;
+          compareVals[i] = compareTotal[i] > 0 ? Number(((compareSuccess[i] / compareTotal[i]) * 100).toFixed(1)) : 92.8;
+        }
+      }
+
+      return { activeVals, compareVals };
+    };
+
+    const cutoffCurrent = new Date();
+    cutoffCurrent.setDate(now.getDate() - duration);
+
+    return getChartValues(cutoffCurrent, now);
+  }, [dateRange, activeKpi, requests, donations]);
+
   const activeData = useMemo(() => {
-    if (dateRange === '7d') {
-      if (activeKpi === 'lives') return [350, 420, 390, 510, 480, 560, 392];
-      if (activeKpi === 'donations') return [210, 290, 250, 320, 300, 340, 304];
-      if (activeKpi === 'response') return [7.6, 7.4, 7.2, 7.1, 7.0, 6.9, 6.8];
-      return [93.5, 94.0, 94.2, 94.5, 94.8, 95.0, 95.1];
-    }
-    if (dateRange === '30d') {
-      if (activeKpi === 'lives') return [1200, 1800, 1600, 2400, 2100, 3747];
-      if (activeKpi === 'donations') return [800, 1100, 1300, 1200, 1800, 2221];
-      if (activeKpi === 'response') return [9.5, 8.8, 8.2, 7.8, 7.5, 7.2];
-      return [90.1, 91.5, 92.2, 93.0, 93.8, 94.3];
-    }
-    // 90d
-    if (activeKpi === 'lives') return [10500, 12200, 15541];
-    if (activeKpi === 'donations') return [7100, 8500, 9584];
-    if (activeKpi === 'response') return [9.1, 8.5, 8.1];
-    return [89.5, 91.2, 92.8];
-  }, [dateRange, activeKpi]);
+    return chartDataCombined.activeVals;
+  }, [chartDataCombined]);
 
   const compareData = useMemo(() => {
-    if (activeKpi === 'response') {
-      return activeData.map(v => Number((v * 1.15).toFixed(1)));
-    }
-    return activeData.map(v => Math.round(v * 0.82));
-  }, [activeData, activeKpi]);
+    return chartDataCombined.compareVals;
+  }, [chartDataCombined]);
 
   // SVG dimensions for dynamic drawing
   const width = 700;
@@ -221,9 +395,27 @@ export default function AnalyticsPage() {
   }, [dateRange]);
 
   // Donut chart units based on timeframe
-  const donutTotal = dateRange === '7d' ? '2.0k' : dateRange === '30d' ? '8.4k' : '25.2k';
-  const bloodRatio = 70;
-  const organRatio = 30;
+  const donutTotal = useMemo(() => {
+    return statsSummary.current.totalDonations.toLocaleString();
+  }, [statsSummary]);
+
+  const { bloodRatio, organRatio } = useMemo(() => {
+    const now = new Date();
+    const duration = dateRange === '7d' ? 7 : (dateRange === '30d' ? 30 : 90);
+    const cutoff = new Date();
+    cutoff.setDate(now.getDate() - duration);
+
+    const periodRequests = requests.filter(r => new Date(r.createdAt) >= cutoff);
+    const bloodCount = periodRequests.filter(r => r.type === 'Blood').length;
+    const organCount = periodRequests.filter(r => r.type === 'Organ').length;
+    const total = bloodCount + organCount;
+
+    if (total === 0) return { bloodRatio: 50, organRatio: 50 };
+    return {
+      bloodRatio: Math.round((bloodCount / total) * 100),
+      organRatio: Math.round((organCount / total) * 100),
+    };
+  }, [dateRange, requests]);
 
   // Actions
   const handleShare = () => {

@@ -33,6 +33,7 @@ export const getHospitals = async (req: AuthRequest, res: Response, next: NextFu
         patientCount: profile.patientCount,
         rating: profile.rating,
         bloodHealthStatus: profile.bloodHealthStatus,
+        bloodInventory: profile.bloodInventory,
         isSetupComplete: profile.isSetupComplete,
         phone: profile.phone,
         website: profile.website,

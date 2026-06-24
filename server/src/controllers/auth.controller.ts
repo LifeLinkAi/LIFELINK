@@ -387,3 +387,12 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     next(error);
   }
 };
+
+export const getUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: users });
+  } catch (error) {
+    next(error);
+  }
+};
