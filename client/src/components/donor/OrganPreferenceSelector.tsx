@@ -136,6 +136,7 @@ interface OrganPreferenceSelectorProps {
   selected: string[];
   onChange: (updated: string[]) => void;
   disabled?: boolean;
+  disabledOrgans?: string[];
 }
 
 /**
@@ -143,9 +144,9 @@ interface OrganPreferenceSelectorProps {
  * Enforces single-organ selection (radio button behavior).
  * Displays clinical details and prerequisites for the selected organ in a dropdown card.
  */
-export function OrganPreferenceSelector({ selected, onChange, disabled = false }: OrganPreferenceSelectorProps) {
+export function OrganPreferenceSelector({ selected, onChange, disabled = false, disabledOrgans = [] }: OrganPreferenceSelectorProps) {
   const toggle = (organ: string) => {
-    if (disabled) return;
+    if (disabled || disabledOrgans.includes(organ)) return;
     // Enforce single-organ selection: if already selected, deselect it; otherwise, select only this one.
     onChange(selected.includes(organ) ? [] : [organ]);
   };
@@ -158,23 +159,31 @@ export function OrganPreferenceSelector({ selected, onChange, disabled = false }
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ORGAN_OPTIONS.map((organ) => {
           const isSelected = selected.includes(organ);
+          const isDonated = disabledOrgans.includes(organ);
           return (
             <button
               key={organ}
               type="button"
-              disabled={disabled}
+              disabled={disabled || isDonated}
               onClick={() => toggle(organ)}
               className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left transition-all duration-150 text-sm font-semibold
                 ${isSelected
                   ? "bg-[#eef4e2] border-[#3b5e2b] text-[#3b5e2b] shadow-sm"
-                  : "bg-white border-gray-200 text-gray-600 hover:border-[#a5d84a] hover:bg-[#f8fbf4]"
+                  : isDonated
+                    ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-[#a5d84a] hover:bg-[#f8fbf4]"
                 }
-                ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                ${(disabled || isDonated) ? "cursor-not-allowed" : "cursor-pointer"}`}
             >
-              <span className={`shrink-0 ${isSelected ? "text-[#3b5e2b]" : "text-gray-400"}`}>
+              <span className={`shrink-0 ${isSelected ? "text-[#3b5e2b]" : isDonated ? "text-slate-300" : "text-gray-400"}`}>
                 {ORGAN_ICONS[organ]}
               </span>
               <span className="leading-tight">{organ}</span>
+              {isDonated && (
+                <span className="ml-auto text-[8px] bg-slate-200 text-slate-600 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90">
+                  Donated
+                </span>
+              )}
               {isSelected && (
                 <svg className="ml-auto shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b5e2b" strokeWidth="3">
                   <polyline points="20 6 9 17 4 12" />

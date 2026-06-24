@@ -119,8 +119,14 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
         };
 
         const waitlistedPatients = await OrganWaitlist.find(waitlistFilter)
-          .populate('hospitalId', 'name')
+          .populate('hospitalId', 'name email')
           .sort({ createdAt: -1 });
+
+        const hospitalUserIds = waitlistedPatients
+          .map(p => (p.hospitalId as any)?._id || p.hospitalId)
+          .filter(Boolean);
+
+        const hospitalProfiles = await HospitalProfile.find({ userId: { $in: hospitalUserIds } });
 
         const waitlistIds = waitlistedPatients.map(p => p._id);
 
@@ -130,6 +136,8 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
         const mapped = waitlistedPatients.map(p => {
           const patientObj = p.toObject();
           const matchingReq = existingRequests.find(r => r.waitlistId?.toString() === patientObj._id.toString());
+          const hospProfile = hospitalProfiles.find(hp => hp.userId?.toString() === ((patientObj.hospitalId as any)?._id || patientObj.hospitalId)?.toString());
+          const hospitalPhone = hospProfile?.phone || hospProfile?.contactPerson?.phone || '';
           
           return {
             id: patientObj._id.toString(),
@@ -143,6 +151,7 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
             urgency: patientObj.urgency,
             status: patientObj.status,
             facility: (patientObj.hospitalId as any)?.name || 'Coordinating Medical Center',
+            hospitalPhone: hospitalPhone || null,
             notes: patientObj.medicalHistory || patientObj.comorbidities || '',
             medicalCertificateUrl: patientObj.medicalCertificateUrl || null,
             medicalHistory: patientObj.medicalHistory || null,

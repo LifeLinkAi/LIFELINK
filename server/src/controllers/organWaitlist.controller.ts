@@ -2,10 +2,19 @@ import { Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import { OrganWaitlist } from '../models/OrganWaitlist';
 import { Request as DonationRequest } from '../models/Request';
+import { DonorProfile } from '../models/DonorProfile';
+import { User } from '../models/User';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { logger } from '../utils/logger';
+import {
+  sendClinicalTestingNotification,
+  sendClinicalTestingFailedNotification,
+  sendLegalDeedReadyNotification,
+  sendSurgeryScheduledNotification,
+  sendTransplantOutcomeNotification
+} from '../services/notifications/email.service';
 
 // ==========================================
 // UNIVERSAL HELPERS
@@ -398,6 +407,28 @@ export const evaluateOrganMatch = async (
     sanitizeGeoJSON(requestDoc);
     await requestDoc.save();
 
+    // Trigger donor email notification when match is approved for clinical testing
+    if (action === 'APPROVE_FOR_TESTING' && requestDoc.acceptedDonorId) {
+      try {
+        const profile = await DonorProfile.findById(requestDoc.acceptedDonorId).populate('userId');
+        if (profile && profile.userId) {
+          const user = profile.userId as any;
+          if (user.email) {
+            const testDateStr = new Date(scheduledTestDate!).toLocaleDateString(undefined, { dateStyle: 'long' });
+            await sendClinicalTestingNotification(
+              user.email,
+              user.name || 'Donor',
+              testDateStr,
+              testingFacility || 'Coordinating Hospital',
+              donorInstructions || ''
+            );
+          }
+        }
+      } catch (mailErr: any) {
+        logger.error(`Failed to send clinical test schedule email to donor: ${mailErr.message}`);
+      }
+    }
+
     logger.info(`[evaluateOrganMatch] Request ${requestId} → ${action} by hospital ${req.user.id}`);
 
     res.status(200).json({
@@ -542,6 +573,7 @@ export const submitClinicalEvaluation = async (
       return next(new ApiError(404, 'Match not found, not in testing, or not owned by this hospital.'));
     }
 
+    const originalAcceptedDonorId = requestDoc.acceptedDonorId;
     const now = new Date();
 
     // Save evaluation block
@@ -594,6 +626,33 @@ export const submitClinicalEvaluation = async (
 
     sanitizeGeoJSON(requestDoc);
     await requestDoc.save();
+
+    // Trigger email notifications based on clinical decision
+    if (originalAcceptedDonorId) {
+      try {
+        const profile = await DonorProfile.findById(originalAcceptedDonorId).populate('userId');
+        if (profile && profile.userId) {
+          const user = profile.userId as any;
+          if (user.email) {
+            if (decision === 'APPROVE_SURGERY') {
+              await sendLegalDeedReadyNotification(
+                user.email,
+                user.name || 'Donor',
+                requestDoc.organType || 'Unknown'
+              );
+            } else if (decision === 'FAIL_CLINICAL_MATCH') {
+              await sendClinicalTestingFailedNotification(
+                user.email,
+                user.name || 'Donor',
+                requestDoc.organType || 'Unknown'
+              );
+            }
+          }
+        }
+      } catch (mailErr: any) {
+        logger.error(`Failed to send clinical testing decision email: ${mailErr.message}`);
+      }
+    }
 
     logger.info(`[submitClinicalEvaluation] Request ${requestId} → ${decision} by hospital ${req.user.id}`);
 
@@ -679,6 +738,7 @@ export const getPendingLegalMatches = async (
           }
         : null,
       clinicalEvaluation: m.clinicalEvaluation,
+      legalAgreement: m.legalAgreement,
     }));
 
     logger.info(`[getPendingLegalMatches] ${mapped.length} matches found for hospital ${req.user.id}`);
@@ -705,14 +765,13 @@ export const submitLegalConsent = async (
     }
 
     const { requestId } = req.params;
-    const { signatures, surgeryDetails } = req.body;
-
-    if (!signatures || !signatures.donor || !signatures.recipient || !signatures.hospitalRep || !signatures.ethicsCommittee) {
-      return next(new ApiError(400, 'Cannot approve surgery: all 4 signatures are required.'));
-    }
-    if (!surgeryDetails || !surgeryDetails.date || !surgeryDetails.operatingRoom || !surgeryDetails.leadSurgeon) {
-      return next(new ApiError(400, 'Cannot approve surgery: surgery details are incomplete.'));
-    }
+    const { 
+      recipientSignatureName, 
+      recipientSignatureData, 
+      hospitalSignatureName,
+      ethicsCommitteeCleared,
+      surgeryDetails 
+    } = req.body;
 
     const requestDoc = await DonationRequest.findOne({
       _id: new Types.ObjectId(requestId),
@@ -725,28 +784,82 @@ export const submitLegalConsent = async (
       return next(new ApiError(404, 'Match not found, not pending legal approval, or not owned by this hospital.'));
     }
 
+    // Verify donor signature exists in DB
+    if (!requestDoc.legalAgreement || !requestDoc.legalAgreement.donorSigned) {
+      return next(new ApiError(400, 'Cannot approve: Donor has not yet signed the legal consent deed.'));
+    }
+
+    if (!recipientSignatureName || !recipientSignatureData) {
+      return next(new ApiError(400, 'Recipient signature name and signature data are required.'));
+    }
+
+    if (!hospitalSignatureName) {
+      return next(new ApiError(400, 'Hospital Representative signature name is required.'));
+    }
+
+    if (!ethicsCommitteeCleared) {
+      return next(new ApiError(400, 'Ethics committee clearance must be checked.'));
+    }
+
+    if (!surgeryDetails || !surgeryDetails.date || !surgeryDetails.operatingRoom || !surgeryDetails.leadSurgeon) {
+      return next(new ApiError(400, 'Cannot schedule surgery: surgery details are incomplete.'));
+    }
+
     const now = new Date();
 
-    if (!requestDoc.timeline) requestDoc.timeline = [];
+    // Save signatures to legalAgreement
+    requestDoc.legalAgreement = {
+      donorSigned: true,
+      donorSignatureName: requestDoc.legalAgreement.donorSignatureName,
+      donorSignatureDate: requestDoc.legalAgreement.donorSignatureDate,
+      donorSignatureData: requestDoc.legalAgreement.donorSignatureData,
+      
+      recipientSigned: true,
+      recipientSignatureName,
+      recipientSignatureDate: now,
+      recipientSignatureData,
+      
+      hospitalSigned: true,
+      hospitalSignatureName,
+      hospitalSignedAt: now,
+      
+      ethicsCommitteeCleared: true,
+      ethicsCommitteeClearedAt: now,
+    };
 
     requestDoc.status = 'TRANSPLANT_SCHEDULED';
+    if (!requestDoc.timeline) requestDoc.timeline = [];
     requestDoc.timeline.push({ event: 'legal_clearance_granted', timestamp: now });
     requestDoc.timeline.push({ event: 'transplant_scheduled', timestamp: now });
-    
-    // We optionally save surgery details and signatures somewhere if our schema supports it,
-    // or just into timeline / notes. Since we don't have a specific field for it on Request,
-    // we'll append it to notes for audit purposes if needed, but the primary task is the state transition.
-    
-    // Sanitize location if needed
-    if (requestDoc.location != null) {
-      const coords = (requestDoc.location as any).coordinates;
-      if (!Array.isArray(coords) || coords.length < 2) {
-        requestDoc.location = undefined as any;
-      }
-    }
+
+    // Store surgery details in notes block for easy auditing
+    requestDoc.notes = `Scheduled: OR: ${surgeryDetails.operatingRoom}, Surgeon: ${surgeryDetails.leadSurgeon}. ${requestDoc.notes || ''}`;
 
     sanitizeGeoJSON(requestDoc);
     await requestDoc.save();
+
+    // Trigger surgery scheduled email notification to donor
+    if (requestDoc.acceptedDonorId) {
+      try {
+        const profile = await DonorProfile.findById(requestDoc.acceptedDonorId).populate('userId');
+        if (profile && profile.userId) {
+          const user = profile.userId as any;
+          if (user.email) {
+            const dateStr = new Date(surgeryDetails.date).toLocaleDateString(undefined, { dateStyle: 'long' });
+            await sendSurgeryScheduledNotification(
+              user.email,
+              user.name || 'Donor',
+              requestDoc.organType || 'Unknown',
+              dateStr,
+              surgeryDetails.leadSurgeon || 'Transplant Surgeon',
+              surgeryDetails.operatingRoom || 'Main OR Suite'
+            );
+          }
+        }
+      } catch (mailErr: any) {
+        logger.error(`Failed to send surgery scheduled email to donor: ${mailErr.message}`);
+      }
+    }
 
     if (requestDoc.waitlistId) {
       await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
@@ -759,6 +872,7 @@ export const submitLegalConsent = async (
     res.status(200).json({
       success: true,
       message: 'Legal consent granted. Transplant successfully scheduled.',
+      data: requestDoc,
     });
   } catch (error: any) {
     logger.error(`[submitLegalConsent] ${error.message}`);
@@ -871,6 +985,8 @@ export const updateSurgeryStatus = async (
       return next(new ApiError(404, 'Match not found'));
     }
 
+    const originalAcceptedDonorId = requestDoc.acceptedDonorId;
+
     if (action === 'COMMENCE_SURGERY') {
       if (requestDoc.status !== 'TRANSPLANT_SCHEDULED') {
         return next(new ApiError(400, 'Cannot commence surgery unless transplant is scheduled.'));
@@ -910,12 +1026,39 @@ export const updateSurgeryStatus = async (
         sanitizeGeoJSON(requestDoc);
         await requestDoc.save();
 
+        if (originalAcceptedDonorId) {
+          try {
+            const profile = await DonorProfile.findById(originalAcceptedDonorId).populate('userId');
+            if (profile && profile.userId) {
+              const user = profile.userId as any;
+              if (user.email) {
+                await sendTransplantOutcomeNotification(user.email, user.name || 'Donor', requestDoc.organType || 'Unknown', true);
+              }
+            }
+          } catch (mailErr: any) {
+            logger.error(`Failed to send successful transplant outcome email to donor: ${mailErr.message}`);
+          }
+        }
+
         if (requestDoc.waitlistId) {
           await OrganWaitlist.findByIdAndUpdate(requestDoc.waitlistId, {
             $set: { status: 'Completed' },
           });
         }
       } else {
+        if (originalAcceptedDonorId) {
+          try {
+            const profile = await DonorProfile.findById(originalAcceptedDonorId).populate('userId');
+            if (profile && profile.userId) {
+              const user = profile.userId as any;
+              if (user.email) {
+                await sendTransplantOutcomeNotification(user.email, user.name || 'Donor', requestDoc.organType || 'Unknown', false);
+              }
+            }
+          } catch (mailErr: any) {
+            logger.error(`Failed to send failed transplant outcome email to donor: ${mailErr.message}`);
+          }
+        }
         requestDoc.timeline?.push({ event: 'transplant_surgery_failed', timestamp: new Date() });
         (requestDoc as any).acceptedDonorId = null; // Sever the lock
         sanitizeGeoJSON(requestDoc);

@@ -24,6 +24,7 @@ export interface IRequest extends Document {
   unitsFulfilled?: number;
   urgency: string;
   status: string;
+  acceptedDonorId?: Schema.Types.ObjectId | null;
   matchPercentage?: number;
   registeredDate: Date;
   distance?: string;
@@ -63,6 +64,21 @@ export interface IRequest extends Document {
     unitsRequested: number;
     unitsFulfilled: number;
     fulfilledBagIds: Schema.Types.ObjectId[];
+  };
+  legalAgreement?: {
+    donorSigned: boolean;
+    donorSignatureName?: string;
+    donorSignatureDate?: Date;
+    donorSignatureData?: string;
+    recipientSigned: boolean;
+    recipientSignatureName?: string;
+    recipientSignatureDate?: Date;
+    recipientSignatureData?: string;
+    hospitalSigned: boolean;
+    hospitalSignatureName?: string;
+    hospitalSignedAt?: Date;
+    ethicsCommitteeCleared: boolean;
+    ethicsCommitteeClearedAt?: Date;
   };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
@@ -211,6 +227,11 @@ const requestSchema = new Schema<IRequest>(
       ref: 'DonorProfile',
       default: null,
     },
+    acceptedDonorId: { // RESTORED FIELD
+      type: Schema.Types.ObjectId,
+      ref: 'DonorProfile',
+      default: null,
+    } as any,
     targetDonorId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -267,7 +288,7 @@ const requestSchema = new Schema<IRequest>(
       complications: { type: String },
       patientDischargeDate: { type: Date }
     },
-    bloodLogistics: {
+bloodLogistics: {
       componentType: { 
         type: String, 
         enum: ['WHOLE_BLOOD', 'RBC', 'PLASMA', 'PLATELETS'],
@@ -276,6 +297,21 @@ const requestSchema = new Schema<IRequest>(
       unitsRequested: { type: Number, min: 1 },
       unitsFulfilled: { type: Number, default: 0 },
       fulfilledBagIds: [{ type: Schema.Types.ObjectId, ref: 'BloodBag' }]
+    },
+    legalAgreement: {
+      donorSigned: { type: Boolean, default: false },
+      donorSignatureName: { type: String },
+      donorSignatureDate: { type: Date },
+      donorSignatureData: { type: String },
+      recipientSigned: { type: Boolean, default: false },
+      recipientSignatureName: { type: String },
+      recipientSignatureDate: { type: Date },
+      recipientSignatureData: { type: String },
+      hospitalSigned: { type: Boolean, default: false },
+      hospitalSignatureName: { type: String },
+      hospitalSignedAt: { type: Date },
+      ethicsCommitteeCleared: { type: Boolean, default: false },
+      ethicsCommitteeClearedAt: { type: Date }
     },
     donorName: {
       type: String,
@@ -318,8 +354,8 @@ const requestSchema = new Schema<IRequest>(
 requestSchema.index({ userId: 1, createdAt: -1 });
 requestSchema.index({ status: 1 });
 requestSchema.index({ notifiedDonors: 1 });
-requestSchema.index({ 'matchedDonors.inviteToken': 1 });
-requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
+// requestSchema.index({ 'matchedDonors.inviteToken': 1 });
+// requestSchema.index({ 'matchedDonors.tokenExpiresAt': 1 });
 requestSchema.index({ location: '2dsphere' });
 
 export const Request = model<IRequest>('Request', requestSchema);

@@ -86,6 +86,10 @@ const donorProfileSchema = new Schema(
       type: Date,
       default: null,
     },
+    sentWellnessReminders: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

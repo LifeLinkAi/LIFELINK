@@ -6,6 +6,9 @@ import { DonorProfile } from '../models/DonorProfile';
 import { OrganWaitlist } from '../models/OrganWaitlist';
 import { Request as DonationRequest } from '../models/Request';
 import { User } from '../models/User';
+import { HospitalProfile } from '../models/HospitalProfile';
+import { sendHospitalLegalReviewNotification } from '../services/notifications/email.service';
+import { logger } from '../utils/logger';
 
 /**
  * @desc    Upsert donor organ profile (Intake)
@@ -24,12 +27,40 @@ export const updateDonorOrganProfile = async (
 
     const { organSelection, bloodGroup, healthChecklist, medicalCertificateUrl } = req.body;
 
+    const profile = await DonorProfile.findOne({ userId: new Types.ObjectId(req.user.id) });
+    if (profile) {
+      const completedRequests = await DonationRequest.find({
+        acceptedDonorId: profile._id,
+        status: 'TRANSPLANT_SUCCESSFUL',
+        type: 'Organ'
+      });
+
+      const now = new Date();
+      const twoYearsAgo = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+      const recentlyCompleted = completedRequests.find(r => {
+        const completionDate = r.surgicalOutcome?.surgeryCompletedAt || r.updatedAt;
+        return completionDate > twoYearsAgo;
+      });
+
+      if (recentlyCompleted) {
+        const completionDate = recentlyCompleted.surgicalOutcome?.surgeryCompletedAt || recentlyCompleted.updatedAt;
+        const cooldownEnd = new Date(completionDate.getTime() + 2 * 365 * 24 * 60 * 60 * 1000);
+        const remainingDays = Math.ceil((cooldownEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+        return next(new ApiError(400, `You are in a 2-year cooldown period after your last donation. Remaining days: ${remainingDays}.`));
+      }
+
+      const donatedOrgans = completedRequests.map(r => r.organType);
+      if (organSelection && donatedOrgans.includes(organSelection)) {
+        return next(new ApiError(400, `You have already donated a ${organSelection} and cannot donate the same organ type again.`));
+      }
+    }
+
     const detailsObj = {
       healthChecklist,
       medicalCertificateUrl
     };
 
-    const profile = await DonorProfile.findOneAndUpdate(
+    const updatedProfile = await DonorProfile.findOneAndUpdate(
       { userId: new Types.ObjectId(req.user.id) },
       {
         $set: {
@@ -46,7 +77,7 @@ export const updateDonorOrganProfile = async (
     res.status(200).json({
       success: true,
       message: 'Organ donor profile updated successfully.',
-      data: profile,
+      data: updatedProfile,
     });
   } catch (error: any) {
     next(new ApiError(500, `Failed to update donor organ profile: ${error.message}`));
@@ -114,6 +145,24 @@ export const expressOrganInterest = async (
     
     if (!profile || !user) {
       return next(new ApiError(404, 'Donor profile not found.'));
+    }
+
+    // Cooldown check
+    const completedRequests = await DonationRequest.find({
+      acceptedDonorId: profile._id,
+      status: 'TRANSPLANT_SUCCESSFUL',
+      type: 'Organ'
+    });
+
+    const now = new Date();
+    const twoYearsAgo = new Date(now.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+    const recentlyCompleted = completedRequests.find(r => {
+      const completionDate = r.surgicalOutcome?.surgeryCompletedAt || r.updatedAt;
+      return completionDate > twoYearsAgo;
+    });
+
+    if (recentlyCompleted) {
+      return next(new ApiError(400, 'You are in a 2-year cooldown period following your last organ donation.'));
     }
 
     const existing = await DonationRequest.findOne({
@@ -188,14 +237,136 @@ export const getActiveOrganRequest = async (
       select: 'name email phone address'
     }).populate({
       path: 'waitlistId',
-      select: 'requiredOrgan fullName bloodGroup urgency status'
-    }).lean();
+      select: 'requiredOrgan fullName bloodGroup urgency status medicalCertificateUrl'
+    }).lean() as any;
+
+    if (requestDoc && requestDoc.hospitalId) {
+      const hospProfile = await HospitalProfile.findOne({ userId: requestDoc.hospitalId._id });
+      if (hospProfile) {
+        requestDoc.hospitalId.phone = hospProfile.phone || hospProfile.contactPerson?.phone || '';
+        requestDoc.hospitalId.address = hospProfile.location || hospProfile.city || '';
+      }
+    }
+
+    const completedRequests = await DonationRequest.find({
+      acceptedDonorId: profile._id,
+      status: 'TRANSPLANT_SUCCESSFUL',
+      type: 'Organ'
+    }).populate({
+      path: 'hospitalId',
+      select: 'name email phone address'
+    }).populate({
+      path: 'waitlistId',
+      select: 'requiredOrgan fullName bloodGroup urgency status medicalCertificateUrl'
+    }).sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
       success: true,
       data: requestDoc,
+      pastDonations: completedRequests,
     });
   } catch (error: any) {
     next(new ApiError(500, `Failed to fetch active request: ${error.message}`));
+  }
+};
+
+/**
+ * @desc    Sign active request legal consent deed
+ * @route   POST /api/donor/organ/active-request/sign-legal
+ * @access  Private (Donor)
+ */
+export const signActiveRequestLegal = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Donor') {
+      return next(new ApiError(403, 'Access denied. Donor role required.'));
+    }
+
+    const { signatureName, signatureData } = req.body;
+    if (!signatureName || !signatureData) {
+      return next(new ApiError(400, 'signatureName and signatureData are required.'));
+    }
+
+    const profile = await DonorProfile.findOne({ userId: new Types.ObjectId(req.user.id) });
+    if (!profile) {
+      return next(new ApiError(404, 'Donor profile not found.'));
+    }
+
+    // Find the latest active Organ request for this donor
+    const requestDoc = await DonationRequest.findOne({
+      acceptedDonorId: profile._id,
+      type: 'Organ'
+    }).sort({ createdAt: -1 });
+
+    if (!requestDoc) {
+      return next(new ApiError(404, 'No active request found.'));
+    }
+
+    if (requestDoc.status !== 'PENDING_LEGAL_APPROVAL') {
+      return next(new ApiError(400, 'Request is not in PENDING_LEGAL_APPROVAL state.'));
+    }
+
+    // Update the legal agreement fields for the donor
+    requestDoc.legalAgreement = {
+      donorSigned: true,
+      donorSignatureName: signatureName,
+      donorSignatureDate: new Date(),
+      donorSignatureData: signatureData,
+      recipientSigned: requestDoc.legalAgreement?.recipientSigned || false,
+      recipientSignatureName: requestDoc.legalAgreement?.recipientSignatureName,
+      recipientSignatureDate: requestDoc.legalAgreement?.recipientSignatureDate,
+      recipientSignatureData: requestDoc.legalAgreement?.recipientSignatureData,
+      hospitalSigned: requestDoc.legalAgreement?.hospitalSigned || false,
+      hospitalSignatureName: requestDoc.legalAgreement?.hospitalSignatureName,
+      hospitalSignedAt: requestDoc.legalAgreement?.hospitalSignedAt,
+      ethicsCommitteeCleared: requestDoc.legalAgreement?.ethicsCommitteeCleared || false,
+      ethicsCommitteeClearedAt: requestDoc.legalAgreement?.ethicsCommitteeClearedAt,
+    };
+
+    // Push event to timeline
+    requestDoc.timeline = requestDoc.timeline || [];
+    requestDoc.timeline.push({
+      event: 'donor_signed_legal_agreement',
+      timestamp: new Date()
+    });
+
+    // Sanitize location to avoid MongoServerError on save due to 2dsphere index
+    if (requestDoc.location != null) {
+      const coords = (requestDoc.location as any).coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) {
+        requestDoc.location = undefined as any;
+      }
+    }
+
+    await requestDoc.save();
+
+    // Trigger hospital representative notification when donor signs the legal deed
+    if (requestDoc.hospitalId) {
+      try {
+        const hospitalUser = await User.findById(requestDoc.hospitalId).select('email name');
+        const donorUser = await User.findById(req.user.id).select('name');
+        if (hospitalUser && hospitalUser.email && donorUser) {
+          await sendHospitalLegalReviewNotification(
+            hospitalUser.email,
+            hospitalUser.name || 'Hospital Representative',
+            donorUser.name || 'Living Donor',
+            requestDoc.organType || 'Unknown'
+          );
+        }
+      } catch (mailErr: any) {
+        logger.error(`Failed to send donor legal signature notification to hospital: ${mailErr.message}`);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Legal agreement signed by donor successfully.',
+      data: requestDoc,
+    });
+  } catch (error: any) {
+    next(new ApiError(500, `Failed to sign legal agreement: ${error.message}`));
   }
 };

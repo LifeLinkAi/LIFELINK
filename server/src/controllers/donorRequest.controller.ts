@@ -6,7 +6,7 @@ import { DonationRecord } from '../models/DonationRecord';
 import { User } from '../models/User';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { sendMail, sendDonorRequestNotification } from '../services/notifications/email.service';
+import { sendMail, sendDonorRequestNotification, sendHospitalMatchNotification } from '../services/notifications/email.service';
 import { findBestCompatibleDonorForRequest } from '../services/matching/donor-match.service';
 import { logger } from '../utils/logger';
 
@@ -186,6 +186,24 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       });
 
       await request.save();
+
+      // Trigger Hospital notification when a match is accepted
+      if (request.type === 'Organ' && request.status === 'PENDING_HOSPITAL' && request.hospitalId) {
+        try {
+          const hospitalUser = await User.findById(request.hospitalId).select('email name');
+          if (hospitalUser && hospitalUser.email) {
+            await sendHospitalMatchNotification(
+              hospitalUser.email,
+              hospitalUser.name || request.facility || 'Hospital Representative',
+              donorUser.name,
+              request.organType || 'Unknown',
+              request.bloodGroup
+            );
+          }
+        } catch (mailErr: any) {
+          logger.error(`Failed to send match accepted email to hospital: ${mailErr.message}`);
+        }
+      }
 
       // Create a donation record (Pending until physically completed)
       await DonationRecord.findOneAndUpdate(
