@@ -45,6 +45,21 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     );
   }
 
+  if (!loading && (!isAuthenticated || !user)) {
+    // THE KILL SWITCH: Instantly redirect and return Spinner, NEVER return children.
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#fcfdfa]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 animate-spin" />
+          <p className="font-syne font-semibold text-emerald-800 text-sm tracking-wide">Redirecting to secure login...</p>
+        </div>
+      </div>
+    );
+  }
+
   // If authenticated and role matches, render children
   if (isAuthenticated && (!allowedRoles || (user && allowedRoles.includes(user.role)))) {
     return <>{children}</>;
