@@ -11,7 +11,14 @@ import {
   respondToRequest,
   findMatchesForRequest,
   dispatchToDonors,
-  expressInterest
+  expressInterest,
+  fulfillBloodRequest,
+  getHospitalTriageBoard,
+  getHospitalLobbyQueue,
+  getHospitalPhlebotomyQueue,
+  arriveDirectedDonor,
+  completeDirectDonation,
+  getMyPledges
 } from '../controllers/request.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 
@@ -25,11 +32,20 @@ router.get('/', authenticate, getRequests);
 // Routes for creating and tracking patient-specific needs
 router.post('/patient', authenticate, authorize('Patient', 'Hospital', 'Donor'), createPatientRequest);
 router.get('/my-history', authenticate, authorize('Patient', 'Hospital', 'Donor'), getMyRequests);
+router.get('/donor/my-pledges', authenticate, authorize('Donor'), getMyPledges);
 
 // --- Hospital Request Management Routes ---
 // Hospital dashboard endpoints for reviewing and fulfilling incoming needs
 router.get('/hospital/incoming', authenticate, authorize('Hospital'), getHospitalIncomingRequests);
 router.patch('/:id/status', authenticate, authorize('Hospital'), updateRequestStatus);
+router.patch('/:id/fulfill-blood', authenticate, authorize('Hospital'), fulfillBloodRequest);
+
+// --- Directed Command Center Routes ---
+router.get('/hospital/triage-board', authenticate, authorize('Hospital'), getHospitalTriageBoard);
+router.get('/hospital/lobby-queue', authenticate, authorize('Hospital'), getHospitalLobbyQueue);
+router.get('/hospital/phlebotomy-queue', authenticate, authorize('Hospital'), getHospitalPhlebotomyQueue);
+router.patch('/:reqId/pledge/:donorId/arrive', authenticate, authorize('Hospital'), arriveDirectedDonor);
+router.patch('/:reqId/pledge/:donorId/complete', authenticate, authorize('Hospital'), completeDirectDonation);
 
 // --- Manual Selection & Donor Responses ---
 // Donor response endpoint - token-based, no authentication required so donors can respond via email link

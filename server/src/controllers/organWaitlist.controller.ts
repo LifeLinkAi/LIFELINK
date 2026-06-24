@@ -297,16 +297,16 @@ export const getPendingOrganMatches = async (
           }
         : null,
       // Donor (from DonorProfile + User)
-      donor: m.acceptedDonorId
+      donor: (m as any).acceptedDonorId
         ? {
-            id: m.acceptedDonorId._id?.toString(),
-            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-            email: (m.acceptedDonorId.userId as any)?.email ?? null,
-            bloodType: m.acceptedDonorId.bloodType,
-            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
-            status: m.acceptedDonorId.status,
-            tier: m.acceptedDonorId.tier,
-            details: m.acceptedDonorId.details,
+            id: (m as any).acceptedDonorId._id?.toString(),
+            name: ((m as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: ((m as any).acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: (m as any).acceptedDonorId.bloodType,
+            organsWillingToDonate: (m as any).acceptedDonorId.organsWillingToDonate,
+            status: (m as any).acceptedDonorId.status,
+            tier: (m as any).acceptedDonorId.tier,
+            details: (m as any).acceptedDonorId.details,
           }
         : null,
       clinicalEvaluation: m.clinicalEvaluation,
@@ -398,7 +398,7 @@ export const evaluateOrganMatch = async (
     } else {
       // DECLINE — free the slot so another donor can express interest
       requestDoc.status = 'PENDING_DONOR';
-      requestDoc.acceptedDonorId = null as any;
+      (requestDoc as any).acceptedDonorId = null as any;
       requestDoc.targetDonorId   = null as any;
       if (!requestDoc.timeline) requestDoc.timeline = [];
       requestDoc.timeline.push({ event: 'hospital_declined_match', timestamp: now });
@@ -504,16 +504,16 @@ export const getClinicalTestingMatches = async (
           }
         : null,
       // Donor (from DonorProfile + User)
-      donor: m.acceptedDonorId
+      donor: (m as any).acceptedDonorId
         ? {
-            id: m.acceptedDonorId._id?.toString(),
-            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-            email: (m.acceptedDonorId.userId as any)?.email ?? null,
-            bloodType: m.acceptedDonorId.bloodType,
-            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
-            status: m.acceptedDonorId.status,
-            tier: m.acceptedDonorId.tier,
-            details: m.acceptedDonorId.details,
+            id: (m as any).acceptedDonorId._id?.toString(),
+            name: ((m as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: ((m as any).acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: (m as any).acceptedDonorId.bloodType,
+            organsWillingToDonate: (m as any).acceptedDonorId.organsWillingToDonate,
+            status: (m as any).acceptedDonorId.status,
+            tier: (m as any).acceptedDonorId.tier,
+            details: (m as any).acceptedDonorId.details,
           }
         : null,
     }));
@@ -595,16 +595,16 @@ export const submitClinicalEvaluation = async (
       requestDoc.timeline.push({ event: 'pending_ethics_review', timestamp: now });
       // We don't update OrganWaitlist status here; it waits for legal clearance.
     } else if (decision === 'FAIL_CLINICAL_MATCH') {
-      const acceptedIdStr = requestDoc.acceptedDonorId?.toString();
-      if (acceptedIdStr && requestDoc.matchedDonors) {
-        const matchedEntry = requestDoc.matchedDonors.find(m => m.donorId.toString() === acceptedIdStr);
+      const acceptedIdStr = (requestDoc as any).acceptedDonorId?.toString();
+      if (acceptedIdStr && (requestDoc as any).matchedDonors) {
+        const matchedEntry = (requestDoc as any).matchedDonors.find((m: any) => m.donorId.toString() === acceptedIdStr);
         if (matchedEntry) {
           matchedEntry.status = 'DECLINED';
         }
       }
 
       requestDoc.status = 'PENDING_DONOR';
-      requestDoc.acceptedDonorId = null as any;
+      (requestDoc as any).acceptedDonorId = null as any;
       requestDoc.targetDonorId = null as any;
       requestDoc.timeline.push({ event: 'clinical_evaluation_failed', timestamp: now });
 
@@ -725,16 +725,16 @@ export const getPendingLegalMatches = async (
             comorbidities: m.waitlistId.comorbidities,
           }
         : null,
-      donor: m.acceptedDonorId
+      donor: (m as any).acceptedDonorId
         ? {
-            id: m.acceptedDonorId._id?.toString(),
-            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-            email: (m.acceptedDonorId.userId as any)?.email ?? null,
-            bloodType: m.acceptedDonorId.bloodType,
-            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
-            status: m.acceptedDonorId.status,
-            tier: m.acceptedDonorId.tier,
-            details: m.acceptedDonorId.details,
+            id: (m as any).acceptedDonorId._id?.toString(),
+            name: ((m as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: ((m as any).acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: (m as any).acceptedDonorId.bloodType,
+            organsWillingToDonate: (m as any).acceptedDonorId.organsWillingToDonate,
+            status: (m as any).acceptedDonorId.status,
+            tier: (m as any).acceptedDonorId.tier,
+            details: (m as any).acceptedDonorId.details,
           }
         : null,
       clinicalEvaluation: m.clinicalEvaluation,
@@ -937,16 +937,16 @@ export const getSurgicalPipelineMatches = async (
             comorbidities: m.waitlistId.comorbidities,
           }
         : null,
-      donor: m.acceptedDonorId
+      donor: (m as any).acceptedDonorId
         ? {
-            id: m.acceptedDonorId._id?.toString(),
-            name: (m.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-            email: (m.acceptedDonorId.userId as any)?.email ?? null,
-            bloodType: m.acceptedDonorId.bloodType,
-            organsWillingToDonate: m.acceptedDonorId.organsWillingToDonate,
-            status: m.acceptedDonorId.status,
-            tier: m.acceptedDonorId.tier,
-            details: m.acceptedDonorId.details,
+            id: (m as any).acceptedDonorId._id?.toString(),
+            name: ((m as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+            email: ((m as any).acceptedDonorId.userId as any)?.email ?? null,
+            bloodType: (m as any).acceptedDonorId.bloodType,
+            organsWillingToDonate: (m as any).acceptedDonorId.organsWillingToDonate,
+            status: (m as any).acceptedDonorId.status,
+            tier: (m as any).acceptedDonorId.tier,
+            details: (m as any).acceptedDonorId.details,
           }
         : null,
     }));
@@ -1060,7 +1060,7 @@ export const updateSurgeryStatus = async (
           }
         }
         requestDoc.timeline?.push({ event: 'transplant_surgery_failed', timestamp: new Date() });
-        requestDoc.acceptedDonorId = null; // Sever the lock
+        (requestDoc as any).acceptedDonorId = null; // Sever the lock
         sanitizeGeoJSON(requestDoc);
         await requestDoc.save();
 
@@ -1144,9 +1144,9 @@ export const getArchiveMatches = async (
         updatedAt: p.updatedAt,
         donor: matchDoc?.acceptedDonorId
           ? {
-              id: matchDoc.acceptedDonorId._id?.toString(),
-              name: (matchDoc.acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-              bloodType: matchDoc.acceptedDonorId.bloodType,
+              id: (matchDoc as any).acceptedDonorId._id?.toString(),
+              name: ((matchDoc as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
+              bloodType: (matchDoc as any).acceptedDonorId.bloodType,
             }
           : null,
       };

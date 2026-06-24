@@ -2,8 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, Droplets, Heart, Star, ShieldCheck,
-  AlertTriangle, FlaskConical, Settings, HelpCircle, Plus, LogOut,
+  LayoutDashboard, Droplet, Heart, Settings, HelpCircle, Plus, LogOut, AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Cookies from 'js-cookie';
@@ -13,11 +12,8 @@ import { clearUser } from '@/features/auth/authSlice';
 const NAV = [
   { label: 'Dashboard',          href: '/hospital/dashboard',              icon: LayoutDashboard },
   { label: 'Emergencies',        href: '/hospital/emergencies',            icon: AlertTriangle   },
-  { label: 'Blood Requests',     href: '/hospital/blood-requests',         icon: Droplets        },
-  { label: 'Organ Management',  href: '/hospital/organ-management',        icon: Heart           },
-  { label: 'Donation Monitor',   href: '/hospital/donation-monitor',       icon: Star            },
-  { label: 'Donor Verification', href: '/hospital/donor-verification',     icon: ShieldCheck     },
-  { label: 'Blood Stock',        href: '/hospital/blood-stock',            icon: FlaskConical    },
+  { label: 'Blood Management',   href: '/hospital/blood-management',       icon: Droplet         },
+  { label: 'Organ Management',   href: '/hospital/organ-management',       icon: Heart           },
 ];
 
 export function HospitalSidebar() {

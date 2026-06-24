@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { Types, isValidObjectId } from 'mongoose';
+import mongoose, { Types, isValidObjectId } from 'mongoose';
 import { Request } from '../models/Request';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -11,6 +11,7 @@ import { DonorProfile } from '../models/DonorProfile';
 import { HospitalProfile } from '../models/HospitalProfile';
 import { User } from '../models/User';
 import { OrganWaitlist } from '../models/OrganWaitlist';
+import { BloodBag } from '../models/BloodBag';
 
 // Helper function to safely parse and structure valid GeoJSON locations
 const parseGeoLocation = (body: any) => {
@@ -157,9 +158,8 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
             comorbidities: patientObj.comorbidities || null,
             registeredDate: patientObj.createdAt,
             type: 'Organ',
-            matchedDonors: matchingReq ? matchingReq.matchedDonors : [],
-            targetDonorId: matchingReq ? matchingReq.targetDonorId : null,
-            acceptedDonorId: matchingReq ? matchingReq.acceptedDonorId : null,
+            pledgedDonors: matchingReq ? (matchingReq as any).pledgedDonors : [],
+            targetDonorId: matchingReq ? (matchingReq as any).targetDonorId : null,
           };
         });
 
@@ -291,7 +291,7 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
       facilityType,
       notes,
       type,
-      status: 'Pending',
+      status: 'PENDING',
       registeredDate: new Date(),
       matchPercentage: 0,
     });
@@ -346,7 +346,7 @@ export const findMatchesForRequest = async (req: AuthRequest, res: Response, nex
     const matches = await findNearbyCompatibleDonors(requestObj as any);
     const notifiedDonors = Array.from(new Set([
       ...(requestObj.notifiedDonors || []).map((donorId: any) => donorId.toString()),
-      ...(requestObj.matchedDonors || [])
+      ...((requestObj as any).matchedDonors || [])
         .filter((matched: any) => ['NOTIFIED', 'ACCEPTED'].includes(matched.status))
         .map((matched: any) => matched.donorId?.toString())
         .filter(Boolean),
@@ -371,7 +371,7 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
 
     const alreadyNotified = new Set([
       ...(requestObj.notifiedDonors || []).map((donorId: any) => donorId.toString()),
-      ...(requestObj.matchedDonors || [])
+      ...((requestObj as any).matchedDonors || [])
         .filter((matched: any) => ['NOTIFIED', 'ACCEPTED'].includes(matched.status))
         .map((matched: any) => matched.donorId?.toString())
         .filter(Boolean),
@@ -426,7 +426,7 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
       return next(new ApiError(502, 'No donor notifications were sent successfully.'));
     }
 
-    requestObj.matchedDonors = [...(requestObj.matchedDonors || []), ...(successfulEntries as any)];
+    (requestObj as any).matchedDonors = [...((requestObj as any).matchedDonors || []), ...(successfulEntries as any)];
     requestObj.notifiedDonors = [
       ...(requestObj.notifiedDonors || []),
       ...(successfulDonorIds.map(did => new Types.ObjectId(did)) as any),
@@ -449,15 +449,24 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
     const requests = await Request.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
       .populate({
-        path: 'acceptedDonorId',
-        select: 'bloodType userId',
-        populate: { path: 'userId', select: 'name email' },
+        path: 'pledgedDonors.donorId',
+        select: 'name email'
       })
       .lean();
 
+    // Secondary query to get blood types for donors
+    const donorUserIds = requests.flatMap((r: any) => r.pledgedDonors?.map((p: any) => p.donorId?._id).filter(Boolean) || []);
+    let donorProfiles: any[] = [];
+    if (donorUserIds.length > 0) {
+      donorProfiles = await mongoose.model('DonorProfile').find({ userId: { $in: donorUserIds } }).lean();
+    }
+
     const mapped = requests.map((r: any) => {
-      const donorProfile = r.acceptedDonorId as any;
-      const donorUser = donorProfile?.userId as any;
+      // Find an active/completed pledge to display donor info for backward compatibility
+      const activePledge = r.pledgedDonors?.find((p: any) => ['PLEDGED', 'ARRIVED', 'BLEEDING', 'COMPLETED'].includes(p.status));
+      const donorUser = activePledge?.donorId as any;
+      const donorProfile = donorUser ? donorProfiles.find(dp => dp.userId.toString() === donorUser._id.toString()) : null;
+
       return {
         id: r._id.toString(),
         ...r,
@@ -465,7 +474,7 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
         donorName: donorUser?.name || null,
         donorEmail: donorUser?.email || null,
         donorBloodType: donorProfile?.bloodType || null,
-        acceptedAt: r.updatedAt || null,
+        acceptedAt: activePledge ? activePledge.pledgedAt : (r.updatedAt || null),
       };
     });
 
@@ -481,95 +490,45 @@ export const getMyRequests = async (req: AuthRequest, res: Response, next: NextF
 export const respondToRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const { token, response: donorResponse } = req.body as { token?: string; response?: 'ACCEPTED' | 'DECLINED' };
+    const { response: donorResponse } = req.body as { response?: 'ACCEPTED' | 'DECLINED' };
 
-    if (!token || !donorResponse) {
-      return next(new ApiError(400, 'Missing token or response.'));
+    if (!donorResponse) {
+      return next(new ApiError(400, 'Missing response.'));
     }
 
-    const requestObj = await Request.findOne(
-      { _id: new Types.ObjectId(id), 'matchedDonors.inviteToken': token },
-      { 'matchedDonors.$': 1, acceptedDonorId: 1, status: 1, notifiedDonors: 1, requestedBy: 1, facility: 1 }
-    );
-    if (!requestObj) return next(new ApiError(404, 'Request or token not found.'));
-
-    const matched = (requestObj.matchedDonors && requestObj.matchedDonors[0]) as any;
-    if (!matched) return next(new ApiError(400, 'Invalid token.'));
-
-    const now = new Date();
-    if (matched.tokenExpiresAt && matched.tokenExpiresAt < now) {
-      await Request.updateOne({ _id: new Types.ObjectId(id), 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'EXPIRED' } });
-      return next(new ApiError(400, 'Token has expired.'));
+    if (!req.user || req.user.role !== 'Donor') {
+      return next(new ApiError(401, 'Only donors can respond to requests.'));
     }
+
+    const requestObj = await Request.findById(id);
+    if (!requestObj) return next(new ApiError(404, 'Request not found.'));
 
     if (donorResponse === 'ACCEPTED') {
-      const donorId = matched.donorId;
-
-      // If this specific donor already accepted the request, return a success response
-      if (matched.status === 'ACCEPTED' && requestObj.acceptedDonorId?.toString() === donorId.toString()) {
-        res.status(200).json({ success: true, message: 'You have already accepted this request.' });
+      const donorId = req.user.id;
+      const alreadyPledged = requestObj.pledgedDonors?.some(pd => pd.donorId.toString() === donorId);
+      
+      if (alreadyPledged) {
+        res.status(200).json({ success: true, message: 'You have already pledged to this request.' });
         return;
       }
 
-      const donorProfile = await DonorProfile.findById(new Types.ObjectId(donorId));
-      if (!donorProfile) return next(new ApiError(404, 'Donor profile not found.'));
-      const targetDonorId = donorProfile.userId;
+      requestObj.pledgedDonors.push({
+        donorId: req.user.id as any,
+        status: 'PLEDGED',
+        pledgedAt: new Date()
+      });
 
-      let hospitalId = requestObj.hospitalId || null;
-      if (!hospitalId) {
-        const creator = await User.findById(new Types.ObjectId(requestObj.requestedBy as any));
-        if (creator && creator.role === 'Hospital') {
-          hospitalId = creator._id as any;
-        } else if (requestObj.facility) {
-          const matchingHospital = await User.findOne({ name: requestObj.facility, role: 'Hospital' });
-          if (matchingHospital) {
-            hospitalId = matchingHospital._id as any;
-          }
-        }
-      }
+      if (!requestObj.timeline) requestObj.timeline = [];
+      requestObj.timeline.push({
+        event: 'donor_pledged',
+        timestamp: new Date()
+      });
 
-      const filter = {
-        _id: new Types.ObjectId(id),
-        'matchedDonors.inviteToken': token,
-        'matchedDonors.status': 'NOTIFIED',
-        acceptedDonorId: null,
-      };
-      const update = {
-        $set: {
-          'matchedDonors.$.status': 'ACCEPTED',
-          'matchedDonors.$.respondedAt': now,
-          status: 'PENDING_HOSPITAL',
-          acceptedDonorId: new Types.ObjectId(donorId),
-          targetDonorId: new Types.ObjectId(targetDonorId as any),
-          hospitalId: hospitalId ? new Types.ObjectId(hospitalId.toString()) : null,
-        },
-        $push: {
-          timeline: {
-            event: 'donor_accepted',
-            timestamp: now
-          }
-        }
-      };
-
-      const updated = await Request.findOneAndUpdate(filter, update, { new: true });
-      if (!updated) {
-        const latestRequest = await Request.findById(id, { status: 1, notifiedDonors: 1, matchedDonors: 1, acceptedDonorId: 1 }).lean();
-        console.log('[respondToRequest] acceptance validation failed', {
-          requestId: id,
-          requestStatus: latestRequest?.status,
-          requestNotifiedDonors: (latestRequest?.notifiedDonors || []).map((notifiedDonor: any) => notifiedDonor.toString()),
-          incomingDonorId: donorId?.toString(),
-          matchedDonorStatus: matched.status,
-          acceptedDonorId: latestRequest?.acceptedDonorId?.toString?.() || latestRequest?.acceptedDonorId,
-        });
-        return next(new ApiError(400, 'This request has already been accepted by another donor or the link is invalid.'));
-      }
-
-      res.status(200).json({ success: true, message: 'Thank you — you have accepted the request.' });
+      await requestObj.save();
+      res.status(200).json({ success: true, message: 'Thank you — you have pledged to the request.' });
       return;
     }
 
-    await Request.updateOne({ _id: id, 'matchedDonors.inviteToken': token }, { $set: { 'matchedDonors.$.status': 'DECLINED', 'matchedDonors.$.respondedAt': now } });
     res.status(200).json({ success: true, message: 'You have declined the request. Thank you.' });
   } catch (error) {
     next(error);
@@ -592,9 +551,8 @@ export const getHospitalIncomingRequests = async (req: AuthRequest, res: Respons
     })
       .sort({ createdAt: -1 })
       .populate({
-        path: 'acceptedDonorId',
-        select: 'bloodType userId',
-        populate: { path: 'userId', select: 'name email' }
+        path: 'pledgedDonors.donorId',
+        select: 'name email'
       })
       .lean() as RequestRecord[];
 
@@ -673,6 +631,34 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
   }
 };
 
+export const getMyPledges = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Donor') return next(new ApiError(403, 'Access denied.'));
+    
+    const requests = await Request.find({
+      pledgedDonors: {
+        $elemMatch: {
+          $or: [
+            { donorId: new Types.ObjectId(req.user.id) },
+            { donorId: req.user.id }
+          ],
+          status: { $in: ['PLEDGED', 'ARRIVED', 'COMPLETED'] }
+        }
+      }
+    }).lean();
+
+    const result = requests.map((r: any) => {
+      const dto = toRequestDto(r);
+      const myPledge = r.pledgedDonors.find((d: any) => d.donorId.toString() === req.user!.id);
+      return { ...dto, myPledgeStatus: myPledge?.status };
+    });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const expressInterest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -725,30 +711,21 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
       return next(new ApiError(404, 'Transplant request or waitlist patient not found.'));
     }
 
-    // Check if donor already exists in matchedDonors
-    const alreadyMatched = requestObj.matchedDonors.some(
-      (m: any) => m.donorId.toString() === donorProfile._id.toString()
+    // Check if donor already exists in pledgedDonors
+    const alreadyPledged = requestObj.pledgedDonors?.some(
+      (m: any) => m.donorId.toString() === req.user!.id
     );
 
-    if (alreadyMatched) {
-      return next(new ApiError(400, 'You have already expressed interest or been matched to this request.'));
+    if (alreadyPledged) {
+      return next(new ApiError(400, 'You have already pledged to this request.'));
     }
 
-    const inviteToken = crypto.randomBytes(20).toString('hex');
-    const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    // Push into matchedDonors with status 'ACCEPTED'
-    requestObj.matchedDonors.push({
-      donorId: donorProfile._id as any,
-      status: 'ACCEPTED',
-      inviteToken,
-      tokenExpiresAt,
-      respondedAt: new Date(),
+    requestObj.pledgedDonors.push({
+      donorId: req.user.id as any,
+      status: 'PLEDGED',
+      pledgedAt: new Date(),
     });
 
-    requestObj.acceptedDonorId = donorProfile._id as any;
-    requestObj.targetDonorId = new Types.ObjectId(req.user.id) as any;
-    
     // Find coordinating hospital ID
     let hospitalId: any = requestObj.hospitalId || null;
     if (!hospitalId) {
@@ -763,14 +740,16 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
       }
     }
     requestObj.hospitalId = hospitalId;
-    requestObj.status = 'PENDING_HOSPITAL';
+    if (requestObj.status === 'Waitlisted') {
+      requestObj.status = 'PENDING_HOSPITAL';
+    }
 
     if (!requestObj.timeline) {
       requestObj.timeline = [];
     }
 
     requestObj.timeline.push({
-      event: 'donor_accepted',
+      event: 'donor_pledged',
       timestamp: new Date(),
     });
 
@@ -782,3 +761,245 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
     next(error);
   }
 };
+
+// ==========================================
+// BLOOD FULFILLMENT ENGINE (FIFO)
+// ==========================================
+
+export const fulfillBloodRequest = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    if (!req.user || req.user.role !== 'Hospital') {
+      throw new ApiError(403, 'Access denied. Hospital role required.');
+    }
+
+    const { id } = req.params;
+    const { unitsToFulfill } = req.body;
+
+    if (!isValidObjectId(id)) {
+      throw new ApiError(400, 'Invalid request ID.');
+    }
+
+    if (!unitsToFulfill || typeof unitsToFulfill !== 'number' || unitsToFulfill <= 0) {
+      throw new ApiError(400, 'unitsToFulfill must be a positive integer.');
+    }
+
+    // 1. Fetch Request
+    const requestDoc = await Request.findById(id).session(session);
+    if (!requestDoc) {
+      throw new ApiError(404, 'Request not found.');
+    }
+
+    if (requestDoc.type !== 'Blood') {
+      throw new ApiError(400, 'This endpoint is for blood requests only.');
+    }
+
+    if (requestDoc.status === 'FULFILLED' || requestDoc.status === 'CANCELLED') {
+      throw new ApiError(400, 'Request is already fulfilled or cancelled.');
+    }
+
+    const requested = requestDoc.bloodLogistics?.unitsRequested || requestDoc.units || 1;
+    const alreadyFulfilled = requestDoc.bloodLogistics?.unitsFulfilled || 0;
+    const remaining = requested - alreadyFulfilled;
+
+    if (unitsToFulfill > remaining) {
+      throw new ApiError(400, `Cannot fulfill ${unitsToFulfill} units. Only ${remaining} units remaining.`);
+    }
+
+    const requiredComponent = requestDoc.bloodLogistics?.componentType || 'WHOLE_BLOOD';
+    const hospitalIdObj = new Types.ObjectId(req.user.id);
+
+    // 2. FIFO Query
+    const availableBags = await BloodBag.find({
+      hospitalId: hospitalIdObj,
+      bloodGroup: requestDoc.bloodGroup,
+      componentType: requiredComponent,
+      status: 'AVAILABLE',
+      expirationDate: { $gt: new Date() }, // strictly viable
+    })
+      .sort({ expirationDate: 1 }) // oldest viable first
+      .limit(unitsToFulfill)
+      .session(session);
+
+    // 3. Stock Check
+    if (availableBags.length < unitsToFulfill) {
+      throw new ApiError(400, `Insufficient viable stock. Requested ${unitsToFulfill}, but only ${availableBags.length} available.`);
+    }
+
+    const bagIds = availableBags.map((bag) => bag._id);
+
+    // 4. Ledger Update
+    await BloodBag.updateMany(
+      { _id: { $in: bagIds } },
+      { $set: { status: 'TRANSFUSED' } },
+      { session }
+    );
+
+    // 5. Request Update
+    if (!requestDoc.bloodLogistics) {
+      requestDoc.bloodLogistics = {
+        componentType: requiredComponent as any,
+        unitsRequested: requested,
+        unitsFulfilled: 0,
+        fulfilledBagIds: [],
+      };
+    }
+
+    requestDoc.bloodLogistics.fulfilledBagIds.push(...bagIds as any);
+    requestDoc.bloodLogistics.unitsFulfilled += unitsToFulfill;
+
+    if (requestDoc.bloodLogistics.unitsFulfilled >= requested) {
+      requestDoc.status = 'FULFILLED';
+    } else {
+      requestDoc.status = 'IN_PROGRESS';
+    }
+
+    if (!requestDoc.timeline) requestDoc.timeline = [];
+    requestDoc.timeline.push({
+      event: `blood_fulfilled_${unitsToFulfill}_units`,
+      timestamp: new Date()
+    });
+
+    sanitizeRequestForSave(requestDoc, req.user.id);
+    await requestDoc.save({ session });
+
+    // 6. Commit
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully fulfilled ${unitsToFulfill} units.`,
+      data: requestDoc
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    next(error);
+  }
+};
+
+// ==========================================
+// NEW HOSPITAL DIRECTED COMMAND CENTER ENDPOINTS
+// ==========================================
+
+export const getHospitalTriageBoard = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') return next(new ApiError(403, 'Access denied.'));
+    const requests = await Request.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      status: { $in: ['Pending', 'PENDING_HOSPITAL', 'DONOR_NOTIFIED', 'APPROVED', 'IN_PROGRESS'] }
+    }).sort({ createdAt: -1 }).lean();
+
+    res.status(200).json({ success: true, data: requests.map(toRequestDto) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getHospitalLobbyQueue = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') return next(new ApiError(403, 'Access denied.'));
+    const requests = await Request.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      'pledgedDonors.status': 'PLEDGED'
+    }).populate('pledgedDonors.donorId', 'name bloodType').lean();
+
+    res.status(200).json({ success: true, data: requests.map(toRequestDto) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getHospitalPhlebotomyQueue = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'Hospital') return next(new ApiError(403, 'Access denied.'));
+    const requests = await Request.find({
+      hospitalId: new Types.ObjectId(req.user.id),
+      'pledgedDonors.status': 'ARRIVED'
+    }).populate('pledgedDonors.donorId', 'name bloodType').lean();
+
+    res.status(200).json({ success: true, data: requests.map(toRequestDto) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const arriveDirectedDonor = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { reqId, donorId } = req.params;
+    if (!req.user || req.user.role !== 'Hospital') return next(new ApiError(403, 'Access denied.'));
+
+    const requestObj = await Request.findOneAndUpdate(
+      { _id: new Types.ObjectId(reqId), hospitalId: new Types.ObjectId(req.user.id), 'pledgedDonors.donorId': new Types.ObjectId(donorId) },
+      { $set: { 'pledgedDonors.$.status': 'ARRIVED' } },
+      { new: true }
+    );
+    if (!requestObj) return next(new ApiError(404, 'Request or pledge not found for this hospital.'));
+
+    res.status(200).json({ success: true, message: 'Donor arrived in Lobby.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeDirectDonation = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { reqId, donorId } = req.params;
+    if (!req.user || req.user.role !== 'Hospital') return next(new ApiError(403, 'Access denied.'));
+
+    const requestObj = await Request.findOne({
+      _id: new Types.ObjectId(reqId),
+      hospitalId: new Types.ObjectId(req.user.id),
+      'pledgedDonors.donorId': new Types.ObjectId(donorId)
+    });
+
+    if (!requestObj) return next(new ApiError(404, 'Request or pledge not found for this hospital.'));
+
+    const pledge = requestObj.pledgedDonors.find(p => p.donorId.toString() === donorId);
+    if (!pledge || pledge.status !== 'ARRIVED') {
+      return next(new ApiError(400, 'Donor must be in ARRIVED status.'));
+    }
+
+    pledge.status = 'COMPLETED';
+
+    if (!requestObj.bloodLogistics) {
+      requestObj.bloodLogistics = {
+        componentType: 'WHOLE_BLOOD',
+        unitsRequested: requestObj.units || 1,
+        unitsFulfilled: 0,
+        fulfilledBagIds: [],
+      };
+    }
+
+    requestObj.bloodLogistics.unitsFulfilled += 1;
+    (requestObj as any).unitsFulfilled = ((requestObj as any).unitsFulfilled || 0) + 1;
+
+    if ((requestObj as any).unitsFulfilled >= (requestObj.units || 1)) {
+      requestObj.status = 'FULFILLED'; // <-- Blow the final whistle!
+    } else {
+      requestObj.status = 'IN_PROGRESS';
+    }
+
+    if (!requestObj.timeline) requestObj.timeline = [];
+    requestObj.timeline.push({ event: `direct_donation_completed`, timestamp: new Date() });
+
+    await requestObj.save();
+
+    // The Magic Click: Lock 56-day cooldown
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const now = new Date();
+    const formattedDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+    await DonorProfile.findOneAndUpdate(
+      { userId: new Types.ObjectId(donorId) },
+      { $set: { lastDonation: formattedDate } }
+    );
+
+    res.status(200).json({ success: true, message: 'Direct donation completed!' });
+  } catch (error) {
+    next(error);
+  }
+};
+

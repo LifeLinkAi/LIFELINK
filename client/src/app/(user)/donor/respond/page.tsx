@@ -22,7 +22,7 @@ function RespondContent() {
     }
     setStatus('loading');
     try {
-      const res = await api.post(`/requests/${requestId}/respond`, { token, response });
+      const res = await api.post(`/donors/requests/${requestId}/respond`, { action: response });
       if (res?.data?.success) {
         setStatus('success');
         setMessage(res.data.message || 'Response recorded.');

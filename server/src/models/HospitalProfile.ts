@@ -24,9 +24,8 @@ const hospitalProfileSchema = new Schema(
       trim: true,
     },
     location: {
-      type: String,
-      default: '',
-      trim: true,
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], required: true } // [longitude, latitude]
     },
     phone: {
       type: String,
@@ -155,5 +154,7 @@ hospitalProfileSchema.pre('save', function (next) {
   }
   next();
 });
+
+hospitalProfileSchema.index({ location: '2dsphere' });
 
 export const HospitalProfile = model('HospitalProfile', hospitalProfileSchema);
