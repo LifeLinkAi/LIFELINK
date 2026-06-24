@@ -12,7 +12,7 @@ interface OrganRequest {
   organType: 'Kidney' | 'Heart' | 'Liver' | 'Lung' | 'Pancreas';
   bloodGroup: 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
   urgency: 'Critical' | 'High' | 'Routine';
-  status: 'Awaiting Match' | 'Verification' | 'Scheduled' | 'Completed';
+  status: 'Awaiting Match' | 'Verification' | 'Scheduled' | 'Completed' | 'In Progress';
   matchPercentage: number | null;
   registeredDate: string;
   hlaCompatibility: {
@@ -27,6 +27,13 @@ interface OrganRequest {
     legalConsent: boolean;
   };
   notes?: string;
+  donorName?: string;
+  facility?: string;
+  time?: string;
+  clinicalEvaluation?: {
+    scheduledTestDate?: string;
+    notes?: string;
+  };
 }
 
 interface DonorRecord {
@@ -66,6 +73,7 @@ interface SurgeryRecord {
   notes?: string;
 }
 
+
 export default function OrganManagementPage() {
   // Navigation tabs state
   const [activeTab, setActiveTab] = useState<'requests' | 'donors' | 'surgeries'>('requests');
@@ -86,6 +94,47 @@ export default function OrganManagementPage() {
   const [isCreateRequestOpen, setIsCreateRequestOpen] = useState(false);
   const [isRegisterDonorOpen, setIsRegisterDonorOpen] = useState(false);
   const [isScheduleSurgeryOpen, setIsScheduleSurgeryOpen] = useState(false);
+
+  // State for interactive matching & sonar search
+  const [activeScanRequest, setActiveScanRequest] = useState<OrganRequest | null>(null);
+  const [isScanningMatch, setIsScanningMatch] = useState(false);
+  const [scanResults, setScanResults] = useState<Array<{
+    donor: DonorRecord;
+    score: number;
+    hlaIPercent: number;
+    hlaIIPercent: number;
+    hlaI: string;
+    hlaII: string;
+    bloodCompatibility: 'Identical' | 'Compatible';
+  }>>([]);
+
+  const [matchedPairs, setMatchedPairs] = useState<Record<string, string>>({
+    'REQ-7842': 'DON-5011',
+    'REQ-7839': 'DON-5012',
+    'REQ-7841': 'DON-5013',
+    'REQ-7844': 'DON-5015',
+    'REQ-7845': 'DON-5016',
+    'REQ-7849': 'DON-5020',
+    'DON-5011': 'REQ-7842',
+    'DON-5012': 'REQ-7839',
+    'DON-5013': 'REQ-7841',
+    'DON-5015': 'REQ-7844',
+    'DON-5016': 'REQ-7845',
+    'DON-5020': 'REQ-7849',
+  });
+
+  const isBloodCompatible = (donorBlood: string, recipientBlood: string): boolean => {
+    if (donorBlood === recipientBlood) return true;
+    if (donorBlood === 'O-') return true;
+    if (recipientBlood === 'AB+') return true;
+    if (donorBlood === 'O+') return ['O+', 'A+', 'B+', 'AB+'].includes(recipientBlood);
+    if (donorBlood === 'A-') return ['A-', 'A+', 'AB-', 'AB+'].includes(recipientBlood);
+    if (donorBlood === 'A+') return ['A+', 'AB+'].includes(recipientBlood);
+    if (donorBlood === 'B-') return ['B-', 'B+', 'AB-', 'AB+'].includes(recipientBlood);
+    if (donorBlood === 'B+') return ['B+', 'AB+'].includes(recipientBlood);
+    if (donorBlood === 'AB-') return ['AB-', 'AB+'].includes(recipientBlood);
+    return false;
+  };
 
   // New Request Form State
   const [newPatientName, setNewPatientName] = useState('');
@@ -128,294 +177,206 @@ export default function OrganManagementPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Helper to generate consistent age based on string ID hash
+  const getConsistentAge = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return 20 + (Math.abs(hash) % 46); // Ages 20 to 65
+  };
+
+  // Helper to generate consistent gender based on string ID hash
+  const getConsistentGender = (id: string): 'Male' | 'Female' | 'Other' => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const rem = Math.abs(hash) % 3;
+    if (rem === 0) return 'Male';
+    if (rem === 1) return 'Female';
+    return 'Other';
+  };
+
+  // Helper to generate consistent HLA compatibility based on string ID hash
+  const getConsistentHla = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hlaIClass = Math.abs(hash) % 7; // 0 to 6
+    const hlaIIClass = Math.abs(hash) % 5; // 0 to 4
+    const classIPercent = Math.round((hlaIClass / 6) * 100);
+    const classIIPercent = Math.round((hlaIIClass / 4) * 100);
+    return {
+      classI: `${hlaIClass}/6`,
+      classII: `${hlaIIClass}/4`,
+      classIPercent,
+      classIIPercent
+    };
+  };
+
   // Fetch Requests from DB
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
       const res = await api.get('/requests?type=Organ');
       // Set to requests
-      const mapped = res.data.map((r: any) => ({
-        id: r.id || r._id,
-        patientName: r.patientName,
-        age: r.age,
-        gender: r.gender,
-        organType: r.organType,
-        bloodGroup: r.bloodGroup,
-        urgency: r.urgency,
-        status: r.status,
-        matchPercentage: r.matchPercentage,
-        registeredDate: r.registeredDate ? r.registeredDate.split('T')[0] : '',
-        hlaCompatibility: r.hlaCompatibility || { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-        checklist: r.checklist || { identityVerified: true, medicalClearance: true, legalConsent: true },
-        notes: r.notes || '',
-      }));
+      const reqList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const mapped = reqList.map((r: any) => {
+        // Map database status string to frontend matching status type
+        const getMappedStatus = (): 'Awaiting Match' | 'Verification' | 'Scheduled' | 'Completed' | 'In Progress' => {
+          const dbStatus = String(r.status).toUpperCase();
+          if (dbStatus.includes('COMPLETE') || dbStatus.includes('SUCCESS')) return 'Completed';
+          if (dbStatus.includes('PROGRESS') || dbStatus.includes('IN_PROGRESS')) return 'In Progress';
+          if (dbStatus.includes('SCHEDULE')) return 'Scheduled';
+          if (dbStatus.includes('VERIFY') || dbStatus.includes('LEGAL') || dbStatus.includes('TEST') || dbStatus.includes('PENDING')) return 'Verification';
+          return 'Awaiting Match';
+        };
+
+        const currentStatus = getMappedStatus();
+
+        return {
+          id: r.id || r._id,
+          patientName: r.patientName,
+          age: r.age || getConsistentAge(r.id || r._id),
+          gender: r.gender || getConsistentGender(r.id || r._id),
+          organType: r.organType,
+          bloodGroup: r.bloodGroup,
+          urgency: r.urgency,
+          status: currentStatus,
+          matchPercentage: r.matchPercentage || (currentStatus !== 'Awaiting Match' ? 96 : null),
+          registeredDate: r.registeredDate ? r.registeredDate.split('T')[0] : '',
+          hlaCompatibility: r.hlaCompatibility || { 
+            classI: currentStatus === 'Awaiting Match' ? '0/6' : '6/6', 
+            classII: currentStatus === 'Awaiting Match' ? '0/4' : '3/4', 
+            classIPercent: currentStatus === 'Awaiting Match' ? 0 : 100, 
+            classIIPercent: currentStatus === 'Awaiting Match' ? 0 : 75 
+          },
+          checklist: r.checklist || { 
+            identityVerified: r.checklist?.identityVerified ?? true, 
+            medicalClearance: r.checklist?.medicalClearance ?? (currentStatus !== 'Awaiting Match'), 
+            legalConsent: r.checklist?.legalConsent ?? (currentStatus !== 'Awaiting Match') 
+          },
+          notes: r.notes || '',
+          donorName: r.donorName || '',
+          facility: r.facility || '',
+          time: r.time || '',
+          clinicalEvaluation: r.clinicalEvaluation ? {
+            scheduledTestDate: r.clinicalEvaluation.scheduledTestDate,
+            notes: r.clinicalEvaluation.notes
+          } : undefined
+        };
+      });
       setRequests(mapped);
       if (mapped.length > 0) {
         setSelectedRequestId(mapped[0].id);
       }
     } catch (error) {
       console.error(error);
-      showToast('❌ Failed to fetch organ requests from database.');
+      showToast('❌ Failed to fetch requests from database.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Fetch Donors from DB
+  const [donors, setDonors] = useState<DonorRecord[]>([]);
+  const fetchDonors = async () => {
+    try {
+      const res = await api.get('/donors');
+      const donorList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const mapped = donorList.map((d: any) => {
+        const id = d.id || d._id;
+        const rawOrgan = d.organsWillingToDonate?.[0] || 'Kidney';
+        const organType = ['Kidney', 'Heart', 'Liver', 'Lung', 'Pancreas'].includes(rawOrgan) ? rawOrgan : 'Kidney';
+        const dbStatus = String(d.status).toUpperCase();
+        
+        const getMappedDonorStatus = (): 'Awaiting Match' | 'Matched' | 'Verification' => {
+          if (dbStatus.includes('MATCHED')) return 'Matched';
+          if (dbStatus.includes('VERIFY') || dbStatus.includes('PENDING')) return 'Verification';
+          return 'Awaiting Match';
+        };
+
+        return {
+          id,
+          donorName: d.name,
+          age: getConsistentAge(id),
+          gender: getConsistentGender(id),
+          organType,
+          bloodGroup: d.bloodType || 'O+',
+          status: getMappedDonorStatus(),
+          registeredDate: d.createdAt ? d.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+          checklist: {
+            identityVerified: true,
+            medicalClearance: d.status === 'Verified' || d.status === 'Available',
+            legalConsent: d.status === 'Verified' || d.status === 'Available',
+          },
+          hlaCompatibility: getConsistentHla(id),
+          notes: d.details || 'Altruistic organ donor.'
+        };
+      });
+      setDonors(mapped);
+      if (mapped.length > 0) {
+        setSelectedDonorId(mapped[0].id);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to fetch donors from database.');
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
+    fetchDonors();
   }, []);
 
+  // Dynamic surgeries list derived from requests and donors
+  const surgeries = useMemo<SurgeryRecord[]>(() => {
+    return requests
+      .filter(r => ['Scheduled', 'Completed', 'In Progress'].includes(r.status))
+      .map(r => {
+        const id = r.id;
+        const matchedDonorId = matchedPairs[r.id];
+        const matchedDonor = matchedDonorId ? donors.find(d => d.id === matchedDonorId) : null;
+        const donorName = r.donorName || matchedDonor?.donorName || 'Anonymous Donor';
+        
+        return {
+          id,
+          patientName: r.patientName,
+          donorName,
+          organType: r.organType,
+          bloodGroup: r.bloodGroup,
+          hospital: r.facility || 'Coordinating Medical Center',
+          surgicalTeam: r.clinicalEvaluation?.notes || 'Dr. A. Vance, Dr. K. Miller',
+          scheduledDate: r.clinicalEvaluation?.scheduledTestDate ? r.clinicalEvaluation.scheduledTestDate.split('T')[0] : r.registeredDate,
+          scheduledTime: r.time || '08:00 AM',
+          status: r.status === 'Completed' ? 'Completed' : (r.status === 'In Progress' ? 'In Progress' : 'Scheduled'),
+          notes: r.notes || 'Scheduled transplant procedure.'
+        };
+      });
+  }, [requests, donors, matchedPairs]);
 
 
-
-  // Mock Organ Donors Dataset
-  const [donors, setDonors] = useState<DonorRecord[]>([
-    {
-      id: 'DON-5011',
-      donorName: 'Robert Chen',
-      age: 34,
-      gender: 'Male',
-      organType: 'Kidney',
-      bloodGroup: 'O+',
-      status: 'Matched',
-      registeredDate: '2026-05-18',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '6/6', classII: '4/4', classIPercent: 100, classIIPercent: 100 },
-      notes: 'Living altruistic kidney donor. Screenings completed, matched with Sarah Jenkins (REQ-7842).'
-    },
-    {
-      id: 'DON-5012',
-      donorName: 'Sandra Bullock',
-      age: 45,
-      gender: 'Female',
-      organType: 'Liver',
-      bloodGroup: 'B+',
-      status: 'Matched',
-      registeredDate: '2026-05-11',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '6/6', classII: '3/4', classIPercent: 100, classIIPercent: 75 },
-      notes: 'Living liver lobe donor. Matched with Elena Rostova (REQ-7839). All consent docs signed.'
-    },
-    {
-      id: 'DON-5013',
-      donorName: 'Gary Vaynerchuk',
-      age: 29,
-      gender: 'Male',
-      organType: 'Heart',
-      bloodGroup: 'A-',
-      status: 'Verification',
-      registeredDate: '2026-05-15',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '6/6', classII: '4/4', classIPercent: 100, classIIPercent: 100 },
-      notes: 'Deceased donor registry card holder. Verification active for matching candidate Michael Chang (REQ-7841).'
-    },
-    {
-      id: 'DON-5014',
-      donorName: 'Linda Lovelace',
-      age: 52,
-      gender: 'Female',
-      organType: 'Lung',
-      bloodGroup: 'O-',
-      status: 'Awaiting Match',
-      registeredDate: '2026-05-20',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '4/6', classII: '3/4', classIPercent: 66, classIIPercent: 75 },
-      notes: 'Altruistic organ donor. Available for match search. Medical clearance verified.'
-    },
-    {
-      id: 'DON-5015',
-      donorName: 'Timothy Robbins',
-      age: 38,
-      gender: 'Male',
-      organType: 'Pancreas',
-      bloodGroup: 'AB+',
-      status: 'Matched',
-      registeredDate: '2026-05-08',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '5/6', classII: '4/4', classIPercent: 83, classIIPercent: 100 },
-      notes: 'Pancreas donor, matched with Aisha Vance (REQ-7844). Surgery scheduled.'
-    },
-    {
-      id: 'DON-5016',
-      donorName: 'Keanu Reeves',
-      age: 41,
-      gender: 'Male',
-      organType: 'Kidney',
-      bloodGroup: 'B-',
-      status: 'Verification',
-      registeredDate: '2026-05-14',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '5/6', classII: '3/4', classIPercent: 83, classIIPercent: 75 },
-      notes: 'Altruistic kidney donor, matching check with Carlos Mendez (REQ-7845) in progress.'
-    },
-    {
-      id: 'DON-5017',
-      donorName: 'Emma Watson',
-      age: 27,
-      gender: 'Female',
-      organType: 'Heart',
-      bloodGroup: 'O+',
-      status: 'Awaiting Match',
-      registeredDate: '2026-05-21',
-      checklist: { identityVerified: true, medicalClearance: false, legalConsent: true },
-      hlaCompatibility: { classI: '2/6', classII: '1/4', classIPercent: 33, classIIPercent: 25 },
-      notes: 'Deceased donor match screening. Final medical clearance pending.'
-    },
-    {
-      id: 'DON-5018',
-      donorName: 'Christian Bale',
-      age: 36,
-      gender: 'Male',
-      organType: 'Liver',
-      bloodGroup: 'A+',
-      status: 'Matched',
-      registeredDate: '2026-04-29',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '6/6', classII: '4/4', classIPercent: 100, classIIPercent: 100 },
-      notes: 'Living liver lobe transplant successfully donated to Arthur Pendelton (REQ-7847).'
-    },
-    {
-      id: 'DON-5019',
-      donorName: 'Florence Nightingale',
-      age: 23,
-      gender: 'Female',
-      organType: 'Kidney',
-      bloodGroup: 'AB-',
-      status: 'Awaiting Match',
-      registeredDate: '2026-05-12',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '3/6', classII: '2/4', classIPercent: 50, classIIPercent: 50 },
-      notes: 'Living donor. Awaiting compatible high-match score recipient.'
-    },
-    {
-      id: 'DON-5020',
-      donorName: 'Ryan Reynolds',
-      age: 39,
-      gender: 'Male',
-      organType: 'Lung',
-      bloodGroup: 'B+',
-      status: 'Verification',
-      registeredDate: '2026-05-19',
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: { classI: '5/6', classII: '4/4', classIPercent: 83, classIIPercent: 100 },
-      notes: 'Deceased donor candidate, lung match for Marcus Aurelius (REQ-7849) undergoing cross-matching.'
-    }
-  ]);
-
-  // Mock Surgery Schedule Dataset
-  const [surgeries, setSurgeries] = useState<SurgeryRecord[]>([
-    {
-      id: 'SURG-901',
-      patientName: 'Michael Chang',
-      donorName: 'Gary Vaynerchuk',
-      organType: 'Heart',
-      bloodGroup: 'A-',
-      hospital: "St. Jude's Medical Center",
-      surgicalTeam: 'Dr. A. Vance, Dr. K. Miller',
-      scheduledDate: '2026-06-02',
-      scheduledTime: '08:00 AM',
-      status: 'Scheduled',
-      notes: 'Cardiothoracic team prepped. Donor heart delivery coordinated via LIFELINK emergency ambulance service.'
-    },
-    {
-      id: 'SURG-902',
-      patientName: 'Elena Rostova',
-      donorName: 'Sandra Bullock',
-      organType: 'Liver',
-      bloodGroup: 'B+',
-      hospital: 'Central Medicare Center',
-      surgicalTeam: 'Dr. L. Stone, Dr. T. Jenkins',
-      scheduledDate: '2026-05-29',
-      scheduledTime: '10:30 AM',
-      status: 'Scheduled',
-      notes: 'Living donor liver segment transplant. Dual operating rooms prepped.'
-    },
-    {
-      id: 'SURG-903',
-      patientName: 'Aisha Vance',
-      donorName: 'Timothy Robbins',
-      organType: 'Pancreas',
-      bloodGroup: 'AB+',
-      hospital: 'General Medical Hub',
-      surgicalTeam: 'Dr. R. Patel, Dr. H. Cho',
-      scheduledDate: '2026-05-25',
-      scheduledTime: '02:00 PM',
-      status: 'Scheduled',
-      notes: 'Pancreas replacement procedure. Patient pre-op vitals stable.'
-    },
-    {
-      id: 'SURG-904',
-      patientName: 'Arthur Pendelton',
-      donorName: 'Christian Bale',
-      organType: 'Liver',
-      bloodGroup: 'A+',
-      hospital: 'Metro General Hospital',
-      surgicalTeam: 'Dr. M. Diaz, Dr. N. Al-Jamil',
-      scheduledDate: '2026-05-20',
-      scheduledTime: '09:00 AM',
-      status: 'Completed',
-      notes: 'Transplant completed successfully. Patient in ICU recovery showing excellent initial organ function.'
-    },
-    {
-      id: 'SURG-906',
-      patientName: 'Sarah Jenkins',
-      donorName: 'Robert Chen',
-      organType: 'Kidney',
-      bloodGroup: 'O+',
-      hospital: "St. Jude's Medical Center",
-      surgicalTeam: 'Dr. K. Miller, Dr. J. Lopez',
-      scheduledDate: '2026-06-05',
-      scheduledTime: '07:30 AM',
-      status: 'Scheduled',
-      notes: 'Living donor renal transplant. Pre-operative crossmatching fully compatible.'
-    },
-    {
-      id: 'SURG-907',
-      patientName: 'Marcus Aurelius',
-      donorName: 'Ryan Reynolds',
-      organType: 'Lung',
-      bloodGroup: 'B+',
-      hospital: 'Metro General Hospital',
-      surgicalTeam: 'Dr. A. Vance, Dr. F. Patel',
-      scheduledDate: '2026-06-08',
-      scheduledTime: '09:00 AM',
-      status: 'Scheduled',
-      notes: 'Double lung transplant. Recipient matching confirmed.'
-    },
-    {
-      id: 'SURG-908',
-      patientName: 'Carlos Mendez',
-      donorName: 'Keanu Reeves',
-      organType: 'Kidney',
-      bloodGroup: 'B-',
-      hospital: 'Central Medicare Center',
-      surgicalTeam: 'Dr. L. Stone, Dr. M. Diaz',
-      scheduledDate: '2026-06-10',
-      scheduledTime: '08:30 AM',
-      status: 'Scheduled',
-      notes: 'Renal transplant from living donor. Clearance and checklist finalized.'
-    }
-  ]);
-
-  // Derive display values from mock datasets to match target baseline stats
+  // Derive display values from real database records
   const activeRequestsCount = useMemo(() => {
-    return 132 + requests.filter(r => r.status !== 'Completed').length;
+    return requests.filter(r => r.status !== 'Completed').length;
   }, [requests]);
 
   const awaitingMatchCount = useMemo(() => {
-    return 80 + requests.filter(r => r.status === 'Awaiting Match').length;
+    return requests.filter(r => r.status === 'Awaiting Match').length;
   }, [requests]);
 
   const underVerificationCount = useMemo(() => {
-    return 30 + requests.filter(r => r.status === 'Verification').length;
+    return requests.filter(r => r.status === 'Verification').length;
   }, [requests]);
 
   const scheduledSurgeriesCount = useMemo(() => {
-    return 14 + surgeries.filter(s => s.status === 'Scheduled').length;
+    return surgeries.filter(s => s.status === 'Scheduled').length;
   }, [surgeries]);
 
   const registeredDonorsCount = useMemo(() => {
-    return 1194 + donors.length;
+    return donors.length;
   }, [donors]);
 
   // Derived Critical Count from requests
@@ -435,6 +396,20 @@ export default function OrganManagementPage() {
   const selectedSurgery = useMemo(() => {
     return surgeries.find(s => s.id === selectedSurgeryId) || surgeries[0];
   }, [surgeries, selectedSurgeryId]);
+
+  const linkedDonor = useMemo(() => {
+    if (!selectedRequest) return null;
+    const donorId = matchedPairs[selectedRequest.id];
+    if (!donorId) return null;
+    return donors.find(d => d.id === donorId) || null;
+  }, [selectedRequest, matchedPairs, donors]);
+
+  const linkedPatient = useMemo(() => {
+    if (!selectedDonor) return null;
+    const patientId = matchedPairs[selectedDonor.id];
+    if (!patientId) return null;
+    return requests.find(r => r.id === patientId) || null;
+  }, [selectedDonor, matchedPairs, requests]);
 
   // Filter requests
   const filteredRequests = useMemo(() => {
@@ -498,157 +473,259 @@ export default function OrganManagementPage() {
   };
 
   // Form Submit Handlers
-  const handleCreateRequest = (e: React.FormEvent) => {
+  const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPatientName.trim()) return;
 
-    const newId = `REQ-${Math.floor(7850 + Math.random() * 150)}`;
-    const newReq: OrganRequest = {
-      id: newId,
-      patientName: newPatientName,
-      age: newPatientAge,
-      gender: newPatientGender,
-      organType: newPatientOrgan,
-      bloodGroup: newPatientBlood,
-      urgency: newPatientUrgency,
-      status: 'Awaiting Match',
-      matchPercentage: null,
-      registeredDate: new Date().toISOString().split('T')[0],
-      hlaCompatibility: { classI: '0/6', classII: '0/4', classIPercent: 0, classIIPercent: 0 },
-      checklist: { identityVerified: true, medicalClearance: false, legalConsent: false },
-      notes: newPatientNotes || 'No notes added.'
-    };
+    try {
+      const res = await api.post('/requests', {
+        type: 'Organ',
+        urgency: newPatientUrgency,
+        status: 'Awaiting Match',
+        patientName: newPatientName,
+        age: newPatientAge,
+        gender: newPatientGender,
+        organType: newPatientOrgan,
+        bloodGroup: newPatientBlood,
+        notes: newPatientNotes || 'No notes added.'
+      });
 
-    setRequests([newReq, ...requests]);
-    setSelectedRequestId(newId);
-    setIsCreateRequestOpen(false);
+      const reqData = res.data?.data || res.data;
+      const newId = reqData?.id || reqData?._id;
 
-    // Reset Form
-    setNewPatientName('');
-    setNewPatientAge(35);
-    setNewPatientGender('Male');
-    setNewPatientOrgan('Kidney');
-    setNewPatientBlood('O+');
-    setNewPatientUrgency('Routine');
-    setNewPatientNotes('');
+      showToast(`Successfully created organ request for ${newPatientName}.`);
+      setIsCreateRequestOpen(false);
 
-    showToast(`Successfully created organ request ${newId} for ${newPatientName}.`);
+      // Reset Form
+      setNewPatientName('');
+      setNewPatientAge(35);
+      setNewPatientGender('Male');
+      setNewPatientOrgan('Kidney');
+      setNewPatientBlood('O+');
+      setNewPatientUrgency('Routine');
+      setNewPatientNotes('');
+
+      await fetchRequests();
+      if (newId) setSelectedRequestId(newId);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to create request in database.');
+    }
   };
 
-  const handleRegisterDonor = (e: React.FormEvent) => {
+  const handleRegisterDonor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDonorName.trim()) return;
 
-    const newId = `DON-${Math.floor(5021 + Math.random() * 100)}`;
-    const newDon: DonorRecord = {
-      id: newId,
-      donorName: newDonorName,
-      age: newDonorAge,
-      gender: newDonorGender,
-      organType: newDonorOrgan,
-      bloodGroup: newDonorBlood,
-      status: newDonorStatus,
-      registeredDate: new Date().toISOString().split('T')[0],
-      checklist: { identityVerified: true, medicalClearance: true, legalConsent: true },
-      hlaCompatibility: {
-        classI: newDonorStatus === 'Matched' ? '6/6' : '3/6',
-        classII: newDonorStatus === 'Matched' ? '4/4' : '2/4',
-        classIPercent: newDonorStatus === 'Matched' ? 100 : 50,
-        classIIPercent: newDonorStatus === 'Matched' ? 100 : 50
-      },
-      notes: newDonorNotes || 'No notes added.'
-    };
+    try {
+      const emailLower = `${newDonorName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Math.floor(Math.random() * 1000)}@lifelink.org`;
+      // Create user
+      const res = await api.post('/donors', {
+        name: newDonorName,
+        email: emailLower
+      });
+      const donorData = res.data?.data || res.data;
+      const donorId = donorData?.id || donorData?._id;
+      
+      if (!donorId) {
+        throw new Error('Failed to retrieve donor ID from response');
+      }
 
-    setDonors([newDon, ...donors]);
-    setSelectedDonorId(newId);
-    setIsRegisterDonorOpen(false);
+      // Update donor profile details
+      await api.put(`/donors/${donorId}`, {
+        bloodType: newDonorBlood,
+        organsWillingToDonate: [newDonorOrgan],
+        status: newDonorStatus === 'Matched' ? 'Verified' : 'Available',
+        details: newDonorNotes || 'No notes added.'
+      });
 
-    // Reset Form
-    setNewDonorName('');
-    setNewDonorAge(30);
-    setNewDonorGender('Male');
-    setNewDonorOrgan('Kidney');
-    setNewDonorBlood('O+');
-    setNewDonorStatus('Awaiting Match');
-    setNewDonorNotes('');
+      showToast(`Successfully registered donor ${newDonorName}.`);
+      setIsRegisterDonorOpen(false);
 
-    showToast(`Successfully registered donor ${newId} (${newDonorName}).`);
+      // Reset Form
+      setNewDonorName('');
+      setNewDonorAge(30);
+      setNewDonorGender('Male');
+      setNewDonorOrgan('Kidney');
+      setNewDonorBlood('O+');
+      setNewDonorStatus('Awaiting Match');
+      setNewDonorNotes('');
+
+      await fetchDonors();
+      setSelectedDonorId(donorId);
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to register donor in database.');
+    }
   };
 
-  const handleScheduleSurgery = (e: React.FormEvent) => {
+  const handleScheduleSurgery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSurgPatient.trim() || !newSurgDonor.trim()) return;
 
-    const newId = `SURG-${Math.floor(909 + Math.random() * 50)}`;
-    const newSurg: SurgeryRecord = {
-      id: newId,
-      patientName: newSurgPatient,
-      donorName: newSurgDonor,
-      organType: newSurgOrgan,
-      bloodGroup: newSurgBlood,
-      hospital: newSurgHospital,
-      surgicalTeam: newSurgTeam,
-      scheduledDate: newSurgDate,
-      scheduledTime: newSurgTime,
-      status: 'Scheduled',
-      notes: newSurgNotes || 'Scheduled transplant procedure.'
-    };
+    const matchingReq = requests.find(r => r.patientName.toLowerCase() === newSurgPatient.toLowerCase());
+    if (matchingReq) {
+      try {
+        await api.put(`/requests/${matchingReq.id}`, {
+          status: 'Scheduled',
+          donorName: newSurgDonor,
+          facility: newSurgHospital,
+          time: newSurgTime,
+          notes: newSurgNotes || 'Scheduled transplant procedure.',
+          clinicalEvaluation: {
+            ...matchingReq.hlaCompatibility,
+            scheduledTestDate: newSurgDate,
+            notes: newSurgTeam
+          }
+        });
 
-    setSurgeries([newSurg, ...surgeries]);
-    setSelectedSurgeryId(newId);
-    setIsScheduleSurgeryOpen(false);
-
-    // If a request was verification state, let's mark it scheduled
-    setRequests(prev =>
-      prev.map(r => {
-        if (r.patientName.toLowerCase() === newSurgPatient.toLowerCase()) {
-          return { ...r, status: 'Scheduled', matchPercentage: 98 };
+        // Also update donor status if matched
+        const matchingDonor = donors.find(d => d.donorName.toLowerCase() === newSurgDonor.toLowerCase());
+        if (matchingDonor) {
+          await api.put(`/donors/${matchingDonor.id}`, {
+            status: 'Matched'
+          });
         }
-        return r;
-      })
-    );
 
-    // If a donor was matched/verification state, mark it Matched
-    setDonors(prev =>
-      prev.map(d => {
-        if (d.donorName.toLowerCase() === newSurgDonor.toLowerCase()) {
-          return { ...d, status: 'Matched' };
-        }
-        return d;
-      })
-    );
+        showToast(`Successfully scheduled transplant surgery for ${newSurgPatient}.`);
+        setIsScheduleSurgeryOpen(false);
 
-    // Reset Form
-    setNewSurgPatient('');
-    setNewSurgDonor('');
-    setNewSurgNotes('');
+        // Reset Form
+        setNewSurgPatient('');
+        setNewSurgDonor('');
+        setNewSurgNotes('');
 
-    showToast(`Successfully scheduled transplant surgery ${newId}.`);
+        await fetchRequests();
+        await fetchDonors();
+        setSelectedSurgeryId(matchingReq.id);
+      } catch (error) {
+        console.error(error);
+        showToast('❌ Failed to schedule surgery in database.');
+      }
+    } else {
+      showToast('❌ Matching request not found.');
+    }
   };
+
 
   // Toggle checklist values locally
-  const toggleRequestChecklist = (field: 'identityVerified' | 'medicalClearance' | 'legalConsent') => {
-    setRequests(prev =>
-      prev.map(r => {
-        if (r.id === selectedRequestId) {
-          const updatedChecklist = { ...r.checklist, [field]: !r.checklist[field] };
-          return { ...r, checklist: updatedChecklist };
-        }
-        return r;
-      })
-    );
+  const toggleRequestChecklist = async (field: 'identityVerified' | 'medicalClearance' | 'legalConsent') => {
+    const target = requests.find(r => r.id === selectedRequestId);
+    if (!target) return;
+    const updatedChecklist = { ...target.checklist, [field]: !target.checklist[field] };
+    try {
+      await api.put(`/requests/${selectedRequestId}`, {
+        checklist: updatedChecklist
+      });
+      await fetchRequests();
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to update checklist in database.');
+    }
   };
 
-  const toggleDonorChecklist = (field: 'identityVerified' | 'medicalClearance' | 'legalConsent') => {
+  const toggleDonorChecklist = async (field: 'identityVerified' | 'medicalClearance' | 'legalConsent') => {
+    const target = donors.find(d => d.id === selectedDonorId);
+    if (!target) return;
+    const updatedChecklist = { ...target.checklist, [field]: !target.checklist[field] };
     setDonors(prev =>
       prev.map(d => {
         if (d.id === selectedDonorId) {
-          const updatedChecklist = { ...d.checklist, [field]: !d.checklist[field] };
           return { ...d, checklist: updatedChecklist };
         }
         return d;
       })
     );
+  };
+
+  const handleRunMatchingSearch = (req: OrganRequest) => {
+    setActiveScanRequest(req);
+    setIsScanningMatch(true);
+    
+    // Simulate sonar radar scanning
+    setTimeout(() => {
+      // Find candidate donors with compatible blood type and same organ type
+      const candidates = donors.filter(
+        d => d.organType === req.organType && 
+             d.status === 'Awaiting Match' && 
+             isBloodCompatible(d.bloodGroup, req.bloodGroup)
+      );
+
+      // Map candidates with realistic scores
+      const mappedResults = candidates.map(d => {
+        // ABO compatibility score
+        const isIdentical = d.bloodGroup === req.bloodGroup;
+        const bloodScore = isIdentical ? 30 : 15;
+        
+        // HLA compatibility score
+        const hlaIPercent = d.hlaCompatibility.classIPercent;
+        const hlaIIPercent = d.hlaCompatibility.classIIPercent;
+        
+        const totalScore = Math.min(100, Math.round(bloodScore + (hlaIPercent * 0.4) + (hlaIIPercent * 0.3)));
+        
+        return {
+          donor: d,
+          score: totalScore,
+          hlaIPercent,
+          hlaIIPercent,
+          hlaI: d.hlaCompatibility.classI,
+          hlaII: d.hlaCompatibility.classII,
+          bloodCompatibility: (isIdentical ? 'Identical' : 'Compatible') as 'Identical' | 'Compatible'
+        };
+      });
+
+      // Sort by score descending
+      mappedResults.sort((a, b) => b.score - a.score);
+      setScanResults(mappedResults);
+      setIsScanningMatch(false);
+    }, 1500);
+  };
+
+  const confirmMatchAllocation = async (
+    req: OrganRequest, 
+    donor: DonorRecord, 
+    matchScore: number,
+    classI: string,
+    classII: string,
+    classIPercent: number,
+    classIIPercent: number
+  ) => {
+    try {
+      // 1. Update request status, match percentage, and hla compatibility
+      await api.put(`/requests/${req.id}`, {
+        status: 'Verification',
+        matchPercentage: matchScore,
+        hlaCompatibility: {
+          classI,
+          classII,
+          classIPercent,
+          classIIPercent
+        },
+        donorName: donor.donorName,
+        assignedDonorId: donor.id
+      });
+
+      // 2. Update donor status
+      await api.put(`/donors/${donor.id}`, {
+        status: 'Verification'
+      });
+
+      // 3. Update matchedPairs dictionary
+      setMatchedPairs(prev => ({
+        ...prev,
+        [req.id]: donor.id,
+        [donor.id]: req.id
+      }));
+
+      // 4. Show success toast & close modal
+      showToast(`Successfully allocated donor ${donor.donorName} to patient ${req.patientName}!`);
+      setActiveScanRequest(null);
+      await fetchRequests();
+      await fetchDonors();
+    } catch (error) {
+      console.error(error);
+      showToast('❌ Failed to allocate match in database.');
+    }
   };
 
   // Setup schedule surgery autofill fields from current selected item
@@ -1301,6 +1378,34 @@ export default function OrganManagementPage() {
                 </div>
               </div>
 
+              {/* Linked Donor Profile */}
+              {linkedDonor && (
+                <div className="space-y-sm">
+                  <span className="font-label-caps text-label-caps text-[#45483c] text-xs font-semibold block">Linked Donor Dossier</span>
+                  <div 
+                    onClick={() => {
+                      setActiveTab('donors');
+                      setSelectedDonorId(linkedDonor.id);
+                    }}
+                    className="bg-white hover:bg-white/70 border border-[#C7D2C0] rounded-xl p-md flex items-center justify-between gap-md cursor-pointer transition-all hover:scale-[1.01] shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-xs">
+                        <span className="font-bold text-sm text-[#3e5219]">{linkedDonor.donorName}</span>
+                        <span className="text-[10px] text-gray-500">({linkedDonor.id})</span>
+                      </div>
+                      <p className="text-[11px] text-[#45483c] mt-0.5">
+                        {linkedDonor.age} Yrs • {linkedDonor.gender} • Blood: <span className="font-bold">{linkedDonor.bloodGroup}</span>
+                      </p>
+                      <span className="inline-block bg-[#496800]/10 text-[#496800] text-[9px] px-1.5 py-0.5 rounded border border-[#496800]/20 font-bold uppercase mt-1">
+                        {linkedDonor.organType} Donor
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-[#3e5219] text-[20px] shrink-0">arrow_forward</span>
+                  </div>
+                </div>
+              )}
+
               {/* Verification Checklist */}
               <div className="space-y-md">
                 <h4 className="font-label-caps text-label-caps text-[#45483c] text-xs font-semibold">Verification Checklist</h4>
@@ -1377,42 +1482,7 @@ export default function OrganManagementPage() {
                   <button
                     onClick={() => {
                       if (selectedRequest.status === 'Awaiting Match') {
-                        // Scan for suitable match automatically
-                        const matchedDonors = donors.filter(
-                          d => d.organType === selectedRequest.organType && d.bloodGroup === selectedRequest.bloodGroup && d.status === 'Awaiting Match'
-                        );
-                        if (matchedDonors.length > 0) {
-                          const topMatch = matchedDonors[0];
-                          
-                          // Update request to Verification and give a match score
-                          setRequests(prev =>
-                            prev.map(r => {
-                              if (r.id === selectedRequest.id) {
-                                return {
-                                  ...r,
-                                  status: 'Verification',
-                                  matchPercentage: 96,
-                                  hlaCompatibility: { classI: '6/6', classII: '3/4', classIPercent: 100, classIIPercent: 75 }
-                                };
-                              }
-                              return r;
-                            })
-                          );
-
-                          // Update donor to matched status
-                          setDonors(prev =>
-                            prev.map(d => {
-                              if (d.id === topMatch.id) {
-                                return { ...d, status: 'Verification' };
-                              }
-                              return d;
-                            })
-                          );
-
-                          showToast(`LIFELINK Cross-matching: Found compatible match for ${selectedRequest.patientName} with donor ${topMatch.donorName} (${topMatch.id})!`);
-                        } else {
-                          showToast(`No compatible O+ / matched HLA donors found in registry cache for ${selectedRequest.patientName}. Matching algorithm remains active.`);
-                        }
+                        handleRunMatchingSearch(selectedRequest);
                       } else {
                         showToast(`Clinical dossier is undergoing bio-ethics validation. Complete the checklist items above.`);
                       }
@@ -1458,6 +1528,36 @@ export default function OrganManagementPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Linked Patient Profile */}
+              {linkedPatient && (
+                <div className="space-y-sm">
+                  <span className="font-label-caps text-label-caps text-[#45483c] text-xs font-semibold block">Linked Patient Dossier</span>
+                  <div 
+                    onClick={() => {
+                      setActiveTab('requests');
+                      setSelectedRequestId(linkedPatient.id);
+                    }}
+                    className="bg-white hover:bg-white/70 border border-[#C7D2C0] rounded-xl p-md flex items-center justify-between gap-md cursor-pointer transition-all hover:scale-[1.01] shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-xs">
+                        <span className="font-bold text-sm text-[#3e5219]">{linkedPatient.patientName}</span>
+                        <span className="text-[10px] text-gray-500">({linkedPatient.id})</span>
+                      </div>
+                      <p className="text-[11px] text-[#45483c] mt-0.5">
+                        {linkedPatient.age} Yrs • {linkedPatient.gender} • Urgency: <span className={`font-bold ${
+                          linkedPatient.urgency === 'Critical' ? 'text-[#ba1a1a]' : 'text-[#3e5219]'
+                        }`}>{linkedPatient.urgency}</span>
+                      </p>
+                      <span className="inline-block bg-[#3e5219]/10 text-[#3e5219] text-[9px] px-1.5 py-0.5 rounded border border-[#3e5219]/20 font-bold uppercase mt-1">
+                        {linkedPatient.organType} Recipient
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-[#3e5219] text-[20px] shrink-0">arrow_forward</span>
+                  </div>
+                </div>
+              )}
 
               {/* Donor Verification Checklist */}
               <div className="space-y-md">
@@ -1583,6 +1683,83 @@ export default function OrganManagementPage() {
                 </div>
               </div>
 
+              {/* Preservation & Logistics Telemetry */}
+              <div className="space-y-md">
+                <h4 className="font-label-caps text-label-caps text-[#45483c] text-xs font-semibold">Preservation & Logistics Telemetry</h4>
+                <div className="bg-white/40 border border-[#C7D2C0]/60 rounded-xl p-md space-y-md text-xs">
+                  <div className="grid grid-cols-2 gap-sm">
+                    <div className="bg-[#EFF2EE] p-sm rounded-lg flex flex-col gap-xs border border-[#C7D2C0]/30">
+                      <span className="text-[10px] text-gray-500 uppercase font-semibold">Cold Ischemia Limit</span>
+                      <span className="font-bold text-sm text-[#3e5219]">
+                        {selectedSurgery.organType === 'Heart' ? '4 Hours' :
+                         selectedSurgery.organType === 'Lung' ? '8 Hours' :
+                         selectedSurgery.organType === 'Kidney' ? '24 Hours' : '12 Hours'}
+                      </span>
+                    </div>
+                    <div className="bg-[#EFF2EE] p-sm rounded-lg flex flex-col gap-xs border border-[#C7D2C0]/30">
+                      <span className="text-[10px] text-gray-500 uppercase font-semibold">Preservation Temp</span>
+                      <span className={`font-bold text-sm ${selectedSurgery.status === 'Completed' ? 'text-gray-500' : 'text-[#496800]'}`}>
+                        {selectedSurgery.status === 'Completed' ? 'N/A (Explanted)' : '3.8°C (Optimal)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Stepper tracker */}
+                  <div className="space-y-sm">
+                    <span className="text-[10px] text-gray-500 uppercase font-semibold block">Transit Progression</span>
+                    <div className="flex items-center justify-between relative mt-2 px-1">
+                      {/* Horizontal progress bar background */}
+                      <div className="absolute top-[9px] left-2 right-2 h-0.5 bg-gray-200 -z-10"></div>
+                      <div 
+                        className="absolute top-[9px] left-2 h-0.5 bg-[#3e5219] -z-10 transition-all duration-500"
+                        style={{
+                          width: selectedSurgery.status === 'Completed' ? '100%' :
+                                 selectedSurgery.status === 'In Progress' ? '50%' : '0%'
+                        }}
+                      ></div>
+
+                      {/* Procurement Step */}
+                      <div className="flex flex-col items-center gap-xs">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border text-[10px] font-bold ${
+                          selectedSurgery.status !== 'Scheduled' 
+                            ? 'bg-[#3e5219] text-white border-[#3e5219]' 
+                            : 'bg-white text-gray-400 border-gray-300'
+                        }`}>
+                          {selectedSurgery.status !== 'Scheduled' ? '✓' : '1'}
+                        </div>
+                        <span className="text-[9px] font-semibold text-gray-500">Procured</span>
+                      </div>
+
+                      {/* Transit Step */}
+                      <div className="flex flex-col items-center gap-xs">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border text-[10px] font-bold ${
+                          selectedSurgery.status !== 'Scheduled' 
+                            ? selectedSurgery.status === 'Completed' 
+                              ? 'bg-[#3e5219] text-white border-[#3e5219]' 
+                              : 'bg-amber-500 text-white border-amber-600 animate-pulse'
+                            : 'bg-white text-gray-400 border-gray-300'
+                        }`}>
+                          {selectedSurgery.status === 'Completed' ? '✓' : '2'}
+                        </div>
+                        <span className="text-[9px] font-semibold text-gray-500">In Transit</span>
+                      </div>
+
+                      {/* Implant Step */}
+                      <div className="flex flex-col items-center gap-xs">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border text-[10px] font-bold ${
+                          selectedSurgery.status === 'Completed' 
+                            ? 'bg-[#3e5219] text-white border-[#3e5219]' 
+                            : 'bg-white text-gray-400 border-gray-300'
+                        }`}>
+                          {selectedSurgery.status === 'Completed' ? '✓' : '3'}
+                        </div>
+                        <span className="text-[9px] font-semibold text-gray-500">Implanted</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {selectedSurgery.notes && (
                 <div className="space-y-sm">
                   <span className="font-label-caps text-label-caps text-[#45483c] text-[10px] font-semibold">Clinical Protocols</span>
@@ -1596,11 +1773,17 @@ export default function OrganManagementPage() {
               <div className="pt-md border-t border-[#C7D2C0]/50 mt-auto space-y-sm">
                 {selectedSurgery.status === 'Scheduled' && (
                   <button
-                    onClick={() => {
-                      setSurgeries(prev =>
-                        prev.map(s => (s.id === selectedSurgery.id ? { ...s, status: 'In Progress' } : s))
-                      );
-                      showToast(`Surgery procedure ${selectedSurgery.id} started. Operating Rooms active.`);
+                    onClick={async () => {
+                      try {
+                        await api.put(`/requests/${selectedSurgery.id}`, {
+                          status: 'In Progress'
+                        });
+                        showToast(`Surgery procedure ${selectedSurgery.id} started. Operating Rooms active.`);
+                        await fetchRequests();
+                      } catch (err) {
+                        console.error(err);
+                        showToast('❌ Failed to start surgery in database.');
+                      }
                     }}
                     className="w-full bg-[#3e5219] hover:bg-[#496800] text-white py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-xs"
                   >
@@ -1611,20 +1794,17 @@ export default function OrganManagementPage() {
 
                 {selectedSurgery.status === 'In Progress' && (
                   <button
-                    onClick={() => {
-                      setSurgeries(prev =>
-                        prev.map(s => (s.id === selectedSurgery.id ? { ...s, status: 'Completed' } : s))
-                      );
-                      // Update request state as Completed
-                      setRequests(prev =>
-                        prev.map(r => {
-                          if (r.patientName.toLowerCase() === selectedSurgery.patientName.toLowerCase()) {
-                            return { ...r, status: 'Completed' };
-                          }
-                          return r;
-                        })
-                      );
-                      showToast(`Transplant Surgery ${selectedSurgery.id} marked as COMPLETED. Patient transferred to Post-Op.`);
+                    onClick={async () => {
+                      try {
+                        await api.put(`/requests/${selectedSurgery.id}`, {
+                          status: 'Completed'
+                        });
+                        showToast(`Transplant Surgery ${selectedSurgery.id} marked as COMPLETED. Patient transferred to Post-Op.`);
+                        await fetchRequests();
+                      } catch (err) {
+                        console.error(err);
+                        showToast('❌ Failed to complete surgery in database.');
+                      }
                     }}
                     className="w-full bg-gradient-to-br from-[#3e5219] to-[#c8f17a] text-white py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-xs"
                   >
@@ -2080,6 +2260,158 @@ export default function OrganManagementPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: Match Finder Scanner ================= */}
+      {activeScanRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <style>{`
+            @keyframes sonar {
+              0% { transform: scale(0.5); opacity: 0.8; }
+              100% { transform: scale(2); opacity: 0; }
+            }
+            .animate-sonar-1 {
+              animation: sonar 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            }
+            .animate-sonar-2 {
+              animation: sonar 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+              animation-delay: 0.6s;
+            }
+            .animate-sonar-3 {
+              animation: sonar 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+              animation-delay: 1.2s;
+            }
+          `}</style>
+
+          <div className="bg-[#F4F7F0] border border-[#C7D2C0] rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scale-up">
+            <div className="bg-[#3e5219] text-white p-lg flex justify-between items-center">
+              <div>
+                <h3 className="font-headline-sm text-headline-sm text-lg font-bold">LIFELINK Match Finder</h3>
+                <p className="text-xs text-[#d2eca2]/80 mt-1">Cross-matching HLA & ABO profiles in real-time</p>
+              </div>
+              {!isScanningMatch && (
+                <button
+                  onClick={() => setActiveScanRequest(null)}
+                  className="text-white/80 hover:text-white"
+                >
+                  <span className="material-symbols-outlined text-[24px]">close</span>
+                </button>
+              )}
+            </div>
+
+            {isScanningMatch ? (
+              /* SCANNING TELEMETRY VIEW */
+              <div className="p-xl flex flex-col items-center justify-center min-h-[350px] gap-xl text-center">
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  {/* Radar waves */}
+                  <div className="absolute inset-0 rounded-full bg-[#3e5219]/10 border border-[#3e5219]/30 animate-sonar-1"></div>
+                  <div className="absolute inset-0 rounded-full bg-[#3e5219]/10 border border-[#3e5219]/30 animate-sonar-2"></div>
+                  <div className="absolute inset-0 rounded-full bg-[#3e5219]/10 border border-[#3e5219]/30 animate-sonar-3"></div>
+                  
+                  {/* Central icon */}
+                  <div className="w-16 h-16 rounded-full bg-[#3e5219] text-white flex items-center justify-center shadow-lg z-10">
+                    <span className="material-symbols-outlined text-[32px] animate-pulse">radar</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-sm">
+                  <h4 className="font-bold text-[#3e5219] text-lg">Scanning LIFELINK National Registry...</h4>
+                  <p className="text-sm text-[#45483c] max-w-md">
+                    Comparing HLA antigens loci mapping and verifying ABO compatibility rules for <span className="font-bold">{activeScanRequest.patientName}</span>.
+                  </p>
+                </div>
+
+                <div className="text-xs text-[#45483c] bg-[#EFF2EE] border border-[#C7D2C0]/50 rounded-xl px-lg py-md w-full max-w-sm space-y-1 text-left font-mono">
+                  <div className="flex items-center gap-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#3e5219] animate-ping"></span>
+                    <span>Querying donor HLA registry card cache...</span>
+                  </div>
+                  <div className="text-gray-400">ABO Blood Rule check: COMPATIBLE ONLY</div>
+                  <div className="text-gray-400">Target Organ: {activeScanRequest.organType}</div>
+                </div>
+              </div>
+            ) : (
+              /* MATCH SCAN RESULTS VIEW */
+              <div className="p-lg space-y-md">
+                {/* Recipient card summary */}
+                <div className="bg-[#EFF2EE] border border-[#C7D2C0] rounded-xl p-md flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-gray-500 uppercase font-semibold block">Recipient Patient</span>
+                    <span className="font-bold text-sm text-[#3e5219]">{activeScanRequest.patientName} ({activeScanRequest.id})</span>
+                    <span className="text-xs text-[#45483c] ml-sm">Age: {activeScanRequest.age} • Blood Group: <span className="font-semibold">{activeScanRequest.bloodGroup}</span></span>
+                  </div>
+                  <span className="bg-[#3e5219]/10 text-[#3e5219] text-xs px-2.5 py-1 font-bold rounded border border-[#3e5219]/20 uppercase">
+                    {activeScanRequest.organType} Waitlist
+                  </span>
+                </div>
+
+                <h4 className="font-label-caps text-label-caps text-[#45483c] text-xs font-semibold">Compatible Registry Donors Found ({scanResults.length})</h4>
+
+                {scanResults.length === 0 ? (
+                  <div className="text-center py-xl border border-dashed border-[#C7D2C0] rounded-xl text-gray-500 text-sm">
+                    No compatible {activeScanRequest.organType} donors found with compatible blood group ({activeScanRequest.bloodGroup}) at this time.
+                  </div>
+                ) : (
+                  <div className="border border-[#C7D2C0] rounded-xl overflow-hidden max-h-[300px] overflow-y-auto bg-white">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-[#C7D2C0] font-medium text-gray-500">
+                          <th className="p-sm">Donor Name</th>
+                          <th className="p-sm">Blood</th>
+                          <th className="p-sm">HLA Match Markers</th>
+                          <th className="p-sm text-center">Match Score</th>
+                          <th className="p-sm text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-gray-700">
+                        {scanResults.map(({ donor, score, hlaI, hlaII, hlaIPercent, hlaIIPercent, bloodCompatibility }) => (
+                          <tr key={donor.id} className="hover:bg-gray-50/50">
+                            <td className="p-sm">
+                              <div className="font-semibold text-gray-900">{donor.donorName}</div>
+                              <div className="text-[10px] text-gray-400">{donor.id} • {donor.age} Yrs • {donor.gender}</div>
+                            </td>
+                            <td className="p-sm">
+                              <span className="font-semibold">{donor.bloodGroup}</span>
+                              <span className="text-[9px] block text-gray-400 capitalize">{bloodCompatibility}</span>
+                            </td>
+                            <td className="p-sm">
+                              <div>Class I: <span className="font-semibold text-[#3e5219]">{hlaI} ({hlaIPercent}%)</span></div>
+                              <div>Class II: <span className="font-semibold text-[#3e5219]">{hlaII} ({hlaIIPercent}%)</span></div>
+                            </td>
+                            <td className="p-sm text-center">
+                              <span className="font-bold text-sm text-[#3e5219] bg-[#c8f17a]/30 px-2 py-0.5 rounded-full">
+                                {score}%
+                              </span>
+                            </td>
+                            <td className="p-sm text-right">
+                              <button
+                                type="button"
+                                onClick={() => confirmMatchAllocation(activeScanRequest, donor, score, hlaI, hlaII, hlaIPercent, hlaIIPercent)}
+                                className="bg-[#3e5219] hover:bg-[#496800] text-white px-md py-1.5 rounded-lg font-medium transition-all text-[11px]"
+                              >
+                                Allocate Match
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-sm border-t border-[#C7D2C0]/50">
+                  <button
+                    type="button"
+                    onClick={() => setActiveScanRequest(null)}
+                    className="border border-[#c5c8b8] text-[#45483c] px-lg py-2 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors"
+                  >
+                    Close Match Finder
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

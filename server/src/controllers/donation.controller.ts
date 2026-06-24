@@ -3,6 +3,7 @@ import { DonationRecord } from '../models/DonationRecord';
 import { HospitalProfile } from '../models/HospitalProfile';
 import { Request as BloodRequest } from '../models/Request';
 import { User } from '../models/User';
+import { DonorProfile } from '../models/DonorProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -91,6 +92,74 @@ export const updatePipelineStatus = async (req: AuthRequest, res: Response, next
     await donation.save();
 
     res.status(200).json({ success: true, data: donation });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllDonations = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const donations = await DonationRecord.find({})
+      .populate('donorId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: donations });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createDonation = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { donorName, bloodGroup, units, location, temperature, hemoglobin } = req.body;
+    
+    let donorUser = await User.findOne({ name: donorName, role: 'Donor' });
+    if (!donorUser) {
+      const emailLower = `${donorName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Math.floor(Math.random() * 1000)}@lifelink.org`;
+      donorUser = new User({
+        name: donorName,
+        email: emailLower,
+        role: 'Donor',
+        password: '$2b$10$temporaryhashedpasswordplaceholderforsecurityreason'
+      });
+      await donorUser.save();
+      
+      const profile = new DonorProfile({
+        userId: donorUser._id,
+        bloodType: bloodGroup || 'O+',
+        status: 'Available',
+        details: 'Altruistic blood donor.'
+      });
+      await profile.save();
+    }
+
+    const donation = new DonationRecord({
+      donorId: donorUser._id,
+      donationType: 'Blood',
+      bloodType: bloodGroup || 'O+',
+      facility: location || 'Main Hub',
+      donationDate: new Date(),
+      status: 'Stored',
+      pipelineStatus: 'completed',
+      volumeMl: (units || 1) * 450,
+      notes: `Hemoglobin: ${hemoglobin || '13.5'}, Temp: ${temperature || '98.6'}`
+    });
+    await donation.save();
+
+    // Check if the facility matches a registered hospital profile and update its inventory
+    const hospitalUser = await User.findOne({ name: location, role: 'Hospital' });
+    if (hospitalUser) {
+      const hospitalProfile = await HospitalProfile.findOne({ userId: hospitalUser._id });
+      if (hospitalProfile) {
+        const invIndex = hospitalProfile.bloodInventory.findIndex(inv => inv.bloodGroup === bloodGroup);
+        if (invIndex !== -1) {
+          hospitalProfile.bloodInventory[invIndex].units += units || 1;
+          await hospitalProfile.save();
+        }
+      }
+    }
+
+    res.status(201).json({ success: true, data: donation });
   } catch (error) {
     next(error);
   }

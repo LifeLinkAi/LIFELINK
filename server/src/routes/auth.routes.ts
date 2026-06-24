@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { register, login, me, logout, getInviteDetails, completeSetup, googleAuth } from '../controllers/auth.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { register, login, me, logout, getInviteDetails, completeSetup, googleAuth, getUsers } from '../controllers/auth.controller';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -11,5 +11,6 @@ router.get('/me', authenticate as any, me as any);
 router.post('/logout', logout);
 router.get('/invite-details', getInviteDetails);
 router.post('/complete-setup', completeSetup);
+router.get('/users', authenticate as any, authorize('Admin') as any, getUsers as any);
 
 export default router;
