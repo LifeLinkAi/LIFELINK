@@ -60,6 +60,21 @@ export interface IRequest extends Document {
     complications?: string;
     patientDischargeDate?: Date;
   };
+  legalAgreement?: {
+    donorSigned: boolean;
+    donorSignatureName?: string;
+    donorSignatureDate?: Date;
+    donorSignatureData?: string;
+    recipientSigned: boolean;
+    recipientSignatureName?: string;
+    recipientSignatureDate?: Date;
+    recipientSignatureData?: string;
+    hospitalSigned: boolean;
+    hospitalSignatureName?: string;
+    hospitalSignedAt?: Date;
+    ethicsCommitteeCleared: boolean;
+    ethicsCommitteeClearedAt?: Date;
+  };
   acceptedBy?: string | null;
   acceptedAt?: Date | null;
   donorId?: Schema.Types.ObjectId | null;
@@ -260,6 +275,21 @@ const requestSchema = new Schema<IRequest>(
       outcome: { type: String, enum: ['SUCCESS', 'FAILED'] },
       complications: { type: String },
       patientDischargeDate: { type: Date }
+    },
+    legalAgreement: {
+      donorSigned: { type: Boolean, default: false },
+      donorSignatureName: { type: String },
+      donorSignatureDate: { type: Date },
+      donorSignatureData: { type: String },
+      recipientSigned: { type: Boolean, default: false },
+      recipientSignatureName: { type: String },
+      recipientSignatureDate: { type: Date },
+      recipientSignatureData: { type: String },
+      hospitalSigned: { type: Boolean, default: false },
+      hospitalSignatureName: { type: String },
+      hospitalSignedAt: { type: Date },
+      ethicsCommitteeCleared: { type: Boolean, default: false },
+      ethicsCommitteeClearedAt: { type: Date }
     },
     donorName: {
       type: String,

@@ -8,6 +8,7 @@ import app from './app';
 import { connectDB } from './config/db';
 import { logger } from './utils/logger';
 import mongoose from 'mongoose';
+import { startWellnessScheduler } from './services/notifications/wellnessScheduler.service';
 
 const server = http.createServer(app);
 
@@ -74,6 +75,9 @@ const startServer = async (): Promise<void> => {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
+
+  // Start the Living Donor Wellness check-up reminders scheduler
+  startWellnessScheduler();
 
   // Start HTTP Server listener
   const port = process.env.PORT || 5000;
