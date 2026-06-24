@@ -52,7 +52,7 @@ app.use(
 // Apply rate limiting to all requests starting with /api or /api/v1
 const isDev = process.env.NODE_ENV !== "production";
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 1 * 60 * 1000, // 1 minute for development.
   max: 100, // Prod: 100 requests per window
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
