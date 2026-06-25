@@ -13,10 +13,23 @@ export const getHospitalDonations = async (req: AuthRequest, res: Response, next
       return next(new ApiError(403, 'Access denied. Hospital role required.'));
     }
 
-    const hospitalProfile = await HospitalProfile.findOne({ userId: req.user.id });
+    let hospitalProfile = await HospitalProfile.findOne({ userId: req.user.id });
     const user = await User.findById(req.user.id);
-    if (!hospitalProfile || !user) {
-      return next(new ApiError(404, 'Hospital profile or user not found.'));
+    
+    if (!user) {
+      return next(new ApiError(404, 'Hospital user not found.'));
+    }
+
+    if (!hospitalProfile) {
+      // Auto-heal the ghost user instead of throwing a 404
+      hospitalProfile = await HospitalProfile.create({
+        userId: user._id,
+        logo: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || 'Hospital')}`,
+        location: {
+          type: 'Point',
+          coordinates: [0, 0]
+        }
+      });
     }
 
     // Find donations at this hospital

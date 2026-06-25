@@ -7,6 +7,7 @@ import { Schema, model, Document } from 'mongoose';
 export type OrganType =
   | 'Kidney'
   | 'Liver'
+  | 'Liver Segment'
   | 'Cornea'
   | 'Heart'
   | 'Lung'
@@ -90,7 +91,7 @@ const organWaitlistSchema = new Schema<IOrganWaitlist>(
     // --- Clinical Data ---
     requiredOrgan: {
       type: String,
-      enum: ['Kidney', 'Liver', 'Cornea', 'Pancreas', 'Bone Marrow', 'Heart', 'Lung'],
+      enum: ['Kidney', 'Liver', 'Liver Segment', 'Cornea', 'Pancreas', 'Bone Marrow', 'Heart', 'Lung'],
       required: true,
     },
     bloodGroup: {

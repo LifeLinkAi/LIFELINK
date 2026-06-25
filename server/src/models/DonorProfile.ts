@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 
-const ORGAN_OPTIONS = ['Kidney', 'Liver', 'Cornea', 'Pancreas', 'Bone Marrow', 'Heart', 'Lung'] as const;
+const ORGAN_OPTIONS = ['Kidney', 'Liver', 'Liver Segment', 'Cornea', 'Pancreas', 'Bone Marrow', 'Heart', 'Lung'] as const;
 
 const donorProfileSchema = new Schema(
   {
