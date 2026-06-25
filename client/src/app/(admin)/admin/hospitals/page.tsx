@@ -95,7 +95,10 @@ export default function HospitalManagementPage() {
         licenseId: h.licenseId || 'LIC-UNKNOWN',
         name: h.name,
         city: h.city || 'San Francisco',
-        location: h.location || h.city || 'San Francisco, CA',
+        // INTERCEPT GEOMATRIX OBJECT: Safely stringify the object structure for React rendering and filtering
+        location: h.location && typeof h.location === 'object' && h.location.coordinates
+          ? `${h.city || 'San Francisco'}, CA`
+          : h.location || h.city || 'San Francisco, CA',
         logo: h.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(h.name)}`,
         specialties: h.specialties || ['General'],
         status: h.status || 'Pending',
@@ -167,7 +170,7 @@ export default function HospitalManagementPage() {
         licenseId: res.data.licenseId || 'LIC-PENDING',
         name: res.data.name,
         city: res.data.city || 'Pending Setup',
-        location: res.data.location || 'Pending Setup',
+        location: res.data.location?.coordinates?.join(', ') || 'No coordinates' || 'Pending Setup',
         logo: res.data.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(res.data.name)}`,
         specialties: res.data.specialties || ['General'],
         status: res.data.status || 'Pending',
@@ -975,23 +978,23 @@ export default function HospitalManagementPage() {
               </div>
             </div>
 
-              {/* Sticky Bottom Actions */}
-              <div className="p-6 bg-white border-t border-outline-variant/30 flex flex-col gap-sm shrink-0">
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => handleUpdateHospitalStatus(selectedHospital.id, selectedHospital.status === 'Suspended' ? 'Active' : 'Suspended')}
-                    className="flex-1 py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors text-center"
-                  >
-                    {selectedHospital.status === 'Suspended' ? 'Activate' : 'Suspend'}
-                  </button>
-                  <button 
-                    onClick={() => handleUpdateHospitalStatus(selectedHospital.id, 'Active')}
-                    className="flex-1 py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center"
-                    disabled={selectedHospital.status === 'Active' || !selectedHospital.isSetupComplete}
-                  >
-                    {selectedHospital.status === 'Active' ? 'Verified ✓' : 'Verify & Activate'}
-                  </button>
-                </div>
+            {/* Sticky Bottom Actions */}
+            <div className="p-6 bg-white border-t border-outline-variant/30 flex flex-col gap-sm shrink-0">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, selectedHospital.status === 'Suspended' ? 'Active' : 'Suspended')}
+                  className="flex-1 py-3 px-4 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl font-syne font-bold text-xs uppercase tracking-wider transition-colors text-center"
+                >
+                  {selectedHospital.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                </button>
+                <button 
+                  onClick={() => handleUpdateHospitalStatus(selectedHospital.id, 'Active')}
+                  className="flex-1 py-3 px-4 bg-primary hover:brightness-110 text-white rounded-xl font-syne font-bold text-xs uppercase tracking-wider shadow-sm transition-all text-center"
+                  disabled={selectedHospital.status === 'Active' || !selectedHospital.isSetupComplete}
+                >
+                  {selectedHospital.status === 'Active' ? 'Verified ✓' : 'Verify & Activate'}
+                </button>
+              </div>
               <button 
                 onClick={() => handleDeleteHospital(selectedHospital.id)}
                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-syne font-bold text-sm shadow-md transition-colors text-center"
