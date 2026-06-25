@@ -39,7 +39,7 @@ export default function DonorOrganPortal() {
 
   const fetchState = async () => {
     try {
-      // Fetch active request first
+      // 1. Check for active organ request (interest sent or accepted) — highest priority
       const reqRes = await api.get('/donor/organ/active-request');
       if (reqRes.data.data) {
         setActiveRequest(reqRes.data.data);
@@ -47,21 +47,23 @@ export default function DonorOrganPortal() {
         return;
       }
 
-      // Fetch profile
-      const profRes = await api.get('/users/profile'); // Adjust endpoint if needed, or if we don't have a GET /profile in donorOrgan, wait, we didn't add a GET profile in donorOrgan. Let me just rely on whether there are matches, but actually if they have no profile, GET matches returns []. Let's just create an implicit check.
-      // Wait, let's fetch matches directly. If matches fail or empty and no profile, they need intake.
-      const matchRes = await api.get('/donor/organ/matches');
-      if (matchRes.data.data && matchRes.data.data.length > 0) {
-        setMatches(matchRes.data.data);
+      // 2. No active request — check if donor has a profile and fetch matches
+      try {
+        const matchRes = await api.get('/donor/organ/matches');
+        if (matchRes.data.data && matchRes.data.data.length > 0) {
+          setMatches(matchRes.data.data);
+          setView('discovery');
+          return;
+        }
+        // Profile exists but no matches right now — show discovery feed (empty)
+        // Only show intake if the matches endpoint explicitly returned an empty array
+        // (means profile exists but no compatible patients)
         setView('discovery');
-      } else {
-        // Assume they need intake or have no matches.
-        // In a real system, we'd check if profile exists explicitly.
-        // For simplicity, if they reach here, we'll show intake if they haven't set an organ, else discovery.
-        setView('intake'); 
+      } catch {
+        // Matches endpoint failed (profile likely doesn't exist) — show intake
+        setView('intake');
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setView('intake');
     }
   };
@@ -258,17 +260,17 @@ export default function DonorOrganPortal() {
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-lg">Active Donation Tracker</h2>
-                <p className="text-sm text-slate-400 mt-0.5">Patient: {activeRequest.waitlistId?.fullName}</p>
+                <p className="text-sm text-slate-400 mt-0.5">Patient: {activeRequest.waitlistId?.fullName ?? 'Awaiting match confirmation'}</p>
               </div>
               <div className="px-3 py-1 bg-white/10 rounded-lg backdrop-blur-md font-mono text-xs font-bold uppercase tracking-widest text-emerald-400">
-                {activeRequest.status.replace(/_/g, ' ')}
+                {activeRequest.status === 'PENDING_HOSPITAL' ? 'UNDER REVIEW' : activeRequest.status.replace(/_/g, ' ')}
               </div>
             </div>
             
             <div className="p-8">
               <div className="relative border-l-2 border-slate-200 ml-3 space-y-8">
                 
-                {/* Step 1 */}
+                {/* Step 1 — Interest Sent (always completed in tracker view) */}
                 <div className="relative pl-8">
                   <div className="absolute w-6 h-6 bg-emerald-500 rounded-full border-4 border-white left-[-13px] top-0 shadow-sm flex items-center justify-center">
                     <CheckCircle2 size={12} className="text-white" />
@@ -277,7 +279,22 @@ export default function DonorOrganPortal() {
                   <p className="text-sm text-slate-500 mt-1">Hospital notified of your willingness to donate.</p>
                 </div>
 
-                {/* Step 2 */}
+                {/* Step 1.5 — Awaiting Hospital Review (animated pulse, only visible for PENDING_HOSPITAL) */}
+                {activeRequest.status === 'PENDING_HOSPITAL' && (
+                  <div className="relative pl-8">
+                    <div className="absolute w-6 h-6 rounded-full border-4 border-white left-[-13px] top-0 shadow-sm bg-amber-400 flex items-center justify-center animate-pulse">
+                      <Activity size={10} className="text-white" />
+                    </div>
+                    <h3 className="font-bold text-amber-700">Awaiting Hospital Review</h3>
+                    <p className="text-sm text-slate-500 mt-1">The hospital is reviewing your interest. You will be notified once they respond.</p>
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-xs font-medium text-amber-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+                      Pending response
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2 — Lab Test Scheduled */}
                 <div className="relative pl-8">
                   <div className={cn("absolute w-6 h-6 rounded-full border-4 border-white left-[-13px] top-0 shadow-sm flex items-center justify-center", 
                     ['CLINICAL_TESTING', 'PENDING_LEGAL_APPROVAL', 'TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS', 'COMPLETED'].includes(activeRequest.status) ? 'bg-emerald-500' : 'bg-slate-200')}>
@@ -311,7 +328,7 @@ export default function DonorOrganPortal() {
                   )}
                 </div>
 
-                {/* Step 3 */}
+                {/* Step 3 — Legal Consent */}
                 <div className="relative pl-8">
                   <div className={cn("absolute w-6 h-6 rounded-full border-4 border-white left-[-13px] top-0 shadow-sm flex items-center justify-center", 
                     ['PENDING_LEGAL_APPROVAL', 'TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS', 'COMPLETED'].includes(activeRequest.status) ? 'bg-emerald-500' : 'bg-slate-200')}>
@@ -319,7 +336,7 @@ export default function DonorOrganPortal() {
                   <h3 className={cn("font-bold", ['PENDING_LEGAL_APPROVAL', 'TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS', 'COMPLETED'].includes(activeRequest.status) ? 'text-slate-900' : 'text-slate-400')}>Legal Consent Verified</h3>
                 </div>
 
-                {/* Step 4 */}
+                {/* Step 4 — Surgery */}
                 <div className="relative pl-8">
                   <div className={cn("absolute w-6 h-6 rounded-full border-4 border-white left-[-13px] top-0 shadow-sm flex items-center justify-center", 
                     ['TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS', 'COMPLETED'].includes(activeRequest.status) ? 'bg-emerald-500' : 'bg-slate-200')}>

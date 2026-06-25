@@ -250,7 +250,9 @@ export const getActiveOrganRequest = async (
 
     const requestDoc = await DonationRequest.findOne({
       acceptedDonorId: profile._id,
-      type: 'Organ'
+      type: 'Organ',
+      // Only return genuinely active records — exclude declined and completed
+      status: { $in: ['PENDING_HOSPITAL', 'CLINICAL_TESTING', 'PENDING_LEGAL_APPROVAL', 'TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS'] },
     }).sort({ createdAt: -1 }).populate({
       path: 'hospitalId',
       select: 'name email phone address'

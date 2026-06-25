@@ -310,20 +310,41 @@ export const getPendingOrganMatches = async (
             comorbidities: m.waitlistId.comorbidities,
           }
         : null,
-      // Donor (from DonorProfile + User)
-      donor: (m as any).acceptedDonorId
-        ? {
-            id: (m as any).acceptedDonorId._id?.toString(),
-            name: ((m as any).acceptedDonorId.userId as any)?.name ?? 'Unknown Donor',
-            email: ((m as any).acceptedDonorId.userId as any)?.email ?? null,
-            bloodType: (m as any).acceptedDonorId.bloodType,
-            organsWillingToDonate: (m as any).acceptedDonorId.organsWillingToDonate,
-            status: (m as any).acceptedDonorId.status,
-            tier: (m as any).acceptedDonorId.tier,
-            details: (m as any).acceptedDonorId.details,
-          }
-        : (m.notifiedDonors && m.notifiedDonors.length > 0)
-        ? {
+      // Donor (from DonorProfile + User, with denormalized fallback)
+      donor: (() => {
+        // Try populated acceptedDonorId (DonorProfile → User chain)
+        if ((m as any).acceptedDonorId) {
+          const dp = (m as any).acceptedDonorId;
+          const populatedName = (dp.userId as any)?.name;
+          const populatedEmail = (dp.userId as any)?.email;
+          return {
+            id: dp._id?.toString(),
+            // Prefer populated name, fallback to denormalized donorName on the document
+            name: populatedName ?? (m as any).donorName ?? 'Unknown Donor',
+            email: populatedEmail ?? (m as any).donorEmail ?? null,
+            bloodType: dp.bloodType ?? (m as any).donorBloodType,
+            organsWillingToDonate: dp.organsWillingToDonate,
+            status: dp.status,
+            tier: dp.tier,
+            details: dp.details,
+          };
+        }
+        // Fallback: use denormalized fields stored directly on the DonationRequest
+        if ((m as any).donorName || (m as any).donorEmail) {
+          return {
+            id: null,
+            name: (m as any).donorName ?? 'Unknown Donor',
+            email: (m as any).donorEmail ?? null,
+            bloodType: (m as any).donorBloodType ?? null,
+            organsWillingToDonate: [],
+            status: null,
+            tier: null,
+            details: null,
+          };
+        }
+        // Last resort: notifiedDonors array
+        if (m.notifiedDonors && m.notifiedDonors.length > 0) {
+          return {
             id: m.notifiedDonors[0]._id?.toString(),
             name: m.notifiedDonors[0].userId?.name ?? 'Unknown Donor',
             email: m.notifiedDonors[0].userId?.email ?? null,
@@ -332,8 +353,10 @@ export const getPendingOrganMatches = async (
             status: m.notifiedDonors[0].status,
             tier: m.notifiedDonors[0].tier,
             details: m.notifiedDonors[0].details,
-          }
-        : null,
+          };
+        }
+        return null;
+      })(),
       clinicalEvaluation: m.clinicalEvaluation,
     }));
 
