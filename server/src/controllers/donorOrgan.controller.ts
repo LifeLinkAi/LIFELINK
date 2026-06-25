@@ -89,6 +89,19 @@ export const updateDonorOrganProfile = async (
  * @route   GET /api/donor/organ/matches
  * @access  Private (Donor)
  */
+const getCompatiblePatientBloodGroups = (donorBloodType: string): string[] => {
+  const d = donorBloodType.toUpperCase().trim();
+  if (d === 'O-') return ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
+  if (d === 'O+') return ['O+', 'A+', 'B+', 'AB+'];
+  if (d === 'A-') return ['A-', 'A+', 'AB-', 'AB+'];
+  if (d === 'A+') return ['A+', 'AB+'];
+  if (d === 'B-') return ['B-', 'B+', 'AB-', 'AB+'];
+  if (d === 'B+') return ['B+', 'AB+'];
+  if (d === 'AB-') return ['AB-', 'AB+'];
+  if (d === 'AB+') return ['AB+'];
+  return [donorBloodType];
+};
+
 export const getDonorOrganMatches = async (
   req: AuthRequest,
   res: Response,
@@ -105,9 +118,15 @@ export const getDonorOrganMatches = async (
       return;
     }
 
+    // Include "Liver Segment" if donor is willing to donate "Liver"
+    const organs = [...profile.organsWillingToDonate];
+    if (organs.includes('Liver') && !organs.includes('Liver Segment')) {
+      organs.push('Liver Segment');
+    }
+
     const waitlist = await OrganWaitlist.find({
-      requiredOrgan: { $in: profile.organsWillingToDonate },
-      bloodGroup: profile.bloodType,
+      requiredOrgan: { $in: organs },
+      bloodGroup: { $in: getCompatiblePatientBloodGroups(profile.bloodType) },
       status: { $in: ['Waitlisted', 'Searching'] }
     }).sort({ urgency: -1, createdAt: 1 }).populate('hospitalId', 'name address').lean();
 

@@ -635,22 +635,35 @@ export const getMyPledges = async (req: AuthRequest, res: Response, next: NextFu
   try {
     if (!req.user || req.user.role !== 'Donor') return next(new ApiError(403, 'Access denied.'));
     
+    const profile = await DonorProfile.findOne({ userId: req.user.id });
+    if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
+
     const requests = await Request.find({
-      pledgedDonors: {
-        $elemMatch: {
-          $or: [
-            { donorId: new Types.ObjectId(req.user.id) },
-            { donorId: req.user.id }
-          ],
-          status: { $in: ['PLEDGED', 'ARRIVED', 'COMPLETED'] }
-        }
-      }
+      $or: [
+        { 
+          pledgedDonors: {
+            $elemMatch: {
+              $or: [
+                { donorId: profile._id },
+                { donorId: new Types.ObjectId(req.user.id) },
+                { donorId: req.user.id }
+              ],
+              status: { $in: ['PLEDGED', 'ARRIVED', 'COMPLETED'] }
+            }
+          }
+        },
+        { acceptedDonorId: profile._id }
+      ]
     }).lean();
 
     const result = requests.map((r: any) => {
       const dto = toRequestDto(r);
-      const myPledge = r.pledgedDonors.find((d: any) => d.donorId.toString() === req.user!.id);
-      return { ...dto, myPledgeStatus: myPledge?.status };
+      const myPledge = r.pledgedDonors?.find((d: any) => 
+        d.donorId.toString() === profile._id.toString() || 
+        d.donorId.toString() === req.user!.id
+      );
+      const isAccepted = r.acceptedDonorId?.toString() === profile._id.toString();
+      return { ...dto, myPledgeStatus: isAccepted ? 'ACCEPTED' : myPledge?.status };
     });
 
     res.status(200).json({ success: true, data: result });
