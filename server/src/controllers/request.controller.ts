@@ -142,6 +142,9 @@ export const getRequests = async (req: AuthRequest, res: Response, next: NextFun
           return {
             id: patientObj._id.toString(),
             _id: patientObj._id,
+            // These two fields are essential for the new /donor/organ/express-interest endpoint
+            waitlistId: patientObj._id.toString(),
+            hospitalId: ((patientObj.hospitalId as any)?._id || patientObj.hospitalId)?.toString(),
             patientName: patientObj.fullName,
             age: patientObj.age,
             gender: patientObj.gender,

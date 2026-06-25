@@ -468,15 +468,32 @@ export default function OrganDonation() {
   );
 
   const handleSendInterest = async (requestId: string) => {
+    // Find the patient record to get waitlistId and hospitalId
+    const patient = patients.find((p: any) => (p.id || p._id) === requestId);
+    
+    // Prefer the correct new endpoint that saves acceptedDonorId + donor identity
+    const waitlistId = patient?.waitlistId;
+    const hospitalId = patient?.hospitalId;
+
     try {
-      const res = await api.post(`/requests/${requestId}/interest`);
-      if (res.data.success) {
-        setInterestedRequestIds((prev) => [...prev, requestId]);
-        showToast("Γ£ô Interest sent! The hospital has been notified.");
+      if (waitlistId && hospitalId) {
+        // Use the proper organ interest endpoint that sets acceptedDonorId + donorName/donorEmail
+        const res = await api.post('/donor/organ/express-interest', { waitlistId, hospitalId });
+        if (res.data.success) {
+          setInterestedRequestIds((prev) => [...prev, requestId]);
+          showToast("✅ Interest sent! The hospital has been notified.");
+        }
+      } else {
+        // Fallback: old route for non-waitlist requests
+        const res = await api.post(`/requests/${requestId}/interest`);
+        if (res.data.success) {
+          setInterestedRequestIds((prev) => [...prev, requestId]);
+          showToast("✅ Interest sent! The hospital has been notified.");
+        }
       }
     } catch (err: any) {
       const msg = err.response?.data?.message ?? err.message ?? "Failed to log interest.";
-      showToast(`Γ¥î ${msg}`);
+      showToast(`❌ ${msg}`);
     }
   };
 
