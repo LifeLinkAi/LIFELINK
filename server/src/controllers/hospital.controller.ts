@@ -17,6 +17,10 @@ export const getHospitals = async (req: AuthRequest, res: Response, next: NextFu
         profile = await HospitalProfile.create({
           userId: user._id,
           logo: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`,
+          location: {
+            type: 'Point',
+            coordinates: [0, 0]
+          }
         });
       }
       result.push({
@@ -589,4 +593,4 @@ export const bulkInviteHospitals = async (req: AuthRequest, res: Response, next:
   } catch (error) {
     next(error);
   }
-};
+};
