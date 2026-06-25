@@ -120,6 +120,10 @@ export const createWaitlistPatient = async (
       medicalHistory:        medicalHistory?.trim() ?? '',
       comorbidities:         comorbidities?.trim() ?? '',
       status:                'Waitlisted',
+      location: {
+        type: 'Point',
+        coordinates: req.body.location?.coordinates || [0, 0]
+      }
     });
 
     logger.info(`[createWaitlistPatient] Patient ${patient._id} registered by hospital ${req.user.id}`);
@@ -264,7 +268,7 @@ export const getPendingOrganMatches = async (
       .populate({
         path: 'acceptedDonorId',
         model: 'DonorProfile',
-        select: 'bloodType organsWillingToDonate status tier details',
+        select: 'userId bloodType organsWillingToDonate status tier details',
         populate: {
           path: 'userId',
           model: 'User',
@@ -470,7 +474,7 @@ export const getClinicalTestingMatches = async (
       .populate({
         path: 'acceptedDonorId',
         model: 'DonorProfile',
-        select: 'bloodType organsWillingToDonate status tier details',
+        select: 'userId bloodType organsWillingToDonate status tier details',
         populate: {
           path: 'userId',
           model: 'User',
@@ -695,7 +699,7 @@ export const getPendingLegalMatches = async (
       .populate({
         path: 'acceptedDonorId',
         model: 'DonorProfile',
-        select: 'bloodType organsWillingToDonate status tier details',
+        select: 'userId bloodType organsWillingToDonate status tier details',
         populate: {
           path: 'userId',
           model: 'User',

@@ -703,6 +703,10 @@ export const expressInterest = async (req: AuthRequest, res: Response, next: Nex
           requestedBy: waitlistPatient.hospitalId,
           hospitalId: waitlistPatient.hospitalId,
           facility: hospitalUser?.name || 'Coordinating Medical Center',
+          location: {
+            type: 'Point',
+            coordinates: [0, 0]
+          }
         });
       }
     }
