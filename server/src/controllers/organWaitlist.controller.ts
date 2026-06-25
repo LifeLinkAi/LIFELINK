@@ -275,6 +275,16 @@ export const getPendingOrganMatches = async (
           select: 'name email',
         },
       })
+      .populate({
+        path: 'notifiedDonors',
+        model: 'DonorProfile',
+        select: 'userId bloodType organsWillingToDonate status tier details',
+        populate: {
+          path: 'userId',
+          model: 'User',
+          select: 'name email phone',
+        },
+      })
       .sort({ updatedAt: -1 })
       .lean();
 
@@ -311,6 +321,17 @@ export const getPendingOrganMatches = async (
             status: (m as any).acceptedDonorId.status,
             tier: (m as any).acceptedDonorId.tier,
             details: (m as any).acceptedDonorId.details,
+          }
+        : (m.notifiedDonors && m.notifiedDonors.length > 0)
+        ? {
+            id: m.notifiedDonors[0]._id?.toString(),
+            name: m.notifiedDonors[0].userId?.name ?? 'Unknown Donor',
+            email: m.notifiedDonors[0].userId?.email ?? null,
+            bloodType: m.notifiedDonors[0].bloodType,
+            organsWillingToDonate: m.notifiedDonors[0].organsWillingToDonate,
+            status: m.notifiedDonors[0].status,
+            tier: m.notifiedDonors[0].tier,
+            details: m.notifiedDonors[0].details,
           }
         : null,
       clinicalEvaluation: m.clinicalEvaluation,
