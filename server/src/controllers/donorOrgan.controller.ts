@@ -194,6 +194,8 @@ export const expressOrganInterest = async (
       return next(new ApiError(400, 'You have already expressed interest for this patient.'));
     }
 
+    const hospProfile = await HospitalProfile.findOne({ userId: new Types.ObjectId(hospitalId) });
+
     const requestDoc = new DonationRequest({
       hospitalId: new Types.ObjectId(hospitalId),
       type: 'Organ',
@@ -215,6 +217,10 @@ export const expressOrganInterest = async (
       timeline: [
         { event: 'donor_expressed_interest', timestamp: new Date() }
       ],
+      location: {
+        type: 'Point',
+        coordinates: hospProfile?.location?.coordinates || [0, 0]
+      },
       distanceKm: Math.floor(Math.random() * 50) + 1
     });
 
