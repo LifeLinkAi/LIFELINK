@@ -336,8 +336,11 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
           licenseId: '',
           governmentLicenseId: '',
           city: '',
-          location: '',
           logo: avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+          location: {
+            type: 'Point',
+            coordinates: [0, 0]
+          },
           specialties: ['General'],
           status: 'Pending',
           isSetupComplete: false,
