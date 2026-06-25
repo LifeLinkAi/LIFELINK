@@ -398,6 +398,12 @@ export const evaluateOrganMatch = async (
       }
 
       requestDoc.status = 'CLINICAL_TESTING';
+
+      // Inject the acceptedDonorId assignment so the document permanently links the donor
+      const donorId = requestDoc.notifiedDonors?.[0] || requestDoc.pledgedDonors?.[0]?.donorId;
+      if (!requestDoc.acceptedDonorId && donorId) {
+        requestDoc.acceptedDonorId = donorId as any;
+      }
       
       // Save scheduling details
       requestDoc.clinicalEvaluation = {
