@@ -2,7 +2,6 @@ import { DonorProfile } from '../../models/DonorProfile';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
 
-// Types
 export interface GeoJSONLocation {
   type: 'Point';
   coordinates: number[];
@@ -17,7 +16,7 @@ export interface MatchRequest {
   urgency?: 'critical' | 'high' | 'medium' | 'low';
 }
 
-// Comprehensive ABO/Rh compatibility matrix
+// Medical ABO/Rh compatibility matrix mapping
 const getCompatibleBloodTypes = (bloodGroup: string): string[] => {
   const matrix: Record<string, string[]> = {
     'O+': ['O+', 'O-'],
@@ -33,84 +32,82 @@ const getCompatibleBloodTypes = (bloodGroup: string): string[] => {
 };
 
 /**
- * Checks if the donor is eligible to donate (>= 56 days recovery period)
+ * Finds up to 10 nearby compatible, eligible donors using an optimized single query pipeline.
  */
-export function isDonorEligible(lastDonation: string | undefined | null): boolean {
-  if (!lastDonation || lastDonation === 'N/A') return true;
-  const parseDate = (raw: string): Date | null => {
-    const wordMatch = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
-    if (wordMatch) {
-      const d = new Date(`${wordMatch[2]} ${wordMatch[1]}, ${wordMatch[3]}`);
-      if (!isNaN(d.getTime())) return d;
-    }
-    const d = new Date(raw);
-    if (!isNaN(d.getTime())) return d;
-    return null;
-  };
-  const donationDate = parseDate(lastDonation);
-  if (!donationDate) return true;
-  const now = new Date();
-  const donation = new Date(donationDate.getFullYear(), donationDate.getMonth(), donationDate.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const daysSince = Math.floor((today.getTime() - donation.getTime()) / msPerDay);
-  return daysSince >= 56;
-}
-
 export const findNearbyCompatibleDonors = async (request: any) => {
   try {
-    const hasLocation = request.location &&
+    const hasLocation = Boolean(
+      request?.location?.coordinates &&
       Array.isArray(request.location.coordinates) &&
       request.location.coordinates.length === 2 &&
-      !(request.location.coordinates[0] === 0 && request.location.coordinates[1] === 0);
+      request.location.coordinates[0] !== 0
+    );
 
-    const matchStage: any = {
+    // 1. Core Filtering Criteria (Status & Compatibility)
+    const matchCriteria: any = {
       status: { $in: ['Available', 'Verified', 'AVAILABLE'] },
       isSetupComplete: true,
     };
 
     if (request.type === 'Blood' && request.bloodGroup) {
-      matchStage.bloodType = { $in: getCompatibleBloodTypes(request.bloodGroup) };
-    } else if (request.type === 'Organ') {
-      if (!request.organType) {
-        logger.error('Matching failed: Organ request initiated without an explicit organ target type.');
-        return [];
-      }
-      matchStage.organsWillingToDonate = request.organType;
+      matchCriteria.bloodType = { $in: getCompatibleBloodTypes(request.bloodGroup) };
+    } else if (request.type === 'Organ' && request.organType) {
+      matchCriteria.organsWillingToDonate = request.organType;
     }
 
-    const exclusionSet = new Set([
-      ...(request.notifiedDonors || []).map((donorId: any) => donorId.toString()),
-      ...(request.rejectedBy || []).map((donorId: any) => donorId.toString()),
-      ...(request.matchedDonors || [])
-        .filter((matched: any) => ['NOTIFIED', 'ACCEPTED'].includes(matched.status))
-        .map((matched: any) => matched.donorId?.toString())
-        .filter(Boolean),
-    ]);
+    // Combine notified and rejected exclusions safely using Mongoose maps
+    const exclusions = [
+      ...(request.notifiedDonors || []),
+      ...(request.rejectedBy || [])
+    ].map(id => new mongoose.Types.ObjectId(id.toString()));
 
-    const excludedDonorObjectIds = Array.from(exclusionSet).map(id => new mongoose.Types.ObjectId(id));
-
-    if (excludedDonorObjectIds.length > 0) {
-      matchStage._id = { $nin: excludedDonorObjectIds };
+    if (exclusions.length > 0) {
+      matchCriteria._id = { $nin: exclusions };
     }
 
+    // 2. Build the Optimized Aggregation Pipeline
     const pipeline: any[] = [];
 
+    // Stage A: Geospatial Core Index Filter
     if (hasLocation) {
-      const [targetLng, targetLat] = request.location.coordinates;
+      const [lng, lat] = request.location.coordinates;
       pipeline.push({
         $geoNear: {
-          near: { type: 'Point', coordinates: [targetLng, targetLat] },
+          near: { type: 'Point', coordinates: [lng, lat] },
           distanceField: 'distanceInMeters',
-          maxDistance: 500000, 
+          maxDistance: 500000, // 500km limit
           spherical: true,
-          query: matchStage 
+          query: matchCriteria // Merges match criteria directly into the index scan layer
         }
       });
     } else {
-      pipeline.push({ $match: matchStage });
+      pipeline.push({ $match: matchCriteria });
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
 
+    // Stage B: IN-ENGINE BIOLOGICAL COOLDOWN (Suggested by Reviewer)
+    // Converts string dates or handles missing entries natively via the DB
+    pipeline.push({
+      $addFields: {
+        parsedDonationDate: {
+          $cond: {
+            if: { $or: [{ $eq: ["$lastDonation", "N/A"] }, { $not: ["$lastDonation"] }] },
+            then: new Date(0), // Sets to epoch if never donated, passing cooldown instantly
+            else: { $toDate: "$lastDonation" }
+          }
+        }
+      }
+    });
+
+    // Filter out donors whose last donation was within the 56-day window (56 days in milliseconds)
+    const cooldownPeriodMs = 56 * 24 * 60 * 60 * 1000;
+    pipeline.push({
+      $match: {
+        parsedDonationDate: { $lte: new Date(Date.now() - cooldownPeriodMs) }
+      }
+    });
+
+    // Stage C: Graph Lookup User Relationships
     pipeline.push(
       {
         $lookup: {
@@ -120,22 +117,16 @@ export const findNearbyCompatibleDonors = async (request: any) => {
           as: 'user'
         }
       },
-      {
-        $unwind: {
-          path: '$user',
-          preserveNullAndEmptyArrays: true
-        }
-      }
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }
     );
 
     if (hasLocation) {
       pipeline.push({ $sort: { distanceInMeters: 1 } });
-    } else {
-      pipeline.push({ $sort: { createdAt: -1 } });
     }
 
-    pipeline.push({ $limit: 30 });
+    pipeline.push({ $limit: 10 });
 
+    // Stage D: IN-ENGINE STRING FORMATTING (Clean Projection Payload)
     pipeline.push({
       $project: {
         _id: 1,
@@ -143,66 +134,95 @@ export const findNearbyCompatibleDonors = async (request: any) => {
         phone: { $ifNull: ['$user.phone', 'N/A'] },
         bloodType: 1,
         organsWillingToDonate: 1,
-        distanceInMeters: hasLocation ? 1 : { $literal: 0 },
+        distanceInMeters: 1,
         lastDonation: 1,
-        distance: hasLocation ? { 
-          $concat: [
-            { $toString: { $round: [{ $divide: ["$distanceInMeters", 1000] }, 1] } }, 
-            " km"
-          ] 
-        } : { $literal: "N/A" },
-        matchPercentage: { $literal: 98 }
+        matchPercentage: { $literal: 98 },
+        distance: {
+          $cond: {
+            if: hasLocation,
+            then: {
+              $concat: [
+                { $toString: { $round: [{ $divide: ["$distanceInMeters", 1000] }, 1] } },
+                " km"
+              ]
+            },
+            else: "N/A"
+          }
+        }
       }
     });
 
-    const compatibleDonors = await DonorProfile.aggregate(pipeline);
-    const eligibleDonors = compatibleDonors.filter(donor => isDonorEligible(donor.lastDonation));
+    return await DonorProfile.aggregate(pipeline);
 
-    return eligibleDonors.slice(0, 10);
   } catch (error) {
-    logger.error('Critical exception captured within execution of findNearbyCompatibleDonors:', error);
-    throw error;
+    logger.error('Error in findNearbyCompatibleDonors optimization layer:', error);
+    return [];
   }
 };
 
+/**
+ * Finds the single best available dispatch target using the query pipeline.
+ */
 export const findBestCompatibleDonorForRequest = async (request: any) => {
   try {
-    const hasLocation = request.location &&
+    const hasLocation = Boolean(
+      request?.location?.coordinates &&
       Array.isArray(request.location.coordinates) &&
       request.location.coordinates.length === 2 &&
-      !(request.location.coordinates[0] === 0 && request.location.coordinates[1] === 0);
+      request.location.coordinates[0] !== 0
+    );
 
-    const matchStage: any = {
+    const matchCriteria: any = {
       status: { $in: ['Available', 'Verified', 'AVAILABLE'] },
       isSetupComplete: true,
     };
 
     if (request.rejectedBy && request.rejectedBy.length > 0) {
-      matchStage._id = { $nin: request.rejectedBy.map((id: any) => new mongoose.Types.ObjectId(id.toString())) };
+      matchCriteria._id = { $nin: request.rejectedBy.map((id: any) => new mongoose.Types.ObjectId(id.toString())) };
     }
 
     if (request.type === 'Blood' && request.bloodGroup) {
-      matchStage.bloodType = { $in: getCompatibleBloodTypes(request.bloodGroup) };
+      matchCriteria.bloodType = { $in: getCompatibleBloodTypes(request.bloodGroup) };
     } else if (request.type === 'Organ' && request.organType) {
-      matchStage.organsWillingToDonate = request.organType;
+      matchCriteria.organsWillingToDonate = request.organType;
     }
 
     const pipeline: any[] = [];
 
     if (hasLocation) {
-      const [targetLng, targetLat] = request.location.coordinates;
+      const [lng, lat] = request.location.coordinates;
       pipeline.push({
         $geoNear: {
-          near: { type: 'Point', coordinates: [targetLng, targetLat] },
+          near: { type: 'Point', coordinates: [lng, lat] },
           distanceField: 'distanceInMeters',
           maxDistance: 50000, 
           spherical: true,
-          query: matchStage 
+          query: matchCriteria
         }
       });
     } else {
-      pipeline.push({ $match: matchStage });
+      pipeline.push({ $match: matchCriteria });
     }
+
+    // Cooldown verification inside the query
+    pipeline.push({
+      $addFields: {
+        parsedDonationDate: {
+          $cond: {
+            if: { $or: [{ $eq: ["$lastDonation", "N/A"] }, { $not: ["$lastDonation"] }] },
+            then: new Date(0),
+            else: { $toDate: "$lastDonation" }
+          }
+        }
+      }
+    });
+
+    const cooldownPeriodMs = 56 * 24 * 60 * 60 * 1000;
+    pipeline.push({
+      $match: {
+        parsedDonationDate: { $lte: new Date(Date.now() - cooldownPeriodMs) }
+      }
+    });
 
     pipeline.push({
       $sort: hasLocation 
@@ -210,17 +230,13 @@ export const findBestCompatibleDonorForRequest = async (request: any) => {
         : { isEmergencyMode: -1, isAvailable: -1, createdAt: -1 }
     });
 
-    pipeline.push({ $limit: 20 });
+    pipeline.push({ $limit: 1 });
 
-    const compatibleDonors = await DonorProfile.aggregate(pipeline);
-    if (compatibleDonors.length === 0) return null;
+    const results = await DonorProfile.aggregate(pipeline);
+    return results.length > 0 ? results[0] : null;
 
-    const eligibleDonors = compatibleDonors.filter(donor => isDonorEligible(donor.lastDonation));
-    if (eligibleDonors.length === 0) return null;
-
-    return eligibleDonors[0];
   } catch (error) {
-    logger.error('Error finding best compatible donor:', error);
+    logger.error('Error in findBestCompatibleDonorForRequest optimization layer:', error);
     return null;
   }
 };
