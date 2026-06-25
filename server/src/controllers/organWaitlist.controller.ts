@@ -423,9 +423,36 @@ export const evaluateOrganMatch = async (
       requestDoc.status = 'CLINICAL_TESTING';
 
       // Inject the acceptedDonorId assignment so the document permanently links the donor
-      const donorId = requestDoc.notifiedDonors?.[0] || requestDoc.pledgedDonors?.[0]?.donorId;
-      if (!requestDoc.acceptedDonorId && donorId) {
-        requestDoc.acceptedDonorId = donorId as any;
+      let resolvedDonorProfileId: any = requestDoc.acceptedDonorId;
+      if (!resolvedDonorProfileId) {
+        const donorId = requestDoc.notifiedDonors?.[0] || requestDoc.pledgedDonors?.[0]?.donorId;
+        if (donorId) {
+          // Check if donorId is the DonorProfile._id
+          let profile = await DonorProfile.findById(donorId);
+          if (!profile) {
+            // Check if donorId is User._id
+            profile = await DonorProfile.findOne({ userId: donorId });
+          }
+          if (profile) {
+            resolvedDonorProfileId = profile._id;
+          } else {
+            resolvedDonorProfileId = donorId as any;
+          }
+        }
+      }
+
+      if (resolvedDonorProfileId) {
+        requestDoc.acceptedDonorId = resolvedDonorProfileId as any;
+        // Populating the denormalized donor information on the request to prevent future Unknown Donor issues
+        const profile = await DonorProfile.findById(resolvedDonorProfileId).populate('userId');
+        if (profile) {
+          const u = profile.userId as any;
+          if (u) {
+            requestDoc.donorName = u.name;
+            requestDoc.donorEmail = u.email;
+            requestDoc.donorBloodType = profile.bloodType;
+          }
+        }
       }
       
       // Save scheduling details

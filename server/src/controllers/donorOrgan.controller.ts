@@ -202,6 +202,7 @@ export const expressOrganInterest = async (
       patientAge: 0,
       patientGender: 'Unknown',
       bloodType: profile.bloodType,
+      bloodGroup: profile.bloodType,
       organType: profile.organsWillingToDonate[0] || 'Unknown',
       urgency: 'Medium',
       acceptedDonorId: profile._id,
@@ -209,10 +210,12 @@ export const expressOrganInterest = async (
       donorName: user.name,
       donorEmail: user.email,
       donorBloodType: profile.bloodType,
+      requestedBy: new Types.ObjectId(req.user.id),
+      registeredDate: new Date(),
       timeline: [
         { event: 'donor_expressed_interest', timestamp: new Date() }
       ],
-      distanceKm: Math.floor(Math.random() * 50) + 1 // mock distance
+      distanceKm: Math.floor(Math.random() * 50) + 1
     });
 
     await requestDoc.save();
