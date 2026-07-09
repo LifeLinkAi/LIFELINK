@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import Cookies from 'js-cookie';
 import { clearUser } from '@/features/auth/authSlice';
+import NotificationBell from '../ui/NotificationBell';
 
 const HOSPITAL_ALERTS = [
   'Critical: O- Negative request escalated',
@@ -15,12 +16,16 @@ const HOSPITAL_ALERTS = [
   'Organ review: Kidney match awaiting approval',
 ];
 
-export function HospitalTopBar() {
+const IcoMenu = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
+
+interface HospitalTopBarProps {
+  onMenuClick?: () => void;
+}
+
+export function HospitalTopBar({ onMenuClick }: HospitalTopBarProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
   const [query, setQuery] = useState('');
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
@@ -47,54 +52,35 @@ export function HospitalTopBar() {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-[#E8E4D8] flex items-center justify-between px-7 flex-shrink-0 sticky top-0 z-40">
-      <div className="relative">
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9A7A]" />
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search records..."
-          className="pl-8 pr-4 h-8 w-64 text-[13px] bg-cream border border-[#E8E4D8] rounded-full outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25"
-        />
+    <header className="h-14 bg-white border-b border-[#E8E4D8] flex items-center justify-between px-4 lg:px-7 flex-shrink-0 sticky top-0 z-40">
+      <div className="flex items-center gap-3 relative">
+        <button
+          className="lg:hidden text-gray-600 hover:text-gray-900 shrink-0"
+          onClick={onMenuClick}
+          aria-label="Open sidebar"
+        >
+          <IcoMenu />
+        </button>
+        <div className="relative hidden sm:block">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9A7A]" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search records..."
+            className="pl-8 pr-4 h-8 w-40 md:w-64 text-[13px] bg-cream border border-[#E8E4D8] rounded-full outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="hidden md:flex items-center gap-2">
         <StatusChip label="ICU: 92%"        variant="warn"     />
         <StatusChip label="Blood: Critical" variant="critical" />
         <StatusChip label="ER: Level 1"     variant="warn"     />
       </div>
 
       <div className="flex items-center gap-1.5">
-        <div className="relative">
-          <IconBtn
-            label="Notifications"
-            badge={unreadCount || HOSPITAL_ALERTS.length}
-            onClick={() => {
-              setAlertsOpen(open => !open);
-              setProfileOpen(false);
-            }}
-          >
-            <Bell size={16} />
-          </IconBtn>
-          {alertsOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white border border-[#E8E4D8] shadow-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#F0EDE3]">
-                <p className="text-[13px] font-bold text-[#1a2e0a]">Hospital Alerts</p>
-              </div>
-              {HOSPITAL_ALERTS.map((alert, index) => (
-                <button
-                  type="button"
-                  key={alert}
-                  className="w-full text-left px-4 py-3 hover:bg-cream transition-colors"
-                >
-                  <p className="text-[12.5px] font-semibold text-[#3A4A2A]">{alert}</p>
-                  <p className="text-[11px] text-[#8A9A7A] mt-0.5">{index === 0 ? 'Just now' : `${index * 8} mins ago`}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
         <Link
           href="/hospital/settings"
@@ -113,7 +99,6 @@ export function HospitalTopBar() {
             type="button"
             onClick={() => {
               setProfileOpen(open => !open);
-              setAlertsOpen(false);
             }}
             className="h-8 rounded-full bg-brand-600 text-white text-[11px] font-semibold pl-3 pr-2 flex items-center gap-1.5 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/25 transition-colors"
           >

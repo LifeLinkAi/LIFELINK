@@ -6,6 +6,7 @@ import { HospitalProfile } from '../models/HospitalProfile';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { sendHospitalInviteEmail } from '../services/notifications/email.service';
+import { notify } from '../services/notifications/notify.service';
 
 export const getHospitals = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -217,11 +218,25 @@ export const updateHospital = async (req: AuthRequest, res: Response, next: Next
     if (email) user.email = email.toLowerCase().trim();
     await user.save();
 
+    const oldProfile = await HospitalProfile.findOne({ userId: user._id });
+
     const profile = await HospitalProfile.findOneAndUpdate(
       { userId: user._id },
       { $set: profileFields },
       { new: true, upsert: true }
     );
+
+    if (profileFields.status && oldProfile && oldProfile.status !== profileFields.status) {
+      await notify({
+        recipientId: user._id.toString(),
+        recipientRole: 'Hospital',
+        type: 'hospital_status_changed',
+        title: 'Account Status Updated',
+        message: `Your hospital account status has been updated to ${profileFields.status}.`,
+        priority: 'high',
+        actionUrl: `/hospital/dashboard`,
+      });
+    }
 
     res.status(200).json({
       id: user._id.toString(),

@@ -15,6 +15,7 @@ import {
   sendSurgeryScheduledNotification,
   sendTransplantOutcomeNotification
 } from '../services/notifications/email.service';
+import { notify } from '../services/notifications/notify.service';
 
 // ==========================================
 // UNIVERSAL HELPERS
@@ -478,6 +479,26 @@ export const evaluateOrganMatch = async (
       }
     } else {
       // DECLINE — free the slot so another donor can express interest
+      const declinedDonorId = requestDoc.acceptedDonorId || requestDoc.targetDonorId;
+      if (declinedDonorId) {
+        try {
+          const profile = await DonorProfile.findById(declinedDonorId);
+          if (profile && profile.userId) {
+            await notify({
+              recipientId: profile.userId.toString(),
+              recipientRole: 'Donor',
+              type: 'organ_interest_declined',
+              title: 'Organ Interest Declined',
+              message: `The hospital has declined your interest for organ donation at this time.`,
+              priority: 'medium',
+              actionUrl: `/donor/incoming-requests`,
+            });
+          }
+        } catch (e) {
+          logger.error(`Failed to notify donor on decline: ${e}`);
+        }
+      }
+
       requestDoc.status = 'PENDING_DONOR';
       (requestDoc as any).acceptedDonorId = null as any;
       requestDoc.targetDonorId   = null as any;
@@ -504,6 +525,16 @@ export const evaluateOrganMatch = async (
               donorInstructions || ''
             );
           }
+          await notify({
+            recipientId: user._id.toString(),
+            recipientRole: 'Donor',
+            type: 'clinical_test_scheduled',
+            title: 'Clinical Test Scheduled',
+            message: `Your clinical test for organ donation has been scheduled.`,
+            priority: 'high',
+            actionUrl: `/donor/incoming-requests`,
+            metadata: { requestId: requestDoc._id }
+          });
         }
       } catch (mailErr: any) {
         logger.error(`Failed to send clinical test schedule email to donor: ${mailErr.message}`);
@@ -721,12 +752,39 @@ export const submitClinicalEvaluation = async (
                 user.name || 'Donor',
                 requestDoc.organType || 'Unknown'
               );
+              await notify({
+                recipientId: user._id.toString(),
+                recipientRole: 'Donor',
+                type: 'surgery_approved',
+                title: 'Surgery Approved',
+                message: `Your clinical test results are successful. Surgery is approved.`,
+                priority: 'high',
+                actionUrl: `/donor/incoming-requests`,
+              });
+              await notify({
+                recipientId: user._id.toString(),
+                recipientRole: 'Donor',
+                type: 'legal_deed_ready',
+                title: 'Legal Consent Deed Ready',
+                message: `Please review and sign the legal consent deed for organ donation.`,
+                priority: 'high',
+                actionUrl: `/donor/incoming-requests`,
+              });
             } else if (decision === 'FAIL_CLINICAL_MATCH') {
               await sendClinicalTestingFailedNotification(
                 user.email,
                 user.name || 'Donor',
                 requestDoc.organType || 'Unknown'
               );
+              await notify({
+                recipientId: user._id.toString(),
+                recipientRole: 'Donor',
+                type: 'clinical_match_failed',
+                title: 'Clinical Match Failed',
+                message: `Unfortunately, the clinical match test has failed.`,
+                priority: 'medium',
+                actionUrl: `/donor/incoming-requests`,
+              });
             }
           }
         }
@@ -1068,7 +1126,7 @@ export const updateSurgeryStatus = async (
 
     const originalAcceptedDonorId = requestDoc.acceptedDonorId;
 
-    if (action === 'COMMENCE_SURGERY') {
+      if (action === 'COMMENCE_SURGERY') {
       if (requestDoc.status !== 'TRANSPLANT_SCHEDULED') {
         return next(new ApiError(400, 'Cannot commence surgery unless transplant is scheduled.'));
       }
@@ -1081,6 +1139,25 @@ export const updateSurgeryStatus = async (
       requestDoc.timeline?.push({ event: 'surgery_commenced', timestamp: new Date() });
       sanitizeGeoJSON(requestDoc);
       await requestDoc.save();
+
+      if (originalAcceptedDonorId) {
+        try {
+          const profile = await DonorProfile.findById(originalAcceptedDonorId);
+          if (profile && profile.userId) {
+            await notify({
+              recipientId: profile.userId.toString(),
+              recipientRole: 'Donor',
+              type: 'surgery_scheduled',
+              title: 'Surgery Commenced',
+              message: `Your surgery is now in progress.`,
+              priority: 'high',
+              actionUrl: `/donor/incoming-requests`,
+            });
+          }
+        } catch (e) {
+          logger.error(`Failed to notify donor on commence surgery: ${e}`);
+        }
+      }
 
     } else if (action === 'LOG_OUTCOME') {
       if (requestDoc.status !== 'SURGERY_IN_PROGRESS') {
@@ -1115,6 +1192,15 @@ export const updateSurgeryStatus = async (
               if (user.email) {
                 await sendTransplantOutcomeNotification(user.email, user.name || 'Donor', requestDoc.organType || 'Unknown', true);
               }
+              await notify({
+                recipientId: user._id.toString(),
+                recipientRole: 'Donor',
+                type: 'transplant_outcome',
+                title: 'Transplant Successful',
+                message: `Your transplant surgery was successful. Thank you!`,
+                priority: 'high',
+                actionUrl: `/donor/incoming-requests`,
+              });
             }
           } catch (mailErr: any) {
             logger.error(`Failed to send successful transplant outcome email to donor: ${mailErr.message}`);
@@ -1135,6 +1221,15 @@ export const updateSurgeryStatus = async (
               if (user.email) {
                 await sendTransplantOutcomeNotification(user.email, user.name || 'Donor', requestDoc.organType || 'Unknown', false);
               }
+              await notify({
+                recipientId: user._id.toString(),
+                recipientRole: 'Donor',
+                type: 'transplant_outcome',
+                title: 'Transplant Unsuccessful',
+                message: `Unfortunately, your transplant surgery was not successful.`,
+                priority: 'high',
+                actionUrl: `/donor/incoming-requests`,
+              });
             }
           } catch (mailErr: any) {
             logger.error(`Failed to send failed transplant outcome email to donor: ${mailErr.message}`);

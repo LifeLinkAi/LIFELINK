@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import api from "@/lib/axios";
+import NotificationBell from "../ui/NotificationBell";
 
 const IcoMenu   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
 const IcoSearch = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
@@ -54,6 +55,7 @@ export function DonorTopBar({ onMenuClick, searchPlaceholder = "Search..." }: Do
           <a href="/donor/emergency-alerts" className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors whitespace-nowrap shadow-sm">
             ✱ SOS
           </a>
+          <NotificationBell />
 
           <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 shrink-0" title={name}>
             {avatar ? (

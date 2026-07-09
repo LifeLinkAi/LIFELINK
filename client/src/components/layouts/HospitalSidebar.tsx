@@ -16,7 +16,12 @@ const NAV = [
   { label: 'Organ Management',   href: '/hospital/organ-management',       icon: Heart           },
 ];
 
-export function HospitalSidebar() {
+interface HospitalSidebarProps {
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
+}
+
+export function HospitalSidebar({ isOpen = false, setIsOpen }: HospitalSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -45,7 +50,10 @@ export function HospitalSidebar() {
   };
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-[240px] bg-brand-900 flex flex-col z-50 overflow-hidden">
+    <aside className={cn(
+      "fixed top-0 left-0 h-screen w-[240px] bg-brand-900 flex flex-col z-50 overflow-hidden transition-transform duration-300 ease-in-out lg:translate-x-0",
+      isOpen ? "translate-x-0" : "-translate-x-full"
+    )}>
 
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-[18px] border-b border-white/10 flex-shrink-0">

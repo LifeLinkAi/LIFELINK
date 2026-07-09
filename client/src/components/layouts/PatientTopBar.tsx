@@ -8,6 +8,7 @@ import Cookies from 'js-cookie';
 import { useAppDispatch } from '@/store/hooks';
 import { clearUser } from '@/features/auth/authSlice';
 import { cn } from '@/lib/utils';
+import NotificationBell from '../ui/NotificationBell';
 
 const NOTIFICATIONS = [
   'Your blood request is updated',
@@ -18,7 +19,6 @@ const NOTIFICATIONS = [
 export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const dispatch = useAppDispatch();
@@ -68,37 +68,7 @@ export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setNotificationsOpen(open => !open);
-              setProfileOpen(false);
-            }}
-            className="relative h-10 w-10 rounded-lg border border-[#D0CCBC] bg-white text-[#3A4A2A] flex items-center justify-center hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 transition-all"
-            aria-label="Notifications"
-          >
-            <Bell size={17} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-600" />
-          </button>
-          {notificationsOpen && (
-            <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-[#E8E4D8] bg-white shadow-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#F0EDE3]">
-                <p className="text-[13px] font-bold text-[#1a2e0a]">Notifications</p>
-              </div>
-              {NOTIFICATIONS.map(item => (
-                <button
-                  key={item}
-                  type="button"
-                  className="w-full text-left px-4 py-3 hover:bg-[#FAFAF7] transition-colors"
-                >
-                  <p className="text-[12.5px] font-medium text-[#3A4A2A]">{item}</p>
-                  <p className="text-[11px] text-[#8A9A7A] mt-0.5">Just now</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
         <Link
           href="/patient/settings"
@@ -113,7 +83,6 @@ export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
             type="button"
             onClick={() => {
               setProfileOpen(open => !open);
-              setNotificationsOpen(false);
             }}
             className="h-10 rounded-lg border border-[#D0CCBC] bg-white pl-2 pr-2.5 flex items-center gap-2 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 transition-all"
           >

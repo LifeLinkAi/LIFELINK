@@ -9,8 +9,10 @@ import { connectDB } from './config/db';
 import { logger } from './utils/logger';
 import mongoose from 'mongoose';
 import { startWellnessScheduler } from './services/notifications/wellnessScheduler.service';
+import { initSocketServer } from './sockets';
 
 const server = http.createServer(app);
+initSocketServer(server);
 
 // Graceful shutdown routine
 const gracefulShutdown = (): void => {

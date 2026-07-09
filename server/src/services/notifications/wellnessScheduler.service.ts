@@ -3,6 +3,7 @@ import { DonorProfile } from '../../models/DonorProfile';
 import { User } from '../../models/User';
 import { WellnessLog } from '../../models/WellnessLog';
 import { sendWellnessCheckupReminderEmail } from './email.service';
+import { notify } from './notify.service';
 import { logger } from '../../utils/logger';
 
 /**
@@ -73,6 +74,16 @@ export const checkWellnessReminders = async (): Promise<void> => {
               nextMilestone.name,
               targetDateStr
             );
+
+            await notify({
+              recipientId: profile.userId.toString(),
+              recipientRole: 'Donor',
+              type: 'wellness_reminder',
+              title: 'Wellness Check-up Due',
+              message: `Your ${nextMilestone.name} is due. Please log your metrics.`,
+              priority: 'high',
+              actionUrl: `/donor/wellness`,
+            });
 
             // Record reminder as sent to prevent duplicate alerts
             await DonorProfile.updateOne(

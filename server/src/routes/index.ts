@@ -11,6 +11,7 @@ import donationRouter from './donation.routes';
 import organWaitlistRouter from './organWaitlist.routes';
 import donorOrganRouter from './donorOrgan.routes';
 import donorWellnessRouter from './donorWellness.routes';
+import notificationRouter from './notification.routes';
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.use('/donations', donationRouter);
 router.use('/organ-waitlist', organWaitlistRouter);
 router.use('/donor/organ', donorOrganRouter);
 router.use('/donor/wellness', donorWellnessRouter);
+router.use('/notifications', notificationRouter);
 
 export default router;
 

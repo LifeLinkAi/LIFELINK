@@ -6,6 +6,7 @@ import { DonationRecord } from '../models/DonationRecord';
 import { User } from '../models/User';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { notify } from '../services/notifications/notify.service';
 import { sendMail, sendDonorRequestNotification, sendHospitalMatchNotification } from '../services/notifications/email.service';
 import { findBestCompatibleDonorForRequest } from '../services/matching/donor-match.service';
 import { logger } from '../utils/logger';
@@ -122,6 +123,9 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
     const profile = await DonorProfile.findOne({ userId: req.user!.id });
     if (!profile) return next(new ApiError(404, 'Donor profile not found.'));
 
+    const donorUser = await User.findById(req.user!.id).select('name email');
+    if (!donorUser) return next(new ApiError(404, 'Donor user account not found.'));
+
     // Check if the request is exclusively assigned to this donor, or if they were notified/dispatched
     const isAssigned = request.assignedDonorId && request.assignedDonorId.toString() === profile._id.toString();
     const isNotified = request.notifiedDonors && request.notifiedDonors.some((did: any) => did.toString() === profile._id.toString());
@@ -164,10 +168,19 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       matchedDonorEntry.respondedAt = new Date();
     }
 
-    if (action === 'ACCEPTED') {
-      const donorUser = await User.findById(req.user!.id).select('name email');
-      if (!donorUser) return next(new ApiError(404, 'Donor user account not found.'));
+    if (request.hospitalId) {
+      await notify({
+        recipientId: request.hospitalId.toString(),
+        recipientRole: 'Hospital',
+        type: 'donor_pledge_response',
+        title: 'Donor Pledge Update',
+        message: `${donorUser.name} has ${action.toLowerCase()} your ${request.type.toLowerCase()} request for patient ${request.patientName}.`,
+        priority: action === 'ACCEPTED' ? 'high' : 'medium',
+        actionUrl: request.type === 'Blood' ? `/hospital/patient-requests` : `/hospital/organ-management`,
+      });
+    }
 
+    if (action === 'ACCEPTED') {
       const alreadyPledged = request.pledgedDonors?.some((pd: any) => pd.donorId.toString() === req.user!.id.toString());
       if (alreadyPledged) {
         return next(new ApiError(400, 'You have already pledged to this request.'));
@@ -185,6 +198,10 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         timestamp: new Date()
       });
 
+      if (request.status === 'DONOR_NOTIFIED' || request.status === 'PENDING') {
+        request.status = 'PENDING_HOSPITAL';
+      }
+
       await request.save();
 
       // Trigger Hospital notification when a match is accepted
@@ -200,9 +217,28 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
               request.bloodGroup
             );
           }
+          await notify({
+            recipientId: request.hospitalId.toString(),
+            recipientRole: 'Hospital',
+            type: 'donor_pledge_response',
+            title: 'Organ Donor Pledge Update',
+            message: `${donorUser.name} has ${action.toLowerCase()} your organ request.`,
+            priority: action === 'ACCEPTED' ? 'high' : 'medium',
+            actionUrl: `/hospital/organ-management`,
+          });
         } catch (mailErr: any) {
           logger.error(`Failed to send match accepted email to hospital: ${mailErr.message}`);
         }
+      } else if (request.type === 'Blood' && request.hospitalId) {
+        await notify({
+          recipientId: request.hospitalId.toString(),
+          recipientRole: 'Hospital',
+          type: 'donor_pledge_response',
+          title: 'Blood Donor Pledge Update',
+          message: `${donorUser.name} has ${action.toLowerCase()} your blood request.`,
+          priority: action === 'ACCEPTED' ? 'high' : 'medium',
+          actionUrl: `/hospital/patient-requests`,
+        });
       }
 
       // Create a donation record (Pending until physically completed)
@@ -223,6 +259,19 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
         },
         { upsert: true, new: true }
       );
+
+      // Send in-app notification to the patient
+      if (request.userId) {
+        await notify({
+          recipientId: request.userId.toString(),
+          recipientRole: 'Patient',
+          type: 'donor_pledge_response',
+          title: 'Donor Found!',
+          message: `${donorUser.name} has accepted your donation request!`,
+          priority: 'high',
+          actionUrl: `/patient/request-status`,
+        });
+      }
 
       // Send SendGrid email to patient
       try {
@@ -321,6 +370,19 @@ export const respondToRequest = async (req: AuthRequest, res: Response, next: Ne
       }
 
       await request.save();
+
+      // Send in-app notification to the patient
+      if (request.userId) {
+        await notify({
+          recipientId: request.userId.toString(),
+          recipientRole: 'Patient',
+          type: 'donor_pledge_response',
+          title: 'Donation Request Update',
+          message: `A donor was unable to fulfill your request. We are continuing the search.`,
+          priority: 'medium',
+          actionUrl: `/patient/request-status`,
+        });
+      }
 
       // Send SendGrid email to patient
       try {

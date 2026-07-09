@@ -7,6 +7,7 @@ import { OrganWaitlist } from '../models/OrganWaitlist';
 import { Request as DonationRequest } from '../models/Request';
 import { User } from '../models/User';
 import { HospitalProfile } from '../models/HospitalProfile';
+import { notify } from '../services/notifications/notify.service';
 import { sendHospitalLegalReviewNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
 
@@ -225,6 +226,17 @@ export const expressOrganInterest = async (
     });
 
     await requestDoc.save();
+
+    await notify({
+      recipientId: hospitalId.toString(),
+      recipientRole: 'Hospital',
+      type: 'organ_interest_received',
+      title: 'New Organ Donor Interest',
+      message: `${user.name} has expressed interest in donating a ${requestDoc.organType}.`,
+      priority: 'high',
+      actionUrl: `/hospital/organ-management`,
+      metadata: { requestId: requestDoc._id, waitlistId }
+    });
 
     res.status(201).json({
       success: true,

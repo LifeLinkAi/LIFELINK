@@ -6,6 +6,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import crypto from 'crypto';
 import { findNearbyCompatibleDonors, findBestCompatibleDonorForRequest } from '../services/matching/donor-match.service';
 import { sendDonorRequestNotification } from '../services/notifications/email.service';
+import { notify } from '../services/notifications/notify.service';
 import { logger } from '../utils/logger';
 import { DonorProfile } from '../models/DonorProfile';
 import { HospitalProfile } from '../models/HospitalProfile';
@@ -321,6 +322,16 @@ export const createPatientRequest = async (req: AuthRequest, res: Response, next
             facility: newReq.facility,
             patientName: newReq.patientName,
           }, inviteUrl);
+          
+          await notify({
+            recipientId: donorUser._id.toString(),
+            recipientRole: 'Donor',
+            type: 'blood_request_match',
+            title: 'Urgent Request Match',
+            message: `You are a match for a ${newReq.urgency.toLowerCase()} ${newReq.type.toLowerCase()} request.`,
+            priority: 'high',
+            actionUrl: `/donor/emergency-alerts`,
+          });
         }
       } catch (err: any) {
         logger.error(`Error sending email to assigned donor ${bestDonor._id}: ${err.message}`);
@@ -418,6 +429,17 @@ export const dispatchToDonors = async (req: AuthRequest, res: Response, next: Ne
       };
       try {
         await sendDonorRequestNotification(toEmail, donorName, requestDetails, inviteUrl);
+        
+        await notify({
+          recipientId: d.userId._id.toString(),
+          recipientRole: 'Donor',
+          type: 'blood_request_match',
+          title: 'Hospital Request Match',
+          message: `A hospital has dispatched an urgent request to you.`,
+          priority: 'high',
+          actionUrl: `/donor/incoming-requests`,
+        });
+
         successfulDonorIds.push(d._id.toString());
         successfulEntries.push(entry);
       } catch (err) {
@@ -618,6 +640,36 @@ export const updateRequestStatus = async (req: AuthRequest, res: Response, next:
           else hospitalProfile.bloodInventory[invIndex].status = 'adequate';
 
           await hospitalProfile.save();
+        }
+      }
+
+      // Notify the requester
+      if (requestObj.requestedBy) {
+        await notify({
+          recipientId: requestObj.requestedBy.toString(),
+          recipientRole: (await User.findById(requestObj.requestedBy))?.role || 'Patient',
+          type: 'blood_donation_complete',
+          title: 'Request Fulfilled',
+          message: `Your request for ${requestObj.patientName} has been fulfilled.`,
+          priority: 'high',
+          actionUrl: `/patient/request-status`,
+        });
+      }
+
+      // Notify the Donors
+      if (requestObj.pledgedDonors) {
+        for (const pledge of requestObj.pledgedDonors) {
+          if (pledge.status !== 'REJECTED') {
+            await notify({
+              recipientId: pledge.donorId.toString(),
+              recipientRole: 'Donor',
+              type: 'blood_donation_complete',
+              title: 'Donation Completed',
+              message: `Thank you for your life-saving blood donation!`,
+              priority: 'high',
+              actionUrl: `/donor/history`,
+            });
+          }
         }
       }
     }
@@ -999,9 +1051,34 @@ export const completeDirectDonation = async (req: AuthRequest, res: Response, ne
 
     if ((requestObj as any).unitsFulfilled >= (requestObj.units || 1)) {
       requestObj.status = 'FULFILLED'; // <-- Blow the final whistle!
+
+      // Notify Patient
+      const patientId = requestObj.userId || requestObj.requestedBy;
+      if (patientId) {
+        await notify({
+          recipientId: patientId.toString(),
+          recipientRole: 'Patient',
+          type: 'blood_donation_complete',
+          title: 'Request Fulfilled',
+          message: `Your blood request has been fulfilled!`,
+          priority: 'high',
+          actionUrl: `/patient/request-status`,
+        });
+      }
     } else {
       requestObj.status = 'IN_PROGRESS';
     }
+
+    // Notify Donor
+    await notify({
+      recipientId: donorId,
+      recipientRole: 'Donor',
+      type: 'blood_donation_complete',
+      title: 'Donation Completed',
+      message: `Thank you for your life-saving blood donation!`,
+      priority: 'high',
+      actionUrl: `/donor/history`,
+    });
 
     if (!requestObj.timeline) requestObj.timeline = [];
     requestObj.timeline.push({ event: `direct_donation_completed`, timestamp: new Date() });

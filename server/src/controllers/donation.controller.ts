@@ -4,6 +4,7 @@ import { HospitalProfile } from '../models/HospitalProfile';
 import { Request as BloodRequest } from '../models/Request';
 import { User } from '../models/User';
 import { DonorProfile } from '../models/DonorProfile';
+import { notify } from '../services/notifications/notify.service';
 import { ApiError } from '../middlewares/error.middleware';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -96,8 +97,36 @@ export const updatePipelineStatus = async (req: AuthRequest, res: Response, next
         if (requestObj && requestObj.status !== 'FULFILLED') {
           requestObj.status = 'FULFILLED';
           await requestObj.save();
+
+          // Notify the requester
+          if (requestObj.requestedBy) {
+            await notify({
+              recipientId: requestObj.requestedBy.toString(),
+              recipientRole: (await User.findById(requestObj.requestedBy))?.role || 'Patient',
+              type: 'blood_donation_complete',
+              title: 'Request Fulfilled',
+              message: `Your blood request for ${requestObj.patientName} has been fulfilled!`,
+              priority: 'high',
+              actionUrl: `/patient/request-status`,
+            });
+          }
         }
       }
+
+      // Notify the donor
+      const donorUser = await User.findById(donation.donorId);
+      if (donorUser) {
+        await notify({
+          recipientId: donorUser._id.toString(),
+          recipientRole: 'Donor',
+          type: 'blood_donation_complete',
+          title: 'Donation Completed',
+          message: `Thank you for your life-saving blood donation!`,
+          priority: 'high',
+          actionUrl: `/donor/history`,
+        });
+      }
+
     } else if (pipelineStatus === 'deferred') {
       donation.status = 'Cancelled';
     }
