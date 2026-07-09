@@ -1,7 +1,6 @@
 'use client';
 import { useEffect } from 'react';
 import { X, Check, Bell, Activity, Droplet, FileText, HeartPulse, Building2, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { INotification } from '@/features/notifications/notificationSlice';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -42,6 +41,29 @@ const getIconForType = (type: string) => {
     default:
       return <Bell className="h-5 w-5 text-gray-400" />;
   }
+};
+
+const formatDistanceToNow = (dateInput: Date | string | number): string => {
+  const date = new Date(dateInput);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'just now';
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 30) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) return `${diffInMonths} month${diffInMonths > 1 ? 's' : ''} ago`;
+  
+  const diffInYears = Math.floor(diffInMonths / 12);
+  return `${diffInYears} year${diffInYears > 1 ? 's' : ''} ago`;
 };
 
 export default function NotificationDrawer({ open, setOpen, notifications, markAsRead, markAllAsRead }: NotificationDrawerProps) {
@@ -136,7 +158,7 @@ export default function NotificationDrawer({ open, setOpen, notifications, markA
                                       </button>
                                     )}
                                     <p className="text-xs text-slate-500 whitespace-nowrap">
-                                      {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                                      {formatDistanceToNow(notification.createdAt)}
                                     </p>
                                   </div>
                                 </div>
