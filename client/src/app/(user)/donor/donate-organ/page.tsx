@@ -151,7 +151,6 @@ export default function OrganDonation() {
 
   const fetchPatients = async (organs: string[], bloodType: string, donorUserId: string, donorProfileId: string) => {
     try {
-      setLoadingPatients(true);
       const res = await api.get("/requests?type=Organ");
       const allRequests = res.data.data || [];
       
@@ -215,14 +214,13 @@ export default function OrganDonation() {
   };
 
   const fetchActiveRequest = useCallback(() => {
-    setLoadingActiveRequest(true);
     api.get("/donor/organ/active-request")
       .then((res) => {
         if (res.data.success) {
           setPastDonations(res.data.pastDonations || []);
           if (res.data.data) {
             const reqDoc = res.data.data;
-            const acceptedStatuses = ['CLINICAL_TESTING', 'PENDING_LEGAL_APPROVAL', 'SURGERY_SCHEDULED', 'COMPLETED'];
+            const acceptedStatuses = ['CLINICAL_TESTING', 'PENDING_LEGAL_APPROVAL', 'TRANSPLANT_SCHEDULED', 'SURGERY_IN_PROGRESS', 'TRANSPLANT_SUCCESSFUL'];
             if (acceptedStatuses.includes(reqDoc.status)) {
               setActiveRequest(reqDoc);
             } else {

@@ -225,7 +225,6 @@ export default function OrganManagementPage() {
   const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   const fetchPatients = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: WaitlistPatient[] }>('/organ-waitlist');
       setPatients(res.data.data ?? []);
@@ -237,7 +236,6 @@ export default function OrganManagementPage() {
   }, []);
 
   const fetchMatches = useCallback(async () => {
-    setMatchLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches');
       setMatches(res.data.data ?? []);
@@ -249,7 +247,6 @@ export default function OrganManagementPage() {
   }, []);
 
   const fetchClinicalMatches = useCallback(async () => {
-    setClinicalLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/clinical-testing');
       setClinicalMatches(res.data.data ?? []);
@@ -261,7 +258,6 @@ export default function OrganManagementPage() {
   }, []);
 
   const fetchLegalMatches = useCallback(async () => {
-    setLegalLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/legal-pending');
       setLegalMatches(res.data.data ?? []);
@@ -273,7 +269,6 @@ export default function OrganManagementPage() {
   }, []);
 
   const fetchSurgicalMatches = useCallback(async () => {
-    setSurgicalLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: OrganMatch[] }>('/organ-waitlist/matches/surgery-pipeline');
       setSurgicalMatches(res.data.data ?? []);
@@ -285,7 +280,6 @@ export default function OrganManagementPage() {
   }, []);
 
   const fetchArchiveMatches = useCallback(async () => {
-    setArchiveLoading(true);
     try {
       const res = await api.get<{ success: boolean; data: any[] }>('/organ-waitlist/archive');
       setArchiveMatches(res.data.data ?? []);
@@ -869,7 +863,8 @@ export default function OrganManagementPage() {
         <SurgicalOutcomeModal
           match={reviewSurgicalMatch}
           onClose={() => setReviewSurgicalMatch(null)}
-          onUpdated={() => { fetchSurgicalMatches(); fetchPatients(); fetchArchiveMatches(); setActiveTab('archive'); }}
+          onUpdated={() => { fetchSurgicalMatches(); fetchPatients(); setActiveTab('surgical'); }}
+          onArchived={() => { fetchSurgicalMatches(); fetchPatients(); fetchArchiveMatches(); setActiveTab('archive'); }}
         />
       )}
 

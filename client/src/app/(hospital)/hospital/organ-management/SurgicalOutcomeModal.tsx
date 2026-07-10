@@ -31,6 +31,7 @@ interface Props {
   match: OrganMatch;
   onClose: () => void;
   onUpdated: () => void;
+  onArchived: () => void;
 }
 
 // ─────────────────────────────────────────────
@@ -57,7 +58,7 @@ const labelCls = 'block text-[10px] uppercase tracking-wider text-slate-500 font
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
 
-export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Props) {
+export default function SurgicalOutcomeModal({ match, onClose, onUpdated, onArchived }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -109,7 +110,7 @@ export default function SurgicalOutcomeModal({ match, onClose, onUpdated }: Prop
           ? 'Transplant archived successfully.'
           : 'Transplant failed. Patient returned to critical waitlist.'
       );
-      onUpdated();
+      onArchived();
       setTimeout(onClose, 1500);
     } catch (err: any) {
       toast.error(err?.response?.data?.error?.message || 'Failed to log outcome.');
