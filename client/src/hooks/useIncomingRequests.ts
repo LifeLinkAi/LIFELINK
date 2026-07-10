@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { fetchIncomingRequests, IncomingRequest } from '@/services/incomingRequestService';
+import { useAppSelector } from '@/store/hooks';
 
 interface UseIncomingRequestsReturn {
   requests: IncomingRequest[];
@@ -18,6 +19,7 @@ export function useIncomingRequests(type?: 'Blood' | 'Organ'): UseIncomingReques
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +38,7 @@ export function useIncomingRequests(type?: 'Blood' | 'Organ'): UseIncomingReques
       });
 
     return () => { cancelled = true; };
-  }, [type, tick]);
+  }, [type, tick, lastUpdated]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 

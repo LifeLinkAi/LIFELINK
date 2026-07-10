@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Droplets, Heart, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import api from '@/lib/axios';
+import { useAppSelector } from '@/store/hooks';
 import toast from 'react-hot-toast';
 
 type RequestType = 'Blood' | 'Organ' | 'General';
@@ -26,6 +27,7 @@ export default function PatientRequestsPage() {
   const [filter, setFilter] = useState<RequestType | 'All'>('All');
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   useEffect(() => {
     let mounted = true;
@@ -44,7 +46,7 @@ export default function PatientRequestsPage() {
     };
     fetch();
     return () => { mounted = false; };
-  }, []);
+  }, [lastUpdated]);
 
   const visible = useMemo(() => {
     return filter === 'All' ? requests : requests.filter(r => r.type === filter);

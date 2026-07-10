@@ -82,7 +82,7 @@ export const checkWellnessReminders = async (): Promise<void> => {
               title: 'Wellness Check-up Due',
               message: `Your ${nextMilestone.name} is due. Please log your metrics.`,
               priority: 'high',
-              actionUrl: `/donor/wellness`,
+              actionUrl: `/donor/donate-organ`,
             });
 
             // Record reminder as sent to prevent duplicate alerts

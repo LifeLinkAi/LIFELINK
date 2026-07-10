@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { cn } from '@/lib/utils';
+import { useAppSelector } from '@/store/hooks';
 import RegisterPatientModal from './RegisterPatientModal';
 import ReviewMatchModal, { OrganMatch } from './ReviewMatchModal';
 import ClinicalEvaluationModal from './ClinicalEvaluationModal';
@@ -220,6 +221,8 @@ export default function OrganManagementPage() {
   const [filterOrgan,  setFilterOrgan]  = useState('all');
   const [filterStatus, setFilterStatus] = useState<WaitlistStatus | 'all'>('all');
   const [updatingId,   setUpdatingId]   = useState<string | null>(null);
+  
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   const fetchPatients = useCallback(async () => {
     setLoading(true);
@@ -300,7 +303,7 @@ export default function OrganManagementPage() {
     fetchLegalMatches();
     fetchSurgicalMatches();
     fetchArchiveMatches();
-  }, [fetchPatients, fetchMatches, fetchClinicalMatches, fetchLegalMatches, fetchSurgicalMatches, fetchArchiveMatches]);
+  }, [fetchPatients, fetchMatches, fetchClinicalMatches, fetchLegalMatches, fetchSurgicalMatches, fetchArchiveMatches, lastUpdated]);
 
   const updateStatus = async (id: string, status: WaitlistStatus) => {
     setUpdatingId(id);
@@ -834,7 +837,7 @@ export default function OrganManagementPage() {
         <ScheduleLabTestModal
           match={scheduleLabMatch}
           onClose={() => setScheduleLabMatch(null)}
-          onScheduled={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); }}
+          onScheduled={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); setActiveTab('clinical'); }}
         />
       )}
 
@@ -842,7 +845,7 @@ export default function OrganManagementPage() {
         <ReviewMatchModal
           match={reviewMatch}
           onClose={() => setReviewMatch(null)}
-          onEvaluated={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); }}
+          onEvaluated={() => { fetchMatches(); fetchClinicalMatches(); fetchPatients(); setActiveTab('clinical'); }}
         />
       )}
 
@@ -850,7 +853,7 @@ export default function OrganManagementPage() {
         <ClinicalEvaluationModal
           match={reviewClinicalMatch}
           onClose={() => setReviewClinicalMatch(null)}
-          onEvaluated={() => { fetchClinicalMatches(); fetchLegalMatches(); fetchPatients(); }}
+          onEvaluated={() => { fetchClinicalMatches(); fetchLegalMatches(); fetchPatients(); setActiveTab('legal'); }}
         />
       )}
 
@@ -858,7 +861,7 @@ export default function OrganManagementPage() {
         <LegalConsentModal
           match={reviewLegalMatch}
           onClose={() => setReviewLegalMatch(null)}
-          onCompleted={() => { fetchLegalMatches(); fetchSurgicalMatches(); fetchPatients(); }}
+          onCompleted={() => { fetchLegalMatches(); fetchSurgicalMatches(); fetchPatients(); setActiveTab('surgical'); }}
         />
       )}
 
@@ -866,7 +869,7 @@ export default function OrganManagementPage() {
         <SurgicalOutcomeModal
           match={reviewSurgicalMatch}
           onClose={() => setReviewSurgicalMatch(null)}
-          onUpdated={() => { fetchSurgicalMatches(); fetchPatients(); fetchArchiveMatches(); }}
+          onUpdated={() => { fetchSurgicalMatches(); fetchPatients(); fetchArchiveMatches(); setActiveTab('archive'); }}
         />
       )}
 

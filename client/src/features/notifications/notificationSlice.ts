@@ -14,11 +14,13 @@ export interface INotification {
 interface NotificationState {
   notifications: INotification[];
   unreadCount: number;
+  lastUpdated: number;
 }
 
 const initialState: NotificationState = {
   notifications: [],
   unreadCount: 0,
+  lastUpdated: 0,
 };
 
 const notificationSlice = createSlice({
@@ -34,6 +36,7 @@ const notificationSlice = createSlice({
       if (!action.payload.isRead) {
         state.unreadCount += 1;
       }
+      state.lastUpdated = Date.now();
     },
     markOneRead(state, action: PayloadAction<string>) {
       const id = action.payload;

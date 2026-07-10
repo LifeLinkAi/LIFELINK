@@ -9,6 +9,7 @@ import {
   TrendingUp, TrendingDown, Activity, CheckCircle, Award, ShieldAlert, FileText, UploadCloud, Trash2, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppSelector } from '@/store/hooks';
 
 interface ActivityItem {
   time: string;
@@ -152,6 +153,8 @@ export default function HospitalDashboard() {
   const [zip, setZip] = useState('');
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
+  
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   // Step 2: Capabilities & Certifications
   const [specialties, setSpecialties] = useState<string[]>(['General']);
@@ -263,7 +266,7 @@ export default function HospitalDashboard() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [lastUpdated]);
 
   const handleUpload = (docType: string) => {
     if (typeof window === 'undefined') return;

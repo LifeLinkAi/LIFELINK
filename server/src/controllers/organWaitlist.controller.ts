@@ -491,7 +491,7 @@ export const evaluateOrganMatch = async (
               title: 'Organ Interest Declined',
               message: `The hospital has declined your interest for organ donation at this time.`,
               priority: 'medium',
-              actionUrl: `/donor/incoming-requests`,
+              actionUrl: `/donor/donate-organ`,
             });
           }
         } catch (e) {
@@ -532,7 +532,7 @@ export const evaluateOrganMatch = async (
             title: 'Clinical Test Scheduled',
             message: `Your clinical test for organ donation has been scheduled.`,
             priority: 'high',
-            actionUrl: `/donor/incoming-requests`,
+            actionUrl: `/donor/donate-organ`,
             metadata: { requestId: requestDoc._id }
           });
         }
@@ -759,7 +759,7 @@ export const submitClinicalEvaluation = async (
                 title: 'Surgery Approved',
                 message: `Your clinical test results are successful. Surgery is approved.`,
                 priority: 'high',
-                actionUrl: `/donor/incoming-requests`,
+                actionUrl: `/donor/donate-organ`,
               });
               await notify({
                 recipientId: user._id.toString(),
@@ -768,7 +768,7 @@ export const submitClinicalEvaluation = async (
                 title: 'Legal Consent Deed Ready',
                 message: `Please review and sign the legal consent deed for organ donation.`,
                 priority: 'high',
-                actionUrl: `/donor/incoming-requests`,
+                actionUrl: `/donor/donate-organ`,
               });
             } else if (decision === 'FAIL_CLINICAL_MATCH') {
               await sendClinicalTestingFailedNotification(
@@ -783,7 +783,7 @@ export const submitClinicalEvaluation = async (
                 title: 'Clinical Match Failed',
                 message: `Unfortunately, the clinical match test has failed.`,
                 priority: 'medium',
-                actionUrl: `/donor/incoming-requests`,
+                actionUrl: `/donor/donate-organ`,
               });
             }
           }
@@ -1151,7 +1151,7 @@ export const updateSurgeryStatus = async (
               title: 'Surgery Commenced',
               message: `Your surgery is now in progress.`,
               priority: 'high',
-              actionUrl: `/donor/incoming-requests`,
+              actionUrl: `/donor/donate-organ`,
             });
           }
         } catch (e) {
@@ -1199,7 +1199,7 @@ export const updateSurgeryStatus = async (
                 title: 'Transplant Successful',
                 message: `Your transplant surgery was successful. Thank you!`,
                 priority: 'high',
-                actionUrl: `/donor/incoming-requests`,
+                actionUrl: `/donor/donate-organ`,
               });
             }
           } catch (mailErr: any) {
@@ -1228,7 +1228,7 @@ export const updateSurgeryStatus = async (
                 title: 'Transplant Unsuccessful',
                 message: `Unfortunately, your transplant surgery was not successful.`,
                 priority: 'high',
-                actionUrl: `/donor/incoming-requests`,
+                actionUrl: `/donor/donate-organ`,
               });
             }
           } catch (mailErr: any) {
