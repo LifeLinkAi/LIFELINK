@@ -5,6 +5,7 @@ import api from "@/lib/axios";
 import { toast } from "react-hot-toast";
 import { useDonorEligibility } from "@/hooks/useDonorEligibility";
 import { LocationPicker, LocationValue } from "@/components/donor/LocationPicker";
+import { useAppSelector } from "@/store/hooks";
 
 interface DonorProfileData {
   id: string;
@@ -26,6 +27,7 @@ export default function DonorDashboard() {
   const [locationValue, setLocationValue] = useState<LocationValue>({ label: "", coordinates: null });
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   // Eligibility from the shared hook (calls /donors/me independently)
   const eligibility = useDonorEligibility();
@@ -51,7 +53,7 @@ export default function DonorDashboard() {
     }
   };
 
-  useEffect(() => { fetchProfile(); }, []);
+  useEffect(() => { fetchProfile(); }, [lastUpdated]);
 
   const handleWizardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -8,6 +8,7 @@ import { IncomingRequest } from "@/services/incomingRequestService";
 import { useRequestResponse } from "@/hooks/useRequestResponse";
 import { RequestActions } from "@/components/donor/RequestActions";
 import toast, { Toaster } from "react-hot-toast";
+import { useAppSelector } from "@/store/hooks";
 
 interface ProfileData {
   id: string;
@@ -25,6 +26,7 @@ export default function OrganDonation() {
   const [editing, setEditing] = useState(false);
   const [draftOrgans, setDraftOrgans] = useState<string[]>([]);
   const { update, isLoading: isSaving } = useUpdateDonorProfile();
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
   
   // Incoming Requests & Responses Hooks/States (from theirs branch)
   const { requests, isLoading: isLoadingRequests, error: requestsError, refetch } = useIncomingRequests("Organ");
@@ -257,7 +259,7 @@ export default function OrganDonation() {
     loadProfile();
     fetchActiveRequest();
     fetchWellnessLogs();
-  }, [fetchActiveRequest, fetchWellnessLogs]);
+  }, [fetchActiveRequest, fetchWellnessLogs, lastUpdated]);
 
   const handleSavePreferences = async () => {
     const result = await update({ organsWillingToDonate: draftOrgans });
