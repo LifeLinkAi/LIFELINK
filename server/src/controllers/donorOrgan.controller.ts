@@ -10,6 +10,7 @@ import { HospitalProfile } from '../models/HospitalProfile';
 import { notify } from '../services/notifications/notify.service';
 import { sendHospitalLegalReviewNotification } from '../services/notifications/email.service';
 import { logger } from '../utils/logger';
+import { calculateMatchScore } from '../utils/organScoring';
 
 /**
  * @desc    Upsert donor organ profile (Intake)
@@ -129,11 +130,32 @@ export const getDonorOrganMatches = async (
       requiredOrgan: { $in: organs },
       bloodGroup: { $in: getCompatiblePatientBloodGroups(profile.bloodType) },
       status: { $in: ['Waitlisted', 'Searching'] }
-    }).sort({ urgency: -1, createdAt: 1 }).populate('hospitalId', 'name address').lean();
+    }).populate('hospitalId', 'name address').lean();
+
+    // Fetch hospital locations for distance calculation (Heart/Lung)
+    const hospitalUserIds = [...new Set(waitlist.map((w: any) => w.hospitalId?._id?.toString()).filter(Boolean))];
+    const hospitalProfiles = await HospitalProfile.find({ userId: { $in: hospitalUserIds } }).lean();
+    const hospitalLocationMap = new Map();
+    for (const hp of hospitalProfiles) {
+      if (hp.location?.coordinates) {
+        hospitalLocationMap.set(hp.userId.toString(), hp.location.coordinates);
+      }
+    }
+
+    // Apply Strategy Pattern scoring
+    const scoredWaitlist = waitlist.map((patient: any) => {
+      const hospitalIdStr = patient.hospitalId?._id?.toString();
+      const patientLocation = hospitalLocationMap.get(hospitalIdStr);
+      const matchScore = calculateMatchScore(patient, profile, patientLocation);
+      return { ...patient, matchScore };
+    });
+
+    // Sort descending by matchScore
+    scoredWaitlist.sort((a, b) => b.matchScore - a.matchScore);
 
     res.status(200).json({
       success: true,
-      data: waitlist,
+      data: scoredWaitlist,
     });
   } catch (error: any) {
     next(new ApiError(500, `Failed to fetch organ matches: ${error.message}`));
