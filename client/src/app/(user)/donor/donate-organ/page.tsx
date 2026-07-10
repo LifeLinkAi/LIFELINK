@@ -517,9 +517,10 @@ export default function OrganDonation() {
         return 1;
       case "PENDING_LEGAL_APPROVAL":
         return 2;
-      case "SURGERY_SCHEDULED":
+      case "TRANSPLANT_SCHEDULED":
+      case "SURGERY_IN_PROGRESS":
         return 3;
-      case "COMPLETED":
+      case "TRANSPLANT_SUCCESSFUL":
         return 4;
       default:
         return 0;
@@ -1707,7 +1708,7 @@ export default function OrganDonation() {
         desc: "Procurement surgery timeline scheduling and coordination of the transplant operating room.",
         icon: "calendar_month",
         renderDetail: () => {
-          if (activeRequest.status === "SURGERY_SCHEDULED") {
+          if (activeRequest.status === "TRANSPLANT_SCHEDULED" || activeRequest.status === "SURGERY_IN_PROGRESS") {
             return (
               <div className="mt-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1749,7 +1750,7 @@ export default function OrganDonation() {
         desc: "Monitoring recovery stats and hospital follow-ups after transplant procedures.",
         icon: "healing",
         renderDetail: () => {
-          if (activeRequest.status === "COMPLETED") {
+          if (activeRequest.status === "TRANSPLANT_SUCCESSFUL") {
             return (
               <div className="mt-2 p-4 bg-emerald-50/40 border border-emerald-100 rounded-2xl space-y-2">
                 <h5 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
