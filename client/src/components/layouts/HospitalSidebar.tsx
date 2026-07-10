@@ -101,7 +101,7 @@ export function HospitalSidebar({ isOpen = false, setIsOpen }: HospitalSidebarPr
         <Link href="/hospital/settings" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <Settings size={16} /> Settings
         </Link>
-        <Link href="/support" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+        <Link href="/contact" className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <HelpCircle size={16} /> Support
         </Link>
         <button

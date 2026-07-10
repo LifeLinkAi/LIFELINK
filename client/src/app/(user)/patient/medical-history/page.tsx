@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
-import { FileText, Plus, ChevronDown, ChevronUp, Download, Calendar, Droplets, Loader } from 'lucide-react';
+import { FileText, Plus, ChevronDown, ChevronUp, Download, Calendar, Droplets, Loader, HeartPulse, Activity, AlertTriangle, Syringe, FileArchive } from 'lucide-react';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -59,83 +59,92 @@ const VACCINATIONS: Vaccination[] = [
   { name: 'Tetanus',      date: 'Jun 2020',  nextDue: 'Jun 2030'      },
 ];
 
-const TYPE_CONFIG: Record<RecordType, { color: string; bg: string; icon: string }> = {
-  'Blood Request': { color: '#CC0000', bg: '#FFE5E5', icon: '🩸' },
-  'Organ Request': { color: '#5B21B6', bg: '#EDE8FF', icon: '❤️' },
-  Diagnosis:      { color: '#CC0000', bg: '#FFE5E5', icon: '🔴' },
-  Surgery:        { color: '#5B21B6', bg: '#EDE8FF', icon: '🔪' },
-  'Lab Report':   { color: '#1A5FAA', bg: '#E3F0FF', icon: '🧪' },
-  Prescription:   { color: '#2B6B0A', bg: '#E8F5E0', icon: '💊' },
-  Allergy:        { color: '#B86E00', bg: '#FFF3E0', icon: '⚠️' },
-  Vaccination:    { color: '#0369a1', bg: '#E0F2FE', icon: '💉' },
+const TYPE_CONFIG: Record<RecordType, { color: string; bg: string; icon: any; border: string }> = {
+  'Blood Request': { color: 'text-rose-600',   bg: 'bg-rose-50',    border: 'border-rose-200',   icon: Droplets },
+  'Organ Request': { color: 'text-indigo-600', bg: 'bg-indigo-50',  border: 'border-indigo-200', icon: HeartPulse },
+  Diagnosis:       { color: 'text-orange-600', bg: 'bg-orange-50',  border: 'border-orange-200', icon: Activity },
+  Surgery:         { color: 'text-sky-600',    bg: 'bg-sky-50',     border: 'border-sky-200',    icon: Activity },
+  'Lab Report':    { color: 'text-emerald-600',bg: 'bg-emerald-50', border: 'border-emerald-200',icon: FileText },
+  Prescription:    { color: 'text-emerald-600',bg: 'bg-emerald-50', border: 'border-emerald-200',icon: FileText },
+  Allergy:         { color: 'text-amber-600',  bg: 'bg-amber-50',   border: 'border-amber-200',  icon: AlertTriangle },
+  Vaccination:     { color: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-200',   icon: Syringe },
 };
 
 const SEVERITY_CONFIG = {
-  severe:   { color: '#CC0000', bg: '#FFE5E5', label: 'Severe'   },
-  moderate: { color: '#B86E00', bg: '#FFF3E0', label: 'Moderate' },
-  mild:     { color: '#2B6B0A', bg: '#E8F5E0', label: 'Mild'     },
+  severe:   { color: 'text-rose-600',   bg: 'bg-rose-50',   border: 'border-rose-200',   label: 'Severe'   },
+  moderate: { color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', label: 'Moderate' },
+  mild:     { color: 'text-emerald-600',bg: 'bg-emerald-50',border: 'border-emerald-200',label: 'Mild'     },
 };
 
 function MedicalRecordCard({ record: r }: { record: MedicalRecord }) {
   const [expanded, setExpanded] = useState(r.critical);
   const tc = TYPE_CONFIG[r.type];
+  const Icon = tc.icon;
 
   return (
     <div className={cn(
-      'bg-white rounded-xl border border-[#E8E4D8] overflow-hidden',
-      r.critical && 'border-l-[3px] border-l-red-500'
+      'bg-white/60 backdrop-blur-xl rounded-3xl border border-white overflow-hidden transition-all duration-300',
+      r.critical ? 'shadow-[0_8px_30px_rgba(225,29,72,0.15)] ring-1 ring-rose-300' : 'shadow-sm hover:shadow-md'
     )}>
       <div
-        className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-[#FAFAF7] sm:flex-nowrap sm:gap-4 sm:px-5"
+        className="flex cursor-pointer flex-wrap items-center gap-4 px-6 py-5 transition-colors hover:bg-white/40 sm:flex-nowrap"
         onClick={() => setExpanded(e => !e)}
       >
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
-          style={{ background: tc.bg }}>
-          {tc.icon}
+        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner", tc.bg, tc.color)}>
+          <Icon size={20} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[14px] font-semibold text-[#1a2e0a]">{r.title}</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[15px] font-bold text-slate-800">{r.title}</span>
             {r.critical && (
-              <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-sm shadow-rose-500/30">
                 Critical
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[11.5px] font-medium px-2 py-0.5 rounded-full border"
-              style={{ color: tc.color, background: tc.bg }}>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className={cn("text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm", tc.color, tc.bg, tc.border)}>
               {r.type}
             </span>
-            <span className="text-[11.5px] text-[#8A9A7A]">{r.date} · {r.doctor}</span>
+            <span className="text-[12px] font-medium text-slate-500">{r.date} · {r.doctor}</span>
           </div>
         </div>
-        <span className="order-4 ml-[52px] max-w-full text-[11.5px] text-[#8A9A7A] sm:order-none sm:ml-0 sm:max-w-[160px] sm:truncate">{r.hospital}</span>
-        {expanded
-          ? <ChevronUp size={16} className="text-[#8A9A7A] flex-shrink-0" />
-          : <ChevronDown size={16} className="text-[#8A9A7A] flex-shrink-0" />
-        }
+        <span className="order-4 ml-[64px] max-w-full text-[12px] font-semibold text-slate-500 sm:order-none sm:ml-0 sm:max-w-[160px] sm:truncate">{r.hospital}</span>
+        
+        <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center border border-white shadow-sm flex-shrink-0 ml-2">
+          {expanded
+            ? <ChevronUp size={16} className="text-slate-500" />
+            : <ChevronDown size={16} className="text-slate-500" />
+          }
+        </div>
       </div>
 
       {expanded && (
-        <div className="px-5 pb-4 border-t border-[#F0EDE3] bg-[#FAFAF7]">
-          <p className="text-[13px] text-[#3A4A2A] leading-relaxed mt-3">{r.notes}</p>
+        <div className="px-6 pb-6 pt-2 bg-white/30 border-t border-white/50">
+          <div className="bg-white/50 rounded-2xl border border-white p-5 shadow-inner">
+            <p className="text-[13px] font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">{r.notes}</p>
+          </div>
+          
           {r.documents.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[11px] font-semibold text-[#8A9A7A] uppercase tracking-wide mb-2">
-                Documents
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest mb-3 px-1">
+                Attached Archives
               </p>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {r.documents.map(doc => (
                   <div key={doc.name}
-                    className="flex flex-col gap-2 rounded-lg border border-[#E8E4D8] bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <FileText size={13} className="text-[#6B7A5A]" />
-                      <span className="min-w-0 break-all text-[12.5px] text-[#3A4A2A]">{doc.name}</span>
-                      <span className="text-[11px] text-[#8A9A7A]">{doc.size}</span>
+                    className="flex flex-col gap-3 rounded-2xl border border-white bg-white/60 backdrop-blur px-4 py-3 sm:flex-row sm:items-center sm:justify-between shadow-sm hover:shadow transition-all group">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                        <FileArchive size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="min-w-0 truncate text-[13px] font-bold text-slate-700 group-hover:text-blue-600 transition-colors">{doc.name}</p>
+                        <p className="text-[11px] font-medium text-slate-400">{doc.size}</p>
+                      </div>
                     </div>
-                    <button className="flex min-h-9 w-full items-center justify-center gap-1 text-[11.5px] font-medium text-[#3d6b1e] hover:underline sm:w-auto">
-                      <Download size={12} /> Download
+                    <button className="flex h-9 items-center justify-center gap-1.5 text-[12px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl px-4 transition-colors">
+                      <Download size={14} /> Download
                     </button>
                   </div>
                 ))}
@@ -207,152 +216,168 @@ export default function MedicalHistoryPage() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 sm:gap-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">Medical History</h1>
-          <p className="text-[13.5px] text-[#6B7A5A] mt-1">
-            Your complete medical records, allergies, and vaccinations.
-          </p>
-        </div>
-        <button className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#1a2e0a] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#2B4A18] sm:w-auto">
-          <Plus size={14} /> Add Record
-        </button>
-      </div>
+    <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Ambient Background Blobs */}
+      <div className="absolute top-[10%] left-[-10%] w-[400px] h-[400px] rounded-full bg-emerald-400/20 blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-400/10 blur-[120px] pointer-events-none" />
 
-      {/* Patient summary card */}
-      <div className="bg-white rounded-xl border border-[#E8E4D8] p-5">
-        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-[20px] font-bold text-red-700 flex-shrink-0">
-            PT
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-6">
+        
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between bg-white/60 backdrop-blur-2xl p-6 md:p-8 rounded-[2.5rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)]">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Medical Archive</h1>
+            <p className="text-[15px] font-medium text-slate-500 mt-2">
+              Securely access your complete medical history, alerts, and vital logs.
+            </p>
           </div>
-          <div className="flex-1">
-            <p className="text-[15px] font-bold text-[#1a2e0a]">Patient Name</p>
-            <p className="text-[12.5px] text-[#6B7A5A] mt-0.5">MRN: 8829-XJ-4 · 45 yrs · Male</p>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0 sm:items-center sm:gap-3">
-            <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
-              <Droplets size={14} className="text-red-600" />
-              <div>
-                <p className="text-[10px] text-[#8A9A7A]">Blood Type</p>
-                <p className="text-[14px] font-bold text-red-700">O−</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
-              <span className="text-[14px]">⚠️</span>
-              <div>
-                <p className="text-[10px] text-[#8A9A7A]">Allergies</p>
-                <p className="text-[14px] font-bold text-amber-700">{ALLERGIES.length}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-[#F5F2E8] p-1">
-        {TABS.map(t => (
-          <button key={t.key}
-            onClick={() => setActiveTab(t.key as typeof activeTab)}
-            className={cn(
-              'min-w-max flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all',
-              activeTab === t.key
-                ? 'bg-white text-[#1a2e0a] shadow-sm'
-                : 'text-[#6B7A5A] hover:text-[#1a2e0a]'
-            )}>
-            {t.label}
-            <span className={cn(
-              'text-[11px] px-1.5 py-0.5 rounded-full',
-              activeTab === t.key ? 'bg-[#F0EDE3] text-[#3A4A2A]' : 'bg-transparent text-[#8A9A7A]'
-            )}>
-              {t.count}
-            </span>
+          <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-3 text-[14px] font-bold text-white transition-all hover:scale-[1.02] shadow-lg shadow-slate-900/20 sm:w-auto">
+            <Plus size={16} /> Add Record
           </button>
-        ))}
-      </div>
-
-      {/* Records tab */}
-      {activeTab === 'records' && (
-        <div className="flex flex-col gap-3">
-          {isLoading && (
-            <div className="flex flex-col items-center gap-3 py-12">
-              <Loader size={32} className="animate-spin text-[#7AB648]" />
-              <p className="text-[14px] text-[#6B7A5A]">Loading your request history...</p>
-            </div>
-          )}
-          {!isLoading && error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-[13px] text-red-700">
-              {error}
-            </div>
-          )}
-          {!isLoading && records.length === 0 && !error && (
-            <div className="flex flex-col items-center gap-3 py-12 bg-white rounded-xl border border-[#E8E4D8]">
-              <Droplets size={32} className="text-[#8A9A7A]" />
-              <p className="text-[14px] font-semibold text-[#1a2e0a]">No requests yet</p>
-              <p className="text-[13px] text-[#6B7A5A] text-center max-w-xs">
-                When you submit blood or organ requests, they will appear here.
-              </p>
-            </div>
-          )}
-          {!isLoading && records.length > 0 && (
-            records.map(r => <MedicalRecordCard key={r.id} record={r} />)
-          )}
         </div>
-      )}
 
-      {/* Allergies tab */}
-      {activeTab === 'allergies' && (
-        <div className="flex flex-col gap-3">
-          {ALLERGIES.map(a => {
-            const sc = SEVERITY_CONFIG[a.severity];
-            return (
-              <div key={a.name} className="flex flex-col items-start gap-3 rounded-xl border border-[#E8E4D8] bg-white px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg flex-shrink-0">
-                  ⚠️
+        {/* Patient summary card */}
+        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full" />
+          
+          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center relative z-10">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-[24px] font-extrabold text-white flex-shrink-0 shadow-inner backdrop-blur">
+              PT
+            </div>
+            <div className="flex-1">
+              <p className="text-[20px] font-extrabold text-white tracking-tight">{user?.name || 'Patient Profile'}</p>
+              <p className="text-[13px] font-medium text-indigo-200 mt-1">MRN: 8829-XJ-4 <span className="opacity-50 mx-2">|</span> 45 yrs <span className="opacity-50 mx-2">|</span> Male</p>
+            </div>
+            <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-shrink-0 sm:items-center">
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur border border-white/10 px-4 py-3 rounded-2xl">
+                <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
+                  <Droplets size={16} />
                 </div>
-                <div className="flex-1">
-                  <p className="text-[14px] font-semibold text-[#1a2e0a]">{a.name}</p>
-                  <p className="text-[12.5px] text-[#6B7A5A] mt-0.5">{a.reaction}</p>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Blood</p>
+                  <p className="text-[16px] font-extrabold text-white">O−</p>
                 </div>
-                <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 sm:ml-auto"
-                  style={{ color: sc.color, background: sc.bg }}>
-                  {sc.label}
-                </span>
               </div>
-            );
-          })}
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur border border-white/10 px-4 py-3 rounded-2xl">
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
+                  <AlertTriangle size={16} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Allergies</p>
+                  <p className="text-[16px] font-extrabold text-white">{ALLERGIES.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Vaccinations tab */}
-      {activeTab === 'vaccinations' && (
-        <div className="flex flex-col gap-3">
-          {VACCINATIONS.map(v => (
-            <div key={v.name} className="flex flex-col items-start gap-3 rounded-xl border border-[#E8E4D8] bg-white px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg flex-shrink-0">
-                💉
-              </div>
-              <div className="flex-1">
-                <p className="text-[14px] font-semibold text-[#1a2e0a]">{v.name}</p>
-                <div className="mt-0.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                  <span className="flex items-center gap-1 text-[12px] text-[#6B7A5A]">
-                    <Calendar size={11} /> Given: {v.date}
-                  </span>
-                  {v.nextDue && (
-                    <span className="flex items-center gap-1 text-[12px] text-[#8A9A7A]">
-                      Next due: {v.nextDue}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 sm:ml-auto">
-                ✓ Done
+        {/* Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto rounded-[2rem] bg-white/60 backdrop-blur border border-white p-2 shadow-sm">
+          {TABS.map(t => (
+            <button key={t.key}
+              onClick={() => setActiveTab(t.key as typeof activeTab)}
+              className={cn(
+                'min-w-max flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[13px] font-bold transition-all',
+                activeTab === t.key
+                  ? 'bg-slate-900 text-white shadow-md'
+                  : 'text-slate-500 hover:bg-white/80 hover:text-slate-800'
+              )}>
+              {t.label}
+              <span className={cn(
+                'text-[11px] font-extrabold px-2 py-0.5 rounded-full',
+                activeTab === t.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+              )}>
+                {t.count}
               </span>
-            </div>
+            </button>
           ))}
         </div>
-      )}
+
+        {/* Records tab */}
+        {activeTab === 'records' && (
+          <div className="flex flex-col gap-4">
+            {isLoading && (
+              <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white p-16 flex flex-col items-center gap-4 text-center">
+                <Loader size={32} className="animate-spin text-blue-400" />
+                <p className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Loading Archives…</p>
+              </div>
+            )}
+            {!isLoading && error && (
+              <div className="bg-rose-50/80 backdrop-blur border border-rose-200 rounded-[2rem] p-6 text-[14px] font-bold text-rose-700 shadow-sm flex items-center gap-3">
+                <AlertTriangle size={20} /> {error}
+              </div>
+            )}
+            {!isLoading && records.length === 0 && !error && (
+              <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white p-16 flex flex-col items-center gap-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
+                  <FileText size={32} />
+                </div>
+                <div>
+                  <p className="text-[16px] font-extrabold text-slate-800">No Archives Found</p>
+                  <p className="text-[13px] font-medium text-slate-500 mt-2 max-w-xs">
+                    Your medical history and requests will appear here once recorded.
+                  </p>
+                </div>
+              </div>
+            )}
+            {!isLoading && records.length > 0 && (
+              records.map(r => <MedicalRecordCard key={r.id} record={r} />)
+            )}
+          </div>
+        )}
+
+        {/* Allergies tab */}
+        {activeTab === 'allergies' && (
+          <div className="flex flex-col gap-4">
+            {ALLERGIES.map(a => {
+              const sc = SEVERITY_CONFIG[a.severity];
+              return (
+                <div key={a.name} className="flex flex-col items-start gap-4 rounded-[2rem] border border-white bg-white/60 backdrop-blur-xl px-6 py-5 sm:flex-row sm:items-center sm:px-6 shadow-sm hover:shadow-md transition-all">
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner", sc.bg, sc.color)}>
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[15px] font-bold text-slate-800">{a.name}</p>
+                    <p className="text-[13px] font-medium text-slate-500 mt-1">{a.reaction}</p>
+                  </div>
+                  <span className={cn("text-[11px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full flex-shrink-0 sm:ml-auto border shadow-sm", sc.color, sc.bg, sc.border)}>
+                    {sc.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Vaccinations tab */}
+        {activeTab === 'vaccinations' && (
+          <div className="flex flex-col gap-4">
+            {VACCINATIONS.map(v => (
+              <div key={v.name} className="flex flex-col items-start gap-4 rounded-[2rem] border border-white bg-white/60 backdrop-blur-xl px-6 py-5 sm:flex-row sm:items-center sm:px-6 shadow-sm hover:shadow-md transition-all">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 shadow-inner">
+                  <Syringe size={20} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[15px] font-bold text-slate-800">{v.name}</p>
+                  <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                    <span className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                      <Calendar size={14} className="text-slate-400" /> Administered: {v.date}
+                    </span>
+                    {v.nextDue && (
+                      <span className="flex items-center gap-1.5 text-[12px] font-medium text-slate-400">
+                        Next cycle: {v.nextDue}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[11px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 sm:ml-auto shadow-sm flex items-center gap-1">
+                  <CheckCircle size={12} /> Verified
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

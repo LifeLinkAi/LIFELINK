@@ -13,6 +13,7 @@ import {
   Syringe
 } from 'lucide-react';
 import api from '@/lib/axios';
+import { useAppSelector } from '@/store/hooks';
 
 interface PledgedDonor {
   donorId: {
@@ -68,12 +69,14 @@ export default function BloodCommandCenter() {
     }
   };
 
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
+
   useEffect(() => {
     fetchData();
     // Setup polling for real-time Command Center telemetry
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [lastUpdated]);
 
   const handleArrive = async (reqId: string, donorId: string) => {
     try {

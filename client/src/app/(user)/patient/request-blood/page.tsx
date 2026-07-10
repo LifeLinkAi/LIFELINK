@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search } from 'lucide-react';
+import { Droplets, MapPin, Clock, CheckCircle, AlertTriangle, Search, Activity, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,14 +24,12 @@ interface BloodRequestForm {
 // -- Data -------------------------------------------------
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: string; bg: string }[] = [
-  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',     color: '#CC0000', bg: '#FFE5E5' },
-  { key: 'high',     label: 'High',      desc: 'Required within a few hours',      color: '#B86E00', bg: '#FFF3E0' },
-  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',         color: '#1A5FAA', bg: '#E3F0FF' },
-  { key: 'low',      label: 'Low',       desc: 'Scheduled or elective procedure', color: '#2B6B0A', bg: '#E8F5E0' },
+const URGENCY_OPTIONS: { key: Urgency; label: string; desc: string; color: string; border: string; bg: string }[] = [
+  { key: 'critical', label: 'Critical',  desc: 'Life-threatening, needed now',     color: 'text-rose-600', border: 'border-rose-400', bg: 'bg-rose-50/80' },
+  { key: 'high',     label: 'High',      desc: 'Required within a few hours',      color: 'text-orange-600', border: 'border-orange-400', bg: 'bg-orange-50/80' },
+  { key: 'medium',   label: 'Medium',    desc: 'Required within 24 hours',         color: 'text-blue-600', border: 'border-blue-400', bg: 'bg-blue-50/80' },
+  { key: 'low',      label: 'Low',       desc: 'Scheduled or elective procedure', color: 'text-emerald-600', border: 'border-emerald-400', bg: 'bg-emerald-50/80' },
 ];
-
-
 
 const STATUS_CONFIG = {
   PENDING:     { label: 'Pending',     color: '#B86E00', bg: '#FFF3E0' },
@@ -105,7 +103,7 @@ export default function RequestBloodPage() {
       urgency: form.urgency,
       facilityType: 'Hospital',
       notes: form.reason || '',
-      contactPhone: form.contactPhone, // Added: explicit phone forwarding
+      contactPhone: form.contactPhone,
       location: coordinates ? { type: 'Point', coordinates } : undefined,
       type: 'Blood',
     };
@@ -117,12 +115,8 @@ export default function RequestBloodPage() {
 
       if (response.status === 201 && response.data?.success && response.data?.data) {
         toast.success('Blood request submitted successfully.');
-        
-        // Use backend parsed document ID cleanly mapping to string id
         const targetId = response.data.data.id || response.data.data._id;
         setRequestId(targetId);
-        
-        // Smoothly hands off context to manual selection pipeline
         router.push(`/patient/select-donors?requestId=${targetId}`);
       } else {
         throw new Error('Unexpected response configuration from server.');
@@ -171,50 +165,56 @@ export default function RequestBloodPage() {
   // -- Submitted state -----------------------------------
   if (step === 'submitted') {
     return (
-      <div className="flex flex-col gap-6 max-w-xl mx-auto">
-        <div className="bg-white rounded-2xl border border-[#E8E4D8] p-10 flex flex-col items-center gap-5 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckCircle size={32} className="text-green-600" />
-          </div>
-          <div>
-            <p className="text-[22px] font-bold text-[#1a2e0a]">Request Submitted</p>
-            <p className="text-[13.5px] text-[#6B7A5A] mt-2">
-              Your blood request has been broadcast. Matching donors will be notified immediately.
-            </p>
-          </div>
-          <div className="w-full bg-[#F5F2E8] rounded-xl p-4 text-left flex flex-col gap-2">
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7A5A]">Request ID</span>
-              <span className="font-semibold text-[#1a2e0a]">{requestId}</span>
+      <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-400/20 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-blue-400/20 blur-[120px] pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-xl">
+          <div className="bg-white/60 backdrop-blur-2xl rounded-[3rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)] p-12 flex flex-col items-center gap-6 text-center">
+            <div className="relative w-24 h-24">
+              <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-20" />
+              <div className="relative w-full h-full bg-gradient-to-br from-emerald-400 to-green-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <CheckCircle size={48} className="text-white" />
+              </div>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7A5A]">Blood Group</span>
-              <span className="font-semibold text-[#1a2e0a]">{form.bloodGroup}</span>
+            <div>
+              <p className="text-3xl font-extrabold text-slate-900 tracking-tight">Request Dispatched</p>
+              <p className="text-[15px] text-slate-500 font-medium mt-2">
+                Your request has been broadcast securely. Matching donors are being alerted immediately.
+              </p>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7A5A]">Units Needed</span>
-              <span className="font-semibold text-[#1a2e0a]">{form.units}</span>
+            <div className="w-full bg-white/50 backdrop-blur border border-white rounded-3xl p-6 text-left flex flex-col gap-4 shadow-inner">
+              <div className="flex justify-between text-[14px]">
+                <span className="text-slate-500 font-medium">Request ID</span>
+                <span className="font-bold text-slate-800">{requestId}</span>
+              </div>
+              <div className="flex justify-between text-[14px]">
+                <span className="text-slate-500 font-medium">Blood Group</span>
+                <span className="font-bold text-rose-600">{form.bloodGroup}</span>
+              </div>
+              <div className="flex justify-between text-[14px]">
+                <span className="text-slate-500 font-medium">Units Needed</span>
+                <span className="font-bold text-slate-800">{form.units}</span>
+              </div>
+              <div className="flex justify-between text-[14px]">
+                <span className="text-slate-500 font-medium">Urgency</span>
+                <span className="font-bold capitalize text-slate-800">{form.urgency}</span>
+              </div>
+              <div className="flex justify-between text-[14px]">
+                <span className="text-slate-500 font-medium">Hospital</span>
+                <span className="font-bold text-slate-800">{hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital}</span>
+              </div>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7A5A]">Urgency</span>
-              <span className="font-semibold capitalize" style={{ color: URGENCY_OPTIONS.find(u => u.key === form.urgency)?.color }}>
-                {form.urgency}
-              </span>
+            <div className="flex gap-4 w-full mt-4">
+              <a href="/patient/request-status"
+                className="flex-1 py-4 bg-slate-900 text-white text-[14px] font-bold rounded-2xl text-center hover:bg-slate-800 transition-colors shadow-lg">
+                Track Live Status
+              </a>
+              <button onClick={handleNew}
+                className="flex-1 py-4 bg-white/60 backdrop-blur border border-white text-slate-700 text-[14px] font-bold rounded-2xl hover:bg-white transition-colors shadow-sm">
+                New Request
+              </button>
             </div>
-            <div className="flex justify-between text-[13px]">
-              <span className="text-[#6B7A5A]">Hospital</span>
-              <span className="font-semibold text-[#1a2e0a]">{hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital}</span>
-            </div>
-          </div>
-          <div className="flex gap-3 w-full">
-            <a href="/patient/request-status"
-              className="flex-1 py-2.5 bg-[#1a2e0a] text-white text-[13px] font-medium rounded-lg text-center hover:bg-[#2B4A18] transition-colors">
-              Track Request -&gt;
-            </a>
-            <button onClick={handleNew}
-              className="flex-1 py-2.5 bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium rounded-lg hover:border-[#7AB648] transition-colors">
-              New Request
-            </button>
           </div>
         </div>
       </div>
@@ -225,63 +225,59 @@ export default function RequestBloodPage() {
   if (step === 'confirming') {
     const urg = URGENCY_OPTIONS.find(u => u.key === form.urgency)!;
     return (
-      <div className="flex flex-col gap-6 max-w-xl mx-auto">
-        <div>
-          <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">Confirm Request</h1>
-          <p className="text-[13.5px] text-[#6B7A5A] mt-1">Review your blood request before broadcasting.</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-[#E8E4D8] p-6 flex flex-col gap-4">
-          {form.urgency === 'critical' && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-              <AlertTriangle size={15} className="text-red-600 flex-shrink-0" />
-              <span className="text-[12.5px] font-semibold text-red-700">
-                Critical request - all nearby compatible donors will be alerted immediately.
-              </span>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Blood Group',  value: form.bloodGroup },
-              { label: 'Units',        value: `${form.units} unit${form.units > 1 ? 's' : ''}` },
-              { label: 'Hospital',     value: hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital },
-              { label: 'Contact',      value: form.contactPhone },
-            ].map(r => (
-              <div key={r.label} className="bg-[#F5F2E8] rounded-lg p-3">
-                <p className="text-[11px] text-[#8A9A7A] uppercase tracking-wide font-medium">{r.label}</p>
-                <p className="text-[14px] font-semibold text-[#1a2e0a] mt-0.5">{r.value}</p>
+      <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-orange-400/20 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-rose-400/20 blur-[120px] pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-2xl flex flex-col gap-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Confirm Dispatch</h1>
+            <p className="text-[15px] font-medium text-slate-500 mt-2">Verify the operational details before broadcasting.</p>
+          </div>
+
+          <div className="bg-white/60 backdrop-blur-2xl rounded-[3rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)] p-8 flex flex-col gap-6">
+            {form.urgency === 'critical' && (
+              <div className="flex items-center gap-3 bg-rose-50/80 backdrop-blur border border-rose-200 rounded-2xl px-6 py-4 shadow-inner">
+                <AlertTriangle size={20} className="text-rose-600 flex-shrink-0 animate-pulse" />
+                <span className="text-[14px] font-bold text-rose-700 leading-tight">
+                  CRITICAL REQUEST — Priority dispatch protocols will engage. All nearby compatible donors will be alerted immediately.
+                </span>
               </div>
-            ))}
-          </div>
-          <div className="bg-[#F5F2E8] rounded-lg p-3">
-            <p className="text-[11px] text-[#8A9A7A] uppercase tracking-wide font-medium">Urgency</p>
-            <span className="text-[13px] font-semibold px-2.5 py-1 rounded-full inline-block mt-1"
-              style={{ color: urg.color, background: urg.bg }}>
-              {urg.label} - {urg.desc}
-            </span>
-          </div>
-          {form.reason && (
-            <div className="bg-[#F5F2E8] rounded-lg p-3">
-              <p className="text-[11px] text-[#8A9A7A] uppercase tracking-wide font-medium">Reason</p>
-              <p className="text-[13px] text-[#3A4A2A] mt-0.5">{form.reason}</p>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Target Blood Group', value: form.bloodGroup },
+                { label: 'Payload',            value: `${form.units} unit${form.units > 1 ? 's' : ''}` },
+                { label: 'Destination',        value: hospitalsList.find(h => h.id === form.hospital)?.name || form.hospital },
+                { label: 'Emergency Contact',  value: form.contactPhone },
+              ].map(r => (
+                <div key={r.label} className="bg-white/50 backdrop-blur border border-white rounded-2xl p-5 shadow-sm">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{r.label}</p>
+                  <p className="text-[15px] font-bold text-slate-800 break-words">{r.value || '—'}</p>
+                </div>
+              ))}
             </div>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleConfirm}
-              disabled={isSubmitting}
-              className={cn(
-                'flex-1 py-3 font-bold text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2',
-                isSubmitting
-                  ? 'bg-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed'
-                  : 'bg-red-600 hover:bg-red-700 text-white'
-              )}
-            >
-              <Droplets size={16} /> {isSubmitting ? 'Submitting...' : 'Confirm & Broadcast'}
-            </button>
-            <button onClick={() => setStep('form')}
-              className="px-5 py-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium rounded-xl hover:border-red-300 transition-colors">
-              Edit
-            </button>
+
+            <div className="bg-white/50 backdrop-blur border border-white rounded-2xl p-5 shadow-sm">
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Medical Brief (Optional)</p>
+              <p className="text-[14px] font-medium text-slate-700 whitespace-pre-wrap">{form.reason || 'No additional brief provided.'}</p>
+            </div>
+
+            <div className="flex gap-4 mt-2">
+              <button onClick={() => setStep('form')}
+                className="py-4 px-8 rounded-2xl bg-white/60 backdrop-blur border border-white text-[14px] font-bold text-slate-700 hover:bg-white transition-all shadow-sm">
+                Edit Intel
+              </button>
+              <button onClick={handleConfirm} disabled={isSubmitting}
+                className="flex-1 py-4 px-8 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-[14px] font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_30px_rgba(37,99,235,0.6)] hover:scale-[1.02] transition-all disabled:opacity-70 disabled:hover:scale-100 flex items-center justify-center gap-2">
+                {isSubmitting ? (
+                  <><Activity size={18} className="animate-spin" /> Broadcasting...</>
+                ) : (
+                  <><ShieldCheck size={18} /> Broadcast Request</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -290,228 +286,230 @@ export default function RequestBloodPage() {
 
   // -- Form state ----------------------------------------
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-[28px] font-bold text-[#1a2e0a] tracking-tight">Request Blood</h1>
-          <p className="text-[13.5px] text-[#6B7A5A] mt-1">
-            Submit a blood request. Matching donors will be notified instantly.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[1fr_300px] gap-5 items-start">
-        {/* Form */}
-        <div className="bg-white rounded-2xl border border-[#E8E4D8] p-6 flex flex-col gap-5">
-
-          {/* Blood group */}
+    <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Ambient Background Blobs */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-rose-400/20 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-blue-400/20 blur-[120px] pointer-events-none" />
+      
+      <div className="relative z-10 flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto">
+        {/* Left Column: Form */}
+        <div className="flex-1 flex flex-col gap-6">
           <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">
-              Blood Group Required <span className="text-red-600">*</span>
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {BLOOD_GROUPS.map(bg => (
-                <button key={bg}
-                  onClick={() => setForm(f => ({ ...f, bloodGroup: bg }))}
-                  className={cn(
-                    'py-2.5 rounded-lg border-2 text-[14px] font-bold transition-all',
-                    form.bloodGroup === bg
-                      ? 'border-red-600 bg-red-50 text-red-700'
-                      : 'border-[#E8E4D8] text-[#3A4A2A] hover:border-red-300'
-                  )}>
-                  {bg}
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Request Blood</h1>
+            <p className="text-[15px] font-medium text-slate-500 mt-2">Find compatible donors quickly and securely.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)] p-8 flex flex-col gap-8">
+            
+            {/* Blood Group */}
+            <div>
+              <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Blood Group Needed <span className="text-rose-500">*</span></label>
+              <div className="grid grid-cols-4 gap-3">
+                {BLOOD_GROUPS.map(bg => (
+                  <button key={bg} onClick={() => setForm(f => ({ ...f, bloodGroup: bg }))}
+                    className={cn(
+                      'py-3 rounded-2xl text-[14px] font-bold transition-all border shadow-sm',
+                      form.bloodGroup === bg
+                        ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white border-transparent shadow-[0_4px_20px_rgba(225,29,72,0.4)] scale-105'
+                        : 'bg-white/50 text-slate-700 border-white hover:border-rose-300 hover:bg-white'
+                    )}>
+                    {bg}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Units */}
+            <div>
+              <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Units Needed</label>
+              <div className="flex items-center gap-4 bg-white/40 p-2 rounded-[2rem] border border-white w-max shadow-sm">
+                <button onClick={() => setForm(f => ({ ...f, units: Math.max(1, f.units - 1) }))}
+                  className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/80 border border-white text-slate-700 hover:bg-white transition-all shadow-sm">
+                  -
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Units */}
-          <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">Units Needed</label>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setForm(f => ({ ...f, units: Math.max(1, f.units - 1) }))}
-                className="w-9 h-9 rounded-lg border border-[#D0CCBC] text-[18px] font-bold text-[#3A4A2A] hover:border-red-400 transition-colors flex items-center justify-center"
-              >-</button>
-              <span className="text-[22px] font-bold text-[#1a2e0a] w-8 text-center">{form.units}</span>
-              <button
-                onClick={() => setForm(f => ({ ...f, units: Math.min(10, f.units + 1) }))}
-                className="w-9 h-9 rounded-lg border border-[#D0CCBC] text-[18px] font-bold text-[#3A4A2A] hover:border-red-400 transition-colors flex items-center justify-center"
-              >+</button>
-              <span className="text-[12.5px] text-[#8A9A7A]">unit{form.units > 1 ? 's' : ''} (max 10)</span>
-            </div>
-          </div>
-
-          {/* Urgency */}
-          <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">
-              Urgency <span className="text-red-600">*</span>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {URGENCY_OPTIONS.map(u => (
-                <button key={u.key}
-                  onClick={() => setForm(f => ({ ...f, urgency: u.key }))}
-                  className={cn(
-                    'flex items-start gap-2.5 p-3 rounded-xl border-2 text-left transition-all',
-                    form.urgency === u.key
-                      ? 'border-2'
-                      : 'border-[#E8E4D8] hover:border-gray-300'
-                  )}
-                  style={form.urgency === u.key ? { borderColor: u.color, background: u.bg } : {}}>
-                  <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                    style={{ background: u.color }} />
-                  <div>
-                    <p className="text-[12.5px] font-semibold" style={{ color: form.urgency === u.key ? u.color : '#1a2e0a' }}>
-                      {u.label}
-                    </p>
-                    <p className="text-[11px] text-[#8A9A7A] mt-0.5">{u.desc}</p>
-                  </div>
+                <div className="w-16 h-12 flex flex-col items-center justify-center bg-transparent rounded-2xl">
+                  <span className="text-[20px] font-extrabold text-slate-900 leading-none">{form.units}</span>
+                </div>
+                <button onClick={() => setForm(f => ({ ...f, units: Math.min(10, f.units + 1) }))}
+                  className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/80 border border-white text-slate-700 hover:bg-white transition-all shadow-sm">
+                  +
                 </button>
-              ))}
+                <span className="text-[12px] font-bold text-slate-400 pr-4">unit{form.units > 1 ? 's' : ''}</span>
+              </div>
             </div>
-          </div>
 
-          {/* Hospital */}
-          <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">
-              Hospital <span className="text-red-600">*</span>
-            </label>
-            <select
-              value={form.hospital}
-              onChange={e => setForm(f => ({ ...f, hospital: e.target.value }))}
-              className="w-full h-10 px-3 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-red-400 transition-colors text-[#3A4A2A]"
+            {/* Urgency */}
+            <div>
+              <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Urgency <span className="text-rose-500">*</span></label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {URGENCY_OPTIONS.map(u => (
+                  <button key={u.key}
+                    onClick={() => setForm(f => ({ ...f, urgency: u.key }))}
+                    className={cn(
+                      'flex items-start gap-4 p-4 rounded-2xl border text-left transition-all',
+                      form.urgency === u.key
+                        ? cn('border-2', u.border, u.bg, 'scale-[1.02] shadow-sm')
+                        : 'border-white bg-white/50 hover:bg-white hover:border-slate-300 shadow-sm'
+                    )}>
+                    <div className={cn("w-3 h-3 rounded-full mt-1.5 flex-shrink-0 shadow-inner", form.urgency === u.key ? `bg-${u.color.split('-')[1]}-500` : "bg-slate-300")} />
+                    <div>
+                      <p className={cn("text-[14px] font-bold", form.urgency === u.key ? u.color : "text-slate-800")}>{u.label}</p>
+                      <p className={cn("text-[12px] mt-1 font-medium", form.urgency === u.key ? u.color.replace('600', '700/70') : "text-slate-500")}>{u.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hospital & Contact Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Hospital <span className="text-rose-500">*</span></label>
+                <select
+                  value={form.hospital}
+                  onChange={e => setForm(f => ({ ...f, hospital: e.target.value }))}
+                  className="w-full h-14 px-4 text-[14px] font-medium bg-white/50 backdrop-blur border border-white rounded-2xl outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/50 transition-all text-slate-800 shadow-sm"
+                >
+                  <option value="">Select hospital...</option>
+                  {hospitalsList.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Contact Phone <span className="text-rose-500">*</span></label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={form.contactPhone}
+                  onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))}
+                  className="w-full h-14 px-4 text-[14px] font-medium bg-white/50 backdrop-blur border border-white rounded-2xl outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/50 transition-all text-slate-800 shadow-sm placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-[13px] font-bold text-slate-700 mb-3 uppercase tracking-wider">Reason <span className="text-slate-400 normal-case tracking-normal">(optional)</span></label>
+              <textarea
+                rows={3}
+                placeholder="Brief description of medical condition..."
+                value={form.reason}
+                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                className="w-full p-4 text-[14px] font-medium bg-white/50 backdrop-blur border border-white rounded-2xl outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/50 transition-all resize-none text-slate-800 shadow-sm placeholder:text-slate-400"
+              />
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={!isValid}
+              className={cn(
+                'w-full py-4 rounded-[1.5rem] font-bold text-[15px] transition-all flex items-center justify-center gap-3',
+                isValid
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] hover:scale-[1.01]'
+                  : 'bg-white/50 border border-white text-slate-400 cursor-not-allowed shadow-sm'
+              )}
             >
-              <option value="">Select hospital...</option>
-              {hospitalsList.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-            </select>
+              <Droplets size={18} />
+              {isValid ? 'Review & Submit Request' : 'Fill required fields to continue'}
+            </button>
           </div>
-
-          {/* Contact */}
-          <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">
-              Contact Phone <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="tel"
-              placeholder="+91 98765 43210"
-              value={form.contactPhone}
-              onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))}
-              className="w-full h-10 px-3 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-red-400 transition-colors"
-            />
-          </div>
-
-          {/* Reason */}
-          <div>
-            <label className="block text-[13px] font-semibold text-[#1a2e0a] mb-2">
-              Reason <span className="text-[#8A9A7A] font-normal">(optional)</span>
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Brief description of medical condition..."
-              value={form.reason}
-              onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-              className="w-full px-3 py-2.5 text-[13px] bg-white border border-[#E8E4D8] rounded-lg outline-none focus:border-red-400 transition-colors resize-none"
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={!isValid}
-            className={cn(
-              'w-full py-3 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2',
-              isValid
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-[#E8E4D8] text-[#8A9A7A] cursor-not-allowed'
-            )}
-          >
-            <Droplets size={16} />
-            {isValid ? 'Review & Submit Request' : 'Fill required fields'}
-          </button>
         </div>
 
         {/* Right panel */}
-        <div className="flex flex-col gap-4">
-          {/* Compatibility info */}
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-4">
-            <p className="text-[12.5px] font-semibold text-[#1a2e0a] mb-3 flex items-center gap-1.5">
-              <Search size={13} /> Compatible Donors Nearby
-            </p>
+        <div className="w-full lg:w-[360px] flex-shrink-0 flex flex-col gap-6">
+          
+          {/* Compatibility Info Card */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-[2.5rem] p-8 text-white shadow-[0_8px_30px_rgba(15,23,42,0.4)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-3xl rounded-full" />
+            <h3 className="text-[14px] font-bold text-slate-300 flex items-center gap-2 mb-6 uppercase tracking-wider">
+              <Search size={16} className="text-rose-400" /> Target Network
+            </h3>
+            
             {form.bloodGroup ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-[12px] font-bold text-red-700">
+              <div className="flex flex-col gap-5 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center text-[18px] font-extrabold text-white shadow-lg shadow-rose-500/30">
                     {form.bloodGroup}
                   </div>
                   <div>
-                    <p className="text-[13px] font-semibold text-[#1a2e0a]">~12 donors found</p>
-                    <p className="text-[11px] text-[#8A9A7A]">within 15 km</p>
+                    <p className="text-[18px] font-extrabold text-white">~12 potential</p>
+                    <p className="text-[13px] font-medium text-slate-400">matching donors nearby</p>
                   </div>
                 </div>
-                <div className="h-px bg-[#E8E4D8]" />
-                <p className="text-[11.5px] text-[#6B7A5A]">
-                  Donors will be notified in waves of 3 until your request is fulfilled.
+                <div className="h-px bg-slate-700" />
+                <p className="text-[13px] font-medium text-slate-400 leading-relaxed">
+                  Upon dispatch, compatible donors within 15 km will be alerted in priority waves until your payload requirements are met.
                 </p>
               </div>
             ) : (
-              <p className="text-[12.5px] text-[#8A9A7A]">Select a blood group to see nearby donors.</p>
+              <div className="flex flex-col items-center gap-4 text-center py-4 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-slate-700 flex items-center justify-center">
+                  <Activity size={20} className="text-slate-500" />
+                </div>
+                <p className="text-[13px] font-medium text-slate-400">Awaiting Blood Group target to calculate network availability.</p>
+              </div>
             )}
           </div>
 
           {/* Recent requests */}
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-4">
-            <p className="text-[12.5px] font-semibold text-[#1a2e0a] mb-3 flex items-center gap-1.5">
-              <Clock size={13} /> Recent Requests
-            </p>
-            <div className="flex flex-col gap-2">
-              {recentRequests.map(r => {
-                const reqStatus = r.status?.toUpperCase() || 'PENDING';
-                const sc = STATUS_CONFIG[reqStatus as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PENDING;
-                const reqId = r.id || r._id;
-                const reqDate = new Date(r.registeredDate || r.createdAt).toLocaleDateString();
-                return (
-                  <div key={reqId} className="flex items-center justify-between py-2 border-b border-[#F0EDE3] last:border-0">
-                    <div>
-                      <p className="text-[12.5px] font-semibold text-[#1a2e0a]">{reqId}</p>
-                      <p className="text-[11px] text-[#8A9A7A]">{r.bloodGroup} - {r.units}u - {reqDate}</p>
+          <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)] p-8">
+            <h3 className="text-[14px] font-bold text-slate-800 flex items-center gap-2 mb-6 uppercase tracking-wider">
+              <Clock size={16} className="text-blue-500" /> Recent Missions
+            </h3>
+            
+            <div className="flex flex-col gap-3">
+              {recentRequests.length === 0 ? (
+                <p className="text-[13px] font-medium text-slate-500 text-center py-4">No recent history.</p>
+              ) : (
+                recentRequests.map(r => {
+                  const reqStatus = r.status?.toUpperCase() || 'PENDING';
+                  const conf = STATUS_CONFIG[reqStatus as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.PENDING;
+                  return (
+                    <div key={r.id} className="p-4 rounded-2xl bg-white/50 border border-white shadow-sm transition-all hover:bg-white/80 group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[13px] font-bold text-slate-800">{r.type} req {r.id.slice(-4).toUpperCase()}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full shadow-inner"
+                          style={{ background: conf.bg, color: conf.color }}>
+                          {conf.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin size={10} /> {r.facility}
+                      </p>
                     </div>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: sc.color, background: sc.bg }}>
-                      {sc.label}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
-            <a href="/patient/request-status"
-              className="block text-center text-[12px] font-medium text-red-600 hover:underline mt-2">
-              View all requests -&gt;
-            </a>
           </div>
 
           {/* Location */}
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-4 flex flex-col gap-3">
-            <div className="flex items-start gap-2.5">
-              <MapPin size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+          <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)] p-8 flex flex-col gap-5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <MapPin size={18} className="text-blue-600" />
+              </div>
               <div>
-                <p className="text-[12px] font-semibold text-[#1a2e0a]">Your Location</p>
-                <p className="text-[11.5px] text-[#6B7A5A] mt-0.5">
+                <p className="text-[14px] font-bold text-slate-800">Your Location</p>
+                <p className="text-[12px] font-medium text-slate-500 mt-1">
                   {coordinates ? `Lat: ${coordinates[1].toFixed(4)}, Lng: ${coordinates[0].toFixed(4)}` : 'Not set'}
                 </p>
               </div>
             </div>
-            <div className="flex flex-col gap-2 md:flex-row">
+            <div className="flex flex-col gap-3 md:flex-row">
               <button
                 onClick={handleUseCurrentLocation}
                 disabled={isLocLoading}
-                className="w-full md:flex-1 py-2 rounded-lg bg-white border border-[#D0CCBC] text-[#3A4A2A] text-[13px] font-medium hover:border-red-300 transition-colors"
+                className="w-full md:flex-1 py-3 rounded-xl bg-white border border-white text-slate-700 text-[13px] font-bold hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm"
               >
                 {isLocLoading ? 'Detecting…' : '📍 Use My Current Location'}
               </button>
-              <button
-                onClick={() => { setCoordinates(null); toast('Location cleared'); }}
-                className="w-full py-2 px-3 bg-white border border-[#D0CCBC] text-[#3A4A2A] rounded-lg md:w-auto"
-              >Clear</button>
+              {coordinates && (
+                <button
+                  onClick={() => { setCoordinates(null); toast('Location cleared'); }}
+                  className="w-full py-3 px-4 bg-white/50 border border-white text-slate-500 rounded-xl md:w-auto hover:text-rose-600 font-bold text-[13px] transition-colors"
+                >Clear</button>
+              )}
             </div>
           </div>
         </div>

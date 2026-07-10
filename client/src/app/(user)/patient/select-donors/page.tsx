@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppSelector } from '@/store/hooks';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -122,23 +123,23 @@ function DonorSkeleton() {
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
-          className="animate-pulse rounded-2xl border border-[#E8E4D8] bg-white p-5 shadow-sm"
+          className="animate-pulse rounded-[2.5rem] border border-white bg-white/40 backdrop-blur-xl p-6 shadow-sm"
         >
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-2xl bg-[#E8E4D8]" />
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-white/60" />
               <div>
-                <div className="h-4 w-32 rounded bg-[#E8E4D8]" />
-                <div className="mt-2 h-3 w-20 rounded bg-[#EFEADF]" />
+                <div className="h-5 w-32 rounded-lg bg-white/60" />
+                <div className="mt-2 h-4 w-20 rounded-lg bg-white/40" />
               </div>
             </div>
-            <div className="h-8 w-16 rounded-full bg-[#E8E4D8]" />
+            <div className="h-10 w-10 rounded-full bg-white/60" />
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="h-16 rounded-xl bg-[#F5F2E8]" />
-            <div className="h-16 rounded-xl bg-[#F5F2E8]" />
+          <div className="mt-8 grid grid-cols-2 gap-4">
+            <div className="h-24 rounded-2xl bg-white/50" />
+            <div className="h-24 rounded-2xl bg-white/50" />
           </div>
-          <div className="mt-5 h-10 rounded-xl bg-[#E8E4D8]" />
+          <div className="mt-6 h-12 rounded-xl bg-white/60" />
         </div>
       ))}
     </div>
@@ -156,6 +157,8 @@ export default function SelectDonorsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifiedDonorIds, setNotifiedDonorIds] = useState<Set<string>>(new Set());
+  
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   const selectedMatches = useMemo(
     () => matches.filter((match) => selectedIds.has(match.donorId)),
@@ -207,7 +210,7 @@ export default function SelectDonorsPage() {
 
   useEffect(() => {
     fetchMatches();
-  }, [fetchMatches]);
+  }, [fetchMatches, lastUpdated]);
 
   const toggleDonor = (donorId: string) => {
     if (notifiedDonorIds.has(donorId)) return;
@@ -266,217 +269,226 @@ export default function SelectDonorsPage() {
   const isEmpty = !loading && !error && matches.length === 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 sm:gap-6">
-      <section className="overflow-hidden rounded-3xl border border-[#DDE6D0] bg-[#123e20] text-white shadow-sm">
-        <div className="grid gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1fr_360px] lg:px-8">
-          <div className="min-w-0">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white/90 transition hover:bg-white/15"
-            >
-              <ArrowLeft size={14} />
-              Back
-            </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D2ECA2] px-3 py-1 text-[12px] font-bold text-[#131F00]">
-                <Sparkles size={14} />
-                Donor matching
-              </span>
-              <span className="inline-flex rounded-full border border-white/20 px-3 py-1 text-[12px] font-medium text-white/80">
-                Request {requestId || 'not provided'}
-              </span>
-            </div>
-            <h1 className="mt-4 max-w-3xl text-2xl font-bold leading-tight tracking-tight sm:text-[32px]">
-              Select verified donors and dispatch invitations
-            </h1>
-            <p className="mt-3 max-w-2xl text-[14px] leading-6 text-white/75">
-              Review compatibility, proximity, and donation profile signals before notifying donors for this request.
-            </p>
-          </div>
+    <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Ambient Background Blobs */}
+      <div className="absolute top-[5%] right-[5%] w-[400px] h-[400px] rounded-full bg-blue-400/20 blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-rose-400/10 blur-[120px] pointer-events-none" />
 
-          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 sm:grid-cols-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase text-white/55">Matches</p>
-              <p className="mt-1 text-2xl font-bold">{loading ? '-' : matches.length}</p>
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-6">
+        
+        {/* Header Hero Section */}
+        <section className="overflow-hidden rounded-[3rem] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-[0_8px_40px_rgba(15,23,42,0.4)] relative">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 blur-[80px] rounded-full" />
+          
+          <div className="grid gap-8 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1fr_380px] lg:px-12 relative z-10">
+            <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="mb-6 inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur px-4 py-2 text-[13px] font-bold text-white/90 transition-all hover:bg-white/10 hover:border-white/30"
+              >
+                <ArrowLeft size={16} />
+                Back to Dashboard
+              </button>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/20 border border-blue-400/30 backdrop-blur px-4 py-1.5 text-[12px] font-extrabold text-blue-300 uppercase tracking-widest shadow-inner">
+                  <Sparkles size={14} className="text-blue-400" />
+                  Donor Radar Active
+                </span>
+                <span className="inline-flex rounded-full border border-white/10 bg-white/5 backdrop-blur px-4 py-1.5 text-[12px] font-bold text-white/60 uppercase tracking-widest">
+                  REQ: {requestId.slice(-6).toUpperCase() || 'NOT_FOUND'}
+                </span>
+              </div>
+              
+              <h1 className="mt-6 max-w-3xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+                Identify & Dispatch Verified Donors
+              </h1>
+              <p className="mt-4 max-w-2xl text-[15px] font-medium leading-relaxed text-slate-400">
+                Review automated compatibility scores, geographical proximity, and donor verification tiers before dispatching mission-critical alerts.
+              </p>
             </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase text-white/55">Selected</p>
-              <p className="mt-1 text-2xl font-bold">{selectedIds.size}</p>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase text-white/55">Radius</p>
-              <p className="mt-1 text-2xl font-bold">50km</p>
+
+            <div className="grid grid-cols-1 gap-4 rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl p-6 sm:grid-cols-3 shadow-inner">
+              <div className="flex flex-col justify-center items-center text-center">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1">Radar Matches</p>
+                <p className="text-3xl font-extrabold text-white">{loading ? '-' : matches.length}</p>
+              </div>
+              <div className="flex flex-col justify-center items-center text-center border-t border-white/10 pt-4 sm:border-t-0 sm:border-l sm:pt-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1">Targeted</p>
+                <p className="text-3xl font-extrabold text-blue-400">{selectedIds.size}</p>
+              </div>
+              <div className="flex flex-col justify-center items-center text-center border-t border-white/10 pt-4 sm:border-t-0 sm:border-l sm:pt-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-1">Search Radius</p>
+                <p className="text-3xl font-extrabold text-white">50<span className="text-[14px] text-slate-400 ml-1">km</span></p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {error && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800">
-          <CircleAlert className="mt-0.5 flex-shrink-0" size={20} />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Unable to continue donor selection</p>
-            <p className="mt-1 text-sm leading-5 text-red-700">{error}</p>
-          </div>
-          <button
-            type="button"
-            onClick={fetchMatches}
-            className="hidden items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-700 shadow-sm transition hover:bg-red-100 sm:inline-flex"
-          >
-            <RefreshCcw size={14} />
-            Retry
-          </button>
-        </div>
-      )}
-
-      {loading && <DonorSkeleton />}
-
-      {isEmpty && (
-        <div className="rounded-3xl border border-dashed border-[#C9D6B8] bg-white p-10 text-center shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F5F2E8] text-[#6B7A5A]">
-            <SearchX size={30} />
-          </div>
-          <h2 className="mt-5 text-[22px] font-bold text-[#1a2e0a]">No matching donors found in radius</h2>
-          <p className="mx-auto mt-2 max-w-xl text-[14px] leading-6 text-[#6B7A5A]">
-            The current request did not return compatible available donors inside the 50 km matching radius.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {error && (
+          <div className="flex items-start gap-4 rounded-[2rem] border border-rose-200 bg-rose-50/80 backdrop-blur p-6 text-rose-800 shadow-sm">
+            <CircleAlert className="mt-1 flex-shrink-0 text-rose-600" size={24} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-extrabold">Radar Interference</p>
+              <p className="mt-1 text-[13px] font-medium leading-relaxed text-rose-700">{error}</p>
+            </div>
             <button
               type="button"
               onClick={fetchMatches}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#123e20] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1b4d2c]"
+              className="hidden items-center gap-2 rounded-2xl bg-white px-5 py-2.5 text-[13px] font-bold text-rose-700 shadow-sm transition hover:bg-rose-50 sm:inline-flex border border-rose-100"
             >
               <RefreshCcw size={16} />
-              Retry search
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/patient/request-status')}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#D8D2C4] bg-white px-4 py-2.5 text-sm font-bold text-[#1a2e0a] transition hover:bg-[#F5F2E8]"
-            >
-              <ClipboardList size={16} />
-              View request status
+              Reboot Radar
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {hasMatches && (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {matches.map((match) => {
-              const selected = selectedIds.has(match.donorId);
-              const alreadyNotified = notifiedDonorIds.has(match.donorId);
-              return (
-                <button
-                  key={match.donorId}
-                  type="button"
-                  disabled={alreadyNotified}
-                  onClick={() => toggleDonor(match.donorId)}
-                  className={cn(
-                    'group relative rounded-2xl border bg-white p-5 text-left shadow-sm transition focus:outline-none focus:ring-4 focus:ring-[#B6D088]/40',
-                    selected ? 'border-[#3d6b1e] ring-2 ring-[#7AB648]/30' : 'border-[#E8E4D8]',
-                    alreadyNotified ? 'cursor-not-allowed opacity-60' : 'hover:-translate-y-0.5 hover:shadow-md'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full border transition',
-                      selected
-                        ? 'border-[#3d6b1e] bg-[#3d6b1e] text-white'
-                        : 'border-[#D8D2C4] text-transparent group-hover:border-[#7AB648]'
-                    )}
-                  >
-                    <Check size={16} strokeWidth={3} />
-                  </div>
+        {loading && <DonorSkeleton />}
 
-                  <div className="flex items-start gap-3 pr-10">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1A5FAA]">
-                      <UserRound size={22} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-[16px] font-bold text-[#1a2e0a]">{match.name}</h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[12px] font-bold text-red-700">
-                          <Droplets size={13} />
-                          {match.bloodGroup}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F9EA] px-2.5 py-1 text-[12px] font-bold text-[#3d6b1e]">
-                          <ShieldCheck size={13} />
-                          {match.tier}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-[#E8E4D8] bg-[#FAF9F4] p-3">
-                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6B7A5A]">
-                        <HeartPulse size={14} />
-                        Match score
-                      </div>
-                      <p className="mt-1 text-2xl font-bold text-[#1a2e0a]">{match.score}%</p>
-                    </div>
-                    <div className="rounded-xl border border-[#E8E4D8] bg-[#FAF9F4] p-3">
-                      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6B7A5A]">
-                        <MapPin size={14} />
-                        Distance
-                      </div>
-                      <p className="mt-1 text-2xl font-bold text-[#1a2e0a]">{formatDistance(match.distanceKm)}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[#EFEADF] pt-4">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase text-[#8A9A7A]">Donor record</p>
-                      <p className="mt-0.5 text-[13px] font-semibold text-[#3A4A2A]">{match.totalDonated}</p>
-                    </div>
-                    {alreadyNotified ? (
-                      <span className="rounded-full bg-[#F0EDE3] px-3 py-1 text-[11px] font-bold text-[#6B7A5A]">
-                        Request Sent
-                      </span>
-                    ) : (
-                      <ChevronRight className="text-[#8A9A7A] transition group-hover:translate-x-0.5" size={18} />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="sticky bottom-2 z-10 rounded-2xl border border-[#D8D2C4] bg-white/95 p-4 shadow-lg backdrop-blur sm:bottom-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-[14px] font-bold text-[#1a2e0a]">
-                  {selectedIds.size} donor{selectedIds.size === 1 ? '' : 's'} selected for dispatch
-                </p>
-                <p className="mt-1 text-[12.5px] text-[#6B7A5A]">
-                  {selectedMatches.length > 0
-                    ? selectedMatches.map((match) => match.name).join(', ')
-                    : 'Select at least one available matching donor to continue.'}
-                </p>
-              </div>
+        {isEmpty && (
+          <div className="rounded-[3rem] border border-white bg-white/60 backdrop-blur-xl p-16 text-center shadow-[0_8px_40px_rgb(0,0,0,0.04)]">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-6 shadow-inner">
+              <SearchX size={40} />
+            </div>
+            <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">No Matching Signatures</h2>
+            <p className="mx-auto mt-3 max-w-xl text-[15px] font-medium leading-relaxed text-slate-500">
+              The automated radar sweep did not detect any compatible donors within the designated 50km operational radius.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
               <button
                 type="button"
-                disabled={selectedIds.size === 0 || submitting}
-                onClick={dispatchSelected}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#CC0000] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#B00000] disabled:cursor-not-allowed disabled:bg-[#D8D2C4] disabled:text-[#6B7A5A] md:w-auto"
+                onClick={fetchMatches}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-[14px] font-bold text-white transition-all hover:bg-slate-800 hover:scale-[1.02] shadow-lg"
               >
-                {submitting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-                {submitting ? 'Dispatching donors' : 'Dispatch selected donors'}
+                <RefreshCcw size={18} />
+                Initiate New Sweep
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/patient/request-status')}
+                className="inline-flex items-center gap-2 rounded-2xl border border-white bg-white/50 backdrop-blur px-6 py-3 text-[14px] font-bold text-slate-700 transition hover:bg-white shadow-sm"
+              >
+                <ClipboardList size={18} />
+                Return to Mission Log
               </button>
             </div>
           </div>
-        </>
-      )}
+        )}
 
-      {!loading && !error && selectedIds.size === 0 && matches.length > 0 && (
-        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <AlertTriangle size={18} />
-          Choose one or more donors before dispatching notifications.
-        </div>
-      )}
+        {hasMatches && (
+          <>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 pb-32">
+              {matches.map((match) => {
+                const selected = selectedIds.has(match.donorId);
+                const alreadyNotified = notifiedDonorIds.has(match.donorId);
+                return (
+                  <button
+                    key={match.donorId}
+                    type="button"
+                    disabled={alreadyNotified}
+                    onClick={() => toggleDonor(match.donorId)}
+                    className={cn(
+                      'group relative rounded-[2.5rem] border bg-white/60 backdrop-blur-xl p-6 text-left transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/20',
+                      selected ? 'border-blue-500 ring-2 ring-blue-500/30 shadow-[0_8px_30px_rgba(59,130,246,0.2)] bg-blue-50/50' : 'border-white shadow-sm hover:shadow-md hover:bg-white/80',
+                      alreadyNotified ? 'cursor-not-allowed opacity-60 grayscale-[50%]' : 'hover:-translate-y-1'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'absolute right-6 top-6 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all shadow-sm',
+                        selected
+                          ? 'border-blue-500 bg-blue-500 text-white shadow-blue-500/40'
+                          : 'border-white bg-white/80 text-transparent group-hover:border-blue-300'
+                      )}
+                    >
+                      <Check size={18} strokeWidth={3} />
+                    </div>
+
+                    <div className="flex items-start gap-4 pr-12">
+                      <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-blue-100 to-indigo-50 text-blue-600 shadow-inner border border-white">
+                        <UserRound size={28} />
+                      </div>
+                      <div className="min-w-0 pt-1">
+                        <h3 className="truncate text-[18px] font-extrabold text-slate-800 tracking-tight">{match.name}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 border border-rose-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-rose-600 shadow-sm">
+                            <Droplets size={12} />
+                            {match.bloodGroup}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-emerald-600 shadow-sm">
+                            <ShieldCheck size={12} />
+                            {match.tier}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white bg-white/50 backdrop-blur p-4 shadow-sm group-hover:bg-white transition-colors">
+                        <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">
+                          <HeartPulse size={14} className={selected ? "text-blue-500" : ""} />
+                          Match Score
+                        </div>
+                        <p className="mt-1 text-3xl font-extrabold text-slate-800">{match.score}<span className="text-[18px] text-slate-400">%</span></p>
+                      </div>
+                      <div className="rounded-2xl border border-white bg-white/50 backdrop-blur p-4 shadow-sm group-hover:bg-white transition-colors">
+                        <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">
+                          <MapPin size={14} className={selected ? "text-blue-500" : ""} />
+                          Distance
+                        </div>
+                        <p className="mt-1 text-3xl font-extrabold text-slate-800">{formatDistance(match.distanceKm)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-between border-t border-white/50 pt-5">
+                      <div>
+                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Donor Record</p>
+                        <p className="mt-1 text-[13px] font-bold text-slate-700">{match.totalDonated}</p>
+                      </div>
+                      {alreadyNotified ? (
+                        <span className="rounded-xl bg-slate-100 border border-slate-200 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-slate-500 shadow-inner">
+                          Dispatched
+                        </span>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center border border-slate-100 shadow-sm group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
+                          <ChevronRight className="text-slate-400 group-hover:text-blue-500 transition-colors" size={16} />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-4xl z-50 px-4">
+              <div className="rounded-[2.5rem] border border-white/40 bg-white/80 p-5 shadow-[0_8px_40px_rgba(0,0,0,0.12)] backdrop-blur-2xl">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="px-2">
+                    <p className="text-[16px] font-extrabold text-slate-800 tracking-tight">
+                      <span className="text-blue-600">{selectedIds.size}</span> donor{selectedIds.size === 1 ? '' : 's'} targeted for dispatch
+                    </p>
+                    <p className="mt-1 text-[13px] font-medium text-slate-500 truncate max-w-md">
+                      {selectedMatches.length > 0
+                        ? selectedMatches.map((match) => match.name).join(', ')
+                        : 'Select at least one available matching donor to initiate dispatch protocols.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={selectedIds.size === 0 || submitting}
+                    onClick={dispatchSelected}
+                    className="inline-flex min-h-[3.5rem] w-full items-center justify-center gap-3 rounded-[1.5rem] bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-[15px] font-bold text-white transition-all hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none md:w-auto flex-shrink-0"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                    {submitting ? 'Transmitting...' : 'Dispatch Notifications'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -47,7 +47,7 @@ export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-[#E8E4D8] bg-[#F5F2E8]/95 px-3 backdrop-blur sm:px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-white/20 bg-white/70 px-3 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.03)] sm:px-4 lg:px-6">
       <button
         type="button"
         onClick={onMenuClick}
@@ -63,7 +63,7 @@ export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search requests, hospitals..."
-          className="h-10 w-full rounded-lg border border-[#D0CCBC] bg-white pl-9 pr-3 text-[13px] text-[#1a2e0a] outline-none transition-all placeholder:text-[#8A9A7A] focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          className="h-10 w-full rounded-full border border-white/50 bg-white/50 pl-9 pr-3 text-[13px] text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-100/50 shadow-sm"
         />
       </div>
 
@@ -84,9 +84,9 @@ export function PatientTopBar({ onMenuClick }: { onMenuClick: () => void }) {
             onClick={() => {
               setProfileOpen(open => !open);
             }}
-            className="h-10 rounded-lg border border-[#D0CCBC] bg-white pl-2 pr-2.5 flex items-center gap-2 hover:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100 transition-all"
+            className="h-10 rounded-full border border-white/50 bg-white/50 pl-2 pr-2.5 flex items-center gap-2 hover:border-red-300 hover:bg-white focus:outline-none focus:ring-4 focus:ring-red-100/50 transition-all shadow-sm"
           >
-            <span className="h-7 w-7 rounded-lg bg-red-700 text-white text-[12px] font-bold flex items-center justify-center">
+            <span className="h-7 w-7 rounded-full bg-gradient-to-br from-red-600 to-red-800 text-white text-[12px] font-bold flex items-center justify-center shadow-inner">
               PT
             </span>
             <ChevronDown size={14} className={cn('text-[#8A9A7A] transition-transform', profileOpen && 'rotate-180')} />

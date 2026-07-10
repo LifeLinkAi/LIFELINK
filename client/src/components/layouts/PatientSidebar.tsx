@@ -65,7 +65,7 @@ export function PatientSidebar({ isOpen, onClose }: PatientSidebarProps) {
 
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-screen w-[240px] flex-col overflow-hidden bg-[#1a0a0a] transition-transform duration-300 ease-in-out md:translate-x-0',
+          'fixed left-0 top-0 z-50 flex h-screen w-[240px] flex-col overflow-hidden bg-slate-950/80 backdrop-blur-3xl border-r border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-in-out md:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -90,13 +90,14 @@ export function PatientSidebar({ isOpen, onClose }: PatientSidebarProps) {
               href={href}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] transition-all duration-150',
+                'flex items-center gap-2.5 px-3 py-[10px] rounded-r-xl text-[13px] transition-all duration-300 relative group overflow-hidden',
                 active
-                  ? 'bg-red-700 text-white font-medium'
-                  : 'text-white/55 hover:text-white/90 hover:bg-white/[0.07]'
+                  ? 'bg-gradient-to-r from-red-600/20 to-transparent text-white font-bold'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
               )}
             >
-              <Icon size={16} className="flex-shrink-0 opacity-90" />
+              {active && <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" />}
+              <Icon size={16} className={cn("flex-shrink-0 transition-transform group-hover:scale-110", active ? "text-red-400" : "")} />
               {label}
             </Link>
           );
@@ -108,14 +109,14 @@ export function PatientSidebar({ isOpen, onClose }: PatientSidebarProps) {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-[10px] rounded-lg text-[13px] text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all group"
         >
-          <LogOut size={16} /> Logout
+          <LogOut size={16} className="group-hover:-translate-x-1 transition-transform" /> Logout
         </button>
         <Link href="/patient/settings" onClick={onClose} className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <Settings size={16} /> Settings
         </Link>
-        <Link href="/support" onClick={onClose} className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
+        <Link href="/contact" onClick={onClose} className="flex items-center gap-2.5 px-3 py-[9px] rounded-lg text-[13px] text-white/55 hover:text-white hover:bg-white/[0.07] transition-all">
           <HelpCircle size={16} /> Support
         </Link>
       </div>

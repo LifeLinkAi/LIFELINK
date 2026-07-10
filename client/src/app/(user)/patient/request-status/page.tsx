@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
+import { Clock, Droplets, Heart, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, Search, Activity, ShieldCheck, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppSelector } from '@/store/hooks';
 import { cn } from '@/lib/utils';
 
 type RequestType   = 'Blood' | 'Organ';
@@ -51,11 +52,11 @@ interface PatientRequest {
 }
 
 const TIMELINE_STEPS: Array<{ event: string; statuses: RequestStatus[] }> = [
-  { event: 'Request Submitted',  statuses: ['PENDING', 'DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Donors Notified',    statuses: ['DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Donor Accepted',     statuses: ['PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Hospital Approved',  statuses: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
-  { event: 'Donation Completed', statuses: ['COMPLETED'] },
+  { event: 'Request Dispatched', statuses: ['PENDING', 'DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donors Alerted',     statuses: ['DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Donor Secured',      statuses: ['PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Hospital Clear',     statuses: ['APPROVED', 'IN_PROGRESS', 'COMPLETED'] },
+  { event: 'Mission Success',    statuses: ['COMPLETED'] },
 ];
 
 function formatRegisteredDate(value: string): string {
@@ -112,29 +113,29 @@ function mapBackendRequest(req: BackendRequest): PatientRequest {
 }
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
-  PENDING:          { label: 'Pending',          color: '#B86E00', bg: '#FFF3E0', border: '#FCD34D' },
-  DONOR_NOTIFIED:   { label: 'Donors Notified',  color: '#1A5FAA', bg: '#E3F0FF', border: '#93C5FD' },
-  PENDING_HOSPITAL: { label: 'Donor Accepted',   color: '#7C3AED', bg: '#EDE9FE', border: '#C4B5FD' },
-  APPROVED:         { label: 'Hospital Approved',color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
-  IN_PROGRESS:      { label: 'In Progress',      color: '#0369a1', bg: '#E0F2FE', border: '#7DD3FC' },
-  COMPLETED:        { label: 'Completed',        color: '#2B6B0A', bg: '#E8F5E0', border: '#86EFAC' },
-  CANCELLED:        { label: 'Cancelled',        color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
+  PENDING:          { label: 'Pending',          color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+  DONOR_NOTIFIED:   { label: 'Donors Alerted',   color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200' },
+  PENDING_HOSPITAL: { label: 'Donor Secured',    color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' },
+  APPROVED:         { label: 'Hospital Clear',   color: 'text-sky-600',    bg: 'bg-sky-50',    border: 'border-sky-200' },
+  IN_PROGRESS:      { label: 'In Progress',      color: 'text-sky-600',    bg: 'bg-sky-50',    border: 'border-sky-200' },
+  COMPLETED:        { label: 'Completed',        color: 'text-emerald-600',bg: 'bg-emerald-50',border: 'border-emerald-200' },
+  CANCELLED:        { label: 'Cancelled',        color: 'text-slate-500',  bg: 'bg-slate-100', border: 'border-slate-200' },
 };
 
 const TYPE_CONFIG: Record<RequestType, { icon: React.ReactNode; color: string; bg: string }> = {
-  Blood:     { icon: <Droplets size={15} />, color: '#CC0000', bg: '#FFE5E5' },
-  Organ:     { icon: <Heart     size={15} />, color: '#5B21B6', bg: '#EDE8FF' },
+  Blood:     { icon: <Droplets size={16} />, color: 'text-rose-600', bg: 'bg-rose-100/50' },
+  Organ:     { icon: <Heart     size={16} />, color: 'text-indigo-600', bg: 'bg-indigo-100/50' },
 };
 
 const URGENCY_COLORS: Record<string, string> = {
-  critical: '#CC0000', high: '#B86E00', medium: '#1A5FAA', low: '#2B6B0A',
+  critical: 'rose-500', high: 'orange-500', medium: 'blue-500', low: 'emerald-500',
 };
 
 const FILTERS = [
-  { key: 'all',        label: 'All'        },
-  { key: 'active',     label: 'Active'     },
-  { key: 'COMPLETED',  label: 'Completed'  },
-  { key: 'CANCELLED',  label: 'Cancelled'  },
+  { key: 'all',        label: 'All Missions' },
+  { key: 'active',     label: 'Active' },
+  { key: 'COMPLETED',  label: 'Success' },
+  { key: 'CANCELLED',  label: 'Aborted' },
 ];
 
 function RequestCard({ req }: { req: PatientRequest }) {
@@ -142,131 +143,132 @@ function RequestCard({ req }: { req: PatientRequest }) {
   const statusKey = (req.status in STATUS_CONFIG ? req.status : 'PENDING') as RequestStatus;
   const sc = STATUS_CONFIG[statusKey];
   const tc = TYPE_CONFIG[req.type];
-  const borderColor = URGENCY_COLORS[req.urgency] ?? URGENCY_COLORS.low;
+  const borderColor = URGENCY_COLORS[req.urgency] ?? 'emerald-500';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#E8E4D8] bg-white"
-      style={{ borderLeft: `3px solid ${borderColor}` }}>
-
+    <div className="overflow-hidden rounded-[2rem] border border-white bg-white/60 backdrop-blur-2xl shadow-sm hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all">
       {/* Header row */}
       <div
-        className="flex cursor-pointer flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-[#FAFAF7] sm:flex-nowrap sm:gap-4 sm:px-5"
+        className="flex cursor-pointer flex-wrap items-center gap-4 px-6 py-5 transition-colors hover:bg-white/40 sm:flex-nowrap"
         onClick={() => setExpanded(e => !e)}
       >
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: tc.bg, color: tc.color }}>
+        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner", tc.bg, tc.color)}>
           {tc.icon}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[14px] font-bold text-[#1a2e0a]">{req.id}</span>
-            <span className="text-[12px] font-medium px-2 py-0.5 rounded-full"
-              style={{ background: tc.bg, color: tc.color }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[15px] font-extrabold text-slate-800 uppercase tracking-widest">{req.id.slice(-6)}</span>
+            <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest", tc.bg, tc.color)}>
               {req.type}
             </span>
+            <div className={cn(`w-2 h-2 rounded-full bg-${borderColor}`)} title={`Urgency: ${req.urgency}`} />
           </div>
-          <p className="text-[12px] text-[#8A9A7A] mt-0.5">{req.detail}</p>
-          <p className="text-[11px] text-[#C0CCBC] mt-0.5">
-            Created {req.createdAt} · Updated {req.updatedAt}
+          <p className="text-[13px] font-bold text-slate-600 mt-1">{req.detail}</p>
+          <p className="text-[11px] font-medium text-slate-400 mt-1">
+            Initiated {req.createdAt}
           </p>
         </div>
 
-        <span className="order-4 ml-[52px] text-[11.5px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 sm:order-none sm:ml-0"
-          style={{ color: sc.color, background: sc.bg, borderColor: sc.border }}>
+        <span className={cn("order-4 ml-[64px] text-[11px] font-bold px-3 py-1.5 rounded-full border flex-shrink-0 sm:order-none sm:ml-0 uppercase tracking-wider shadow-sm", sc.color, sc.bg, sc.border)}>
           {sc.label}
         </span>
 
-        {expanded
-          ? <ChevronUp   size={16} className="text-[#8A9A7A] flex-shrink-0" />
-          : <ChevronDown size={16} className="text-[#8A9A7A] flex-shrink-0" />
-        }
+        <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center border border-white shadow-sm flex-shrink-0 ml-2">
+          {expanded
+            ? <ChevronUp   size={16} className="text-slate-500" />
+            : <ChevronDown size={16} className="text-slate-500" />
+          }
+        </div>
       </div>
 
       {/* Timeline */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-[#F0EDE3] bg-[#FAFAF7]">
+        <div className="px-6 pb-6 pt-2 bg-white/30 border-t border-white/50">
           {(req.status === 'APPROVED' || req.status === 'PENDING_HOSPITAL') && req.donorName && (
-            <div className="mb-4 mt-4 rounded-xl bg-sky-50 border border-sky-100 p-4">
-              <p className="text-[11px] font-bold text-sky-850 uppercase tracking-wide mb-2">Donor Details</p>
-              <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div>
-                  <span className="text-[#8A9A7A] font-semibold">Name:</span>{' '}
-                  <span className="text-[#1a2e0a] font-bold">{req.donorName}</span>
+            <div className="mb-6 mt-4 rounded-2xl bg-indigo-50/50 backdrop-blur border border-indigo-100 p-5 shadow-inner relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-400/10 blur-xl rounded-full" />
+              <p className="text-[11px] font-extrabold text-indigo-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <ShieldCheck size={14} /> Donor Secured
+              </p>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="bg-white/60 p-3 rounded-xl border border-white">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block mb-1">Code Name</span>
+                  <span className="text-slate-800 font-extrabold text-[13px]">{req.donorName}</span>
                 </div>
-                <div>
-                  <span className="text-[#8A9A7A] font-semibold">Blood Type:</span>{' '}
-                  <span className="text-[#1a2e0a] font-bold">{req.donorBloodType || 'N/A'}</span>
+                <div className="bg-white/60 p-3 rounded-xl border border-white">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block mb-1">Blood Type</span>
+                  <span className="text-rose-600 font-extrabold text-[13px]">{req.donorBloodType || 'N/A'}</span>
                 </div>
-                <div>
-                  <span className="text-[#8A9A7A] font-semibold">Acceptance Time:</span>{' '}
-                  <span className="text-[#1a2e0a] font-medium">
+                <div className="bg-white/60 p-3 rounded-xl border border-white">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block mb-1">Timestamp</span>
+                  <span className="text-slate-700 font-bold text-[12px]">
                     {req.acceptedAt ? formatRegisteredDate(req.acceptedAt) : 'N/A'}
                   </span>
                 </div>
-                <div>
-                  <span className="text-[#8A9A7A] font-semibold">Hospital:</span>{' '}
-                  <span className="text-[#1a2e0a] font-semibold">{req.hospital}</span>
+                <div className="bg-white/60 p-3 rounded-xl border border-white">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block mb-1">Facility</span>
+                  <span className="text-slate-700 font-bold text-[12px] truncate block">{req.hospital}</span>
                 </div>
               </div>
             </div>
           )}
-          <p className="text-[11px] font-semibold text-[#8A9A7A] uppercase tracking-wide mt-4 mb-3">
-            Timeline
+          
+          <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest mt-6 mb-4 px-2">
+            Mission Timeline
           </p>
-          <div className="flex flex-col">
+          <div className="flex flex-col px-2">
             {req.timeline.map((t, i) => (
-              <div key={i} className="flex gap-3">
+              <div key={i} className="flex gap-4">
                 <div className="flex flex-col items-center flex-shrink-0 w-4">
                   <div className={cn(
-                    'w-3 h-3 rounded-full mt-1 flex-shrink-0',
-                    t.done ? 'bg-green-500' :
-                    i === req.timeline.findIndex(x => !x.done) ? 'bg-red-500 animate-pulse' :
-                    'bg-[#D0CCBC]'
+                    'w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 border-2 shadow-sm relative z-10',
+                    t.done ? 'bg-emerald-500 border-emerald-400 shadow-emerald-500/20' :
+                    i === req.timeline.findIndex(x => !x.done) ? 'bg-blue-500 border-blue-400 animate-pulse shadow-blue-500/50' :
+                    'bg-slate-200 border-slate-300'
                   )} />
                   {i < req.timeline.length - 1 && (
-                    <div className={cn('w-0.5 flex-1 my-1 min-h-[16px]',
-                      t.done ? 'bg-green-200' : 'bg-[#E8E4D8]'
+                    <div className={cn('w-0.5 flex-1 my-1 min-h-[24px]',
+                      t.done ? 'bg-emerald-200' : 'bg-slate-200'
                     )} />
                   )}
                 </div>
-                <div className="pb-3">
+                <div className="pb-4">
                   <p className={cn(
-                    'text-[13px]',
-                    t.done ? 'text-[#3A4A2A] font-medium' :
+                    'text-[14px]',
+                    t.done ? 'text-slate-800 font-bold' :
                     i === req.timeline.findIndex(x => !x.done)
-                      ? 'text-red-700 font-semibold'
-                      : 'text-[#C0CCBC]'
+                      ? 'text-blue-700 font-extrabold'
+                      : 'text-slate-400 font-medium'
                   )}>
                     {t.event}
                   </p>
-                  <p className="text-[11px] text-[#8A9A7A] mt-0.5">{t.time}</p>
+                  <p className="text-[11px] font-medium text-slate-400 mt-0.5">{t.time}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Actions */}
-          <div className="mt-2 flex w-full flex-col items-stretch gap-2.5 sm:flex-row sm:items-center">
+          <div className="mt-4 flex w-full flex-col items-stretch gap-3 sm:flex-row sm:items-center pt-4 border-t border-white/50">
             {req.status === 'COMPLETED' && (
-              <div className="flex items-center gap-1.5 text-[12.5px] text-green-700 font-medium">
-                <CheckCircle size={14} /> Fulfilled successfully
+              <div className="flex items-center justify-center sm:justify-start gap-2 text-[13px] text-emerald-700 font-bold bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                <CheckCircle size={16} /> Mission Accomplished
               </div>
             )}
             
-            {/* Conditional Matching Access Option */}
             {['PENDING', 'DONOR_NOTIFIED'].includes(req.status) && (
               <Link 
                 href={`/patient/select-donors?requestId=${req.id}`}
-                className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#1a2e0a] px-3 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#2B4A18] sm:w-auto"
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-[13px] font-bold text-white transition-all hover:bg-slate-800 hover:scale-[1.02] shadow-lg sm:w-auto"
               >
-                <Search size={13} /> View Matches
+                <Activity size={16} /> Monitor Radar
               </Link>
             )}
 
             {req.canCancel && (
-              <button className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-50 sm:ml-auto sm:w-auto">
-                <XCircle size={13} /> Cancel Request
+              <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white/50 px-6 py-3 text-[13px] font-bold text-rose-600 transition-colors hover:bg-rose-50 sm:ml-auto sm:w-auto shadow-sm">
+                <XCircle size={16} /> Abort Request
               </button>
             )}
           </div>
@@ -281,6 +283,7 @@ export default function RequestStatusPage() {
   const [requests, setRequests] = useState<BackendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const lastUpdated = useAppSelector(state => state.notifications.lastUpdated);
 
   const ACTIVE_STATUSES = ['PENDING', 'DONOR_NOTIFIED', 'PENDING_HOSPITAL', 'APPROVED', 'IN_PROGRESS'];
 
@@ -303,10 +306,9 @@ export default function RequestStatusPage() {
   useEffect(() => {
     if (!user) return;
     fetchHistory();
-    // Auto-poll every 30 s so donor accept/decline is reflected without manual refresh
     const interval = setInterval(fetchHistory, 30_000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, lastUpdated]);
 
   const displayRequests = requests.map(mapBackendRequest);
 
@@ -324,97 +326,89 @@ export default function RequestStatusPage() {
   };
 
   const stats = [
-    { label: 'Total',    value: displayRequests.length,    color: '' },
-    { label: 'Active',   value: counts.active,              color: 'text-red-600'   },
-    { label: 'Completed',value: counts.COMPLETED,           color: 'text-green-700' },
-    { label: 'Cancelled',value: counts.CANCELLED,           color: 'text-[#8A9A7A]' },
+    { label: 'Total Missions',    value: displayRequests.length,    color: 'text-slate-800' },
+    { label: 'Active Radar',      value: counts.active,             color: 'text-blue-600'  },
+    { label: 'Successes',         value: counts.COMPLETED,          color: 'text-emerald-600'},
+    { label: 'Aborted',           value: counts.CANCELLED,          color: 'text-slate-400' },
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 sm:gap-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#1a2e0a] sm:text-[28px]">My Requests</h1>
-          <p className="text-[13.5px] text-[#6B7A5A] mt-1">
-            Track all your blood and organ requests.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={fetchHistory}
-          disabled={loading}
-          className={cn(
-            'flex min-h-10 w-full items-center justify-center gap-1.5 px-4 py-2 rounded-lg border text-[13px] font-medium transition-colors sm:w-auto',
-            loading
-              ? 'border-[#E8E4D8] bg-[#F5F5F3] text-[#8A9A7A] cursor-not-allowed'
-              : 'border-[#D0CCBC] bg-white text-[#3A4A2A] hover:border-[#7AB648]'
-          )}
-        >
-          <RefreshCw size={13} /> {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
+    <div className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+      {/* Ambient Background Blobs */}
+      <div className="absolute top-[10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-blue-400/20 blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-400/10 blur-[120px] pointer-events-none" />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-[#E8E4D8] p-4 text-center">
-            <p className={cn('text-[26px] font-bold leading-none', s.color || 'text-[#1a2e0a]')}>{s.value}</p>
-            <p className="text-[11.5px] text-[#8A9A7A] mt-1">{s.label}</p>
+      <div className="relative z-10 mx-auto flex w-full max-w-4xl flex-col gap-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between bg-white/60 backdrop-blur-2xl p-6 md:p-8 rounded-[2.5rem] border border-white shadow-[0_8px_40px_rgb(0,0,0,0.04)]">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Mission Log</h1>
+            <p className="text-[15px] font-medium text-slate-500 mt-2">
+              Track live updates and historical archives for all your requests.
+            </p>
           </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {FILTERS.map(f => (
-          <button key={f.key}
-            onClick={() => setFilter(f.key)}
+          <button
+            type="button"
+            onClick={fetchHistory}
+            disabled={loading}
             className={cn(
-              'flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12.5px] font-medium border transition-all',
-              filter === f.key
-                ? 'bg-[#1a2e0a] text-white border-[#1a2e0a]'
-                : 'bg-white text-[#5A6A4A] border-[#D0CCBC] hover:border-[#7AB648]'
-            )}>
-            {f.label}
-            <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full',
-              filter === f.key ? 'bg-white/20 text-white' : 'bg-[#F0EDE3] text-[#6B7A5A]'
-            )}>
-              {counts[f.key as keyof typeof counts] ?? 0}
-            </span>
+              'flex min-h-12 w-full items-center justify-center gap-2 px-6 py-3 rounded-2xl border text-[14px] font-bold transition-all shadow-sm sm:w-auto',
+              loading
+                ? 'border-white bg-white/40 text-slate-400 cursor-not-allowed'
+                : 'border-white bg-white/80 text-slate-700 hover:bg-white hover:text-blue-600 hover:border-blue-200 hover:shadow-md'
+            )}
+          >
+            <RefreshCw size={16} className={cn(loading && "animate-spin")} /> {loading ? 'Syncing…' : 'Sync Radar'}
           </button>
-        ))}
-      </div>
+        </div>
 
-      {/* Request list */}
-      <div className="flex flex-col gap-3">
-        {loading ? (
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-12 text-center text-[#8A9A7A]">
-            Loading your request history…
-          </div>
-        ) : visible.length > 0 ? (
-          visible.map(r => <RequestCard key={r.id} req={r} />)
-        ) : (
-          <div className="bg-white rounded-xl border border-[#E8E4D8] p-12 text-center text-[#8A9A7A]">
-            No requests in this category.
-          </div>
-        )}
-      </div>
-
-      {/* Quick links */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {[
-          { label: 'Request Blood',     href: '/patient/request-blood',     icon: <Droplets  size={16} />, color: '#CC0000' },
-        ].map(l => (
-          <a key={l.label} href={l.href}
-            className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E8E4D8] hover:border-[#7AB648] transition-colors text-center">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center"
-              style={{ background: '#F5F2E8', color: l.color }}>
-              {l.icon}
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {stats.map(s => (
+            <div key={s.label} className="bg-white/60 backdrop-blur-2xl rounded-[2rem] border border-white p-6 shadow-sm hover:shadow-md transition-all text-center">
+              <p className={cn('text-4xl font-extrabold tracking-tight mb-2', s.color)}>{s.value}</p>
+              <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
             </div>
-            <span className="text-[12px] font-medium text-[#3A4A2A]">{l.label}</span>
-          </a>
-        ))}
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {FILTERS.map(f => (
+            <button key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                'flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[13px] font-bold border transition-all shadow-sm',
+                filter === f.key
+                  ? 'bg-slate-900 text-white border-transparent scale-105'
+                  : 'bg-white/60 backdrop-blur text-slate-600 border-white hover:bg-white hover:text-slate-900'
+              )}>
+              {f.label}
+              <span className={cn('text-[11px] font-extrabold px-2 py-0.5 rounded-full',
+                filter === f.key ? 'bg-white/20 text-white' : 'bg-slate-200/50 text-slate-500'
+              )}>
+                {counts[f.key as keyof typeof counts] ?? 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Request list */}
+        <div className="flex flex-col gap-5">
+          {loading ? (
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white p-16 flex flex-col items-center gap-4 text-center">
+              <Activity size={32} className="text-blue-400 animate-pulse" />
+              <p className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">Syncing Archives…</p>
+            </div>
+          ) : visible.length > 0 ? (
+            visible.map(r => <RequestCard key={r.id} req={r} />)
+          ) : (
+            <div className="bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white p-16 flex flex-col items-center gap-4 text-center">
+              <ShieldCheck size={32} className="text-slate-300" />
+              <p className="text-[14px] font-bold text-slate-500 uppercase tracking-widest">No missions match criteria</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
