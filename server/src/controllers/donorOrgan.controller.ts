@@ -401,6 +401,17 @@ export const signActiveRequestLegal = async (
       } catch (mailErr: any) {
         logger.error(`Failed to send donor legal signature notification to hospital: ${mailErr.message}`);
       }
+
+      await notify({
+        recipientId: requestDoc.hospitalId.toString(),
+        recipientRole: 'Hospital',
+        type: 'ORGAN_LEGAL_SIGNED',
+        title: 'Donor Legal Consent Signed',
+        message: `The donor has successfully signed the legal consent deed. It is now ready for your final clearance.`,
+        priority: 'high',
+        actionUrl: `/hospital/organ-management`,
+        metadata: { requestId: requestDoc._id.toString() }
+      });
     }
 
     res.status(200).json({
