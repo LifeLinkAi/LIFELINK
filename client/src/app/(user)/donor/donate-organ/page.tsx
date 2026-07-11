@@ -151,35 +151,26 @@ export default function OrganDonation() {
 
   const fetchPatients = async (organs: string[], bloodType: string, donorUserId: string, donorProfileId: string) => {
     try {
-      const res = await api.get("/requests?type=Organ");
-      const allRequests = res.data.data || [];
+      const res = await api.get("/donor/organ/matches");
+      let compatible = res.data.data || [];
       
-      const compatible = allRequests.filter((r: any) => {
-        if (r.type !== "Organ") return false;
-        
-        // Active match-finding states
-        const activeStates = ["PENDING", "Pending", "Matching", "Awaiting Match", "PENDING_DONOR_ACCEPT", "Waitlisted", "Waitlist", "WAITLISTED", "WAITLIST", "Searching", "SEARCHING"];
-        if (!activeStates.includes(r.status)) return false;
-        
-        // Match organ type
-        if (!r.organType || !organs.includes(r.organType)) return false;
-        
-        // Match blood type
-        if (!r.bloodGroup || !isBloodCompatible(bloodType, r.bloodGroup)) return false;
-        
-        return true;
-      });
+      // Map the WaitlistPatient document fields to the UI expected fields
+      compatible = compatible.map((p: any) => ({
+        ...p,
+        id: p._id,
+        organType: p.requiredOrgan,
+        patientName: p.fullName,
+        facility: p.hospitalId?.name,
+        contactPhone: p.contact,
+        hospitalPhone: p.hospitalId?.contact,
+        registeredDate: p.createdAt,
+      }));
 
       setPatients(compatible);
 
-      // Track requests where this donor has already sent interest
-      const interestSentIds = compatible
-        .filter((r: any) => 
-          r.targetDonorId === donorUserId || 
-          (r.matchedDonors && r.matchedDonors.some((m: any) => m.donorId === donorProfileId || m.donorId === donorUserId || m.status === "ACCEPTED"))
-        )
-        .map((r: any) => r.id || r._id);
-      setInterestedRequestIds(interestSentIds);
+      // We can reset interested request IDs or fetch them from another endpoint if needed.
+      // For now, we rely on the optimistic update when they click "Share Interest".
+      setInterestedRequestIds([]);
     } catch (err) {
       console.error("Error fetching compatible patients:", err);
     } finally {
@@ -2333,6 +2324,12 @@ export default function OrganDonation() {
                               }`}>
                                 {patient.urgency} Urgency
                               </span>
+                              {patient.matchScore !== undefined && (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 font-bold px-2.5 py-0.5 rounded font-label-caps uppercase flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px]">analytics</span>
+                                  Match Score: {Math.round(patient.matchScore)}
+                                </span>
+                              )}
                             </div>
                             <h4 className="text-base font-bold text-gray-900">
                               Recipient: {patient.patientName || "Unknown"} ({patient.gender || "Unknown"}, {patient.age || 0} yrs)
